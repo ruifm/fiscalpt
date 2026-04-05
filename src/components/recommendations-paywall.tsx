@@ -72,6 +72,7 @@ export function RecommendationsPaywall({
   }>({ checking: false, result: null, error: null })
   const [showDiscountInput, setShowDiscountInput] = useState(false)
   const discountInputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const analysisId = `${results[0]?.year}-${Date.now()}`
 
@@ -79,6 +80,10 @@ export function RecommendationsPaywall({
     if (checkoutSessionId) {
       window.history.replaceState({}, '', window.location.pathname + window.location.hash)
       handlePaymentComplete(checkoutSessionId)
+      // Scroll to this section so user sees the loading/results
+      requestAnimationFrame(() => {
+        containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -176,56 +181,66 @@ export function RecommendationsPaywall({
   if (totalSavings <= 0) return null
 
   if (recommendations) {
-    return <RecommendationsDisplay reports={recommendations} chatSlot={chatSlot} />
+    return (
+      <div ref={containerRef}>
+        <RecommendationsDisplay reports={recommendations} chatSlot={chatSlot} />
+      </div>
+    )
   }
 
   if (loading) {
     return (
-      <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="flex items-center justify-center gap-3 py-12">
-          <div
-            className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
-            aria-hidden="true"
-          />
-          <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-            A gerar as suas recomendações...
-          </p>
-        </CardContent>
-      </Card>
+      <div ref={containerRef}>
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex items-center justify-center gap-3 py-12">
+            <div
+              className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
+              aria-hidden="true"
+            />
+            <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
+              A gerar as suas recomendações...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="py-6 text-center">
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-          <Button variant="outline" size="sm" className="mt-3" onClick={() => setError(null)}>
-            Tentar novamente
-          </Button>
-        </CardContent>
-      </Card>
+      <div ref={containerRef}>
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="py-6 text-center">
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => setError(null)}>
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
   if (showCheckout) {
     return (
-      <Card className="border-primary/30">
-        <CardContent className="py-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Unlock className="h-5 w-5 text-primary" aria-hidden="true" />
-              <h3 className="font-semibold">Desbloquear Recomendações</h3>
+      <div ref={containerRef}>
+        <Card className="border-primary/30">
+          <CardContent className="py-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Unlock className="h-5 w-5 text-primary" aria-hidden="true" />
+                <h3 className="font-semibold">Desbloquear Recomendações</h3>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowCheckout(false)}>
+                Cancelar
+              </Button>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setShowCheckout(false)}>
-              Cancelar
-            </Button>
-          </div>
-          <CheckoutForm analysisId={analysisId} sessionHash={sessionHash} onComplete={handlePaymentComplete} />
-        </CardContent>
-      </Card>
+            <CheckoutForm analysisId={analysisId} sessionHash={sessionHash} onComplete={handlePaymentComplete} />
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
@@ -236,11 +251,12 @@ export function RecommendationsPaywall({
     (discountStatus.result.discount_percent ?? 0) < 100
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent print:hidden">
-      <CardContent className="py-8 text-center space-y-5">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <Lock className="h-6 w-6 text-primary" aria-hidden="true" />
-        </div>
+    <div ref={containerRef}>
+      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent print:hidden">
+        <CardContent className="py-8 text-center space-y-5">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Lock className="h-6 w-6 text-primary" aria-hidden="true" />
+          </div>
 
         <div className="space-y-2">
           <h3 className="text-xl font-bold">Recomendações Personalizadas</h3>
@@ -345,6 +361,7 @@ export function RecommendationsPaywall({
         <p className="text-[10px] text-muted-foreground/70">Powered by Stripe</p>
       </CardContent>
     </Card>
+    </div>
   )
 }
 
