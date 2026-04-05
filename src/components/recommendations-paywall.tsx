@@ -48,6 +48,7 @@ interface RecommendationsPaywallProps {
   totalSavings: number
   onUnlock?: (reports: ActionableReport[]) => void
   checkoutSessionId?: string | null
+  sessionHash?: string
   chatSlot?: React.ReactNode
 }
 
@@ -56,6 +57,7 @@ export function RecommendationsPaywall({
   totalSavings,
   onUnlock,
   checkoutSessionId,
+  sessionHash,
   chatSlot,
 }: RecommendationsPaywallProps) {
   const [showCheckout, setShowCheckout] = useState(false)
@@ -221,7 +223,7 @@ export function RecommendationsPaywall({
               Cancelar
             </Button>
           </div>
-          <CheckoutForm analysisId={analysisId} onComplete={handlePaymentComplete} />
+          <CheckoutForm analysisId={analysisId} sessionHash={sessionHash} onComplete={handlePaymentComplete} />
         </CardContent>
       </Card>
     )

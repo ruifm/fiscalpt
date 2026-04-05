@@ -513,6 +513,7 @@ export default function AnalyzePage() {
                   onBack={() => goToStep('questionnaire')}
                   onReset={handleClearAll}
                   checkoutSessionId={checkoutSessionId}
+                  sessionHash={sessionId}
                 />
               </div>
             )}

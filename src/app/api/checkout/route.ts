@@ -21,7 +21,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { analysisId?: string }
+    const body = (await request.json()) as { analysisId?: string; sessionHash?: string }
+    const hash = body.sessionHash ? `#s=${body.sessionHash}` : ''
 
     const session = await stripe.checkout.sessions.create({
       ui_mode: 'embedded_page',
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
       metadata: {
         analysis_id: body.analysisId ?? '',
       },
-      return_url: `${origin}/analyze?session_id={CHECKOUT_SESSION_ID}`,
+      return_url: `${origin}/analyze?session_id={CHECKOUT_SESSION_ID}${hash}`,
     })
 
     return Response.json({ clientSecret: session.client_secret })

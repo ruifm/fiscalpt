@@ -10,10 +10,11 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
 interface CheckoutFormProps {
   analysisId: string
+  sessionHash?: string
   onComplete: (sessionId: string) => void
 }
 
-export function CheckoutForm({ analysisId, onComplete }: CheckoutFormProps) {
+export function CheckoutForm({ analysisId, sessionHash, onComplete }: CheckoutFormProps) {
   const [error, setError] = useState<string | null>(null)
 
   const fetchClientSecret = useCallback(async () => {
@@ -21,7 +22,7 @@ export function CheckoutForm({ analysisId, onComplete }: CheckoutFormProps) {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analysisId }),
+        body: JSON.stringify({ analysisId, sessionHash }),
       })
 
       if (!res.ok) {
