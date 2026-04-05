@@ -1,0 +1,86 @@
+name: 🐛 Bug Report
+description: Reportar um problema com cálculos, extração de documentos ou interface
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar este problema! Quanto mais detalhes fornecer, mais rápido conseguimos resolver.
+
+        ⚠️ **Privacidade**: Nunca partilhe documentos fiscais sem anonimizar primeiro.
+        Use o script `scripts/anonymize-doc.sh` para remover dados pessoais antes de anexar ficheiros.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área afetada
+      options:
+        - Cálculo de impostos (motor fiscal)
+        - Extração de XML
+        - Extração de PDF
+        - Interface / formulários
+        - Resultados / relatório
+        - Outro
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição do problema
+      description: O que aconteceu? O que esperava que acontecesse?
+      placeholder: |
+        O cálculo mostra uma taxa efetiva de 15% mas a liquidação da AT mostra 12%.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      description: Como podemos reproduzir o problema?
+      placeholder: |
+        1. Upload do XML Modelo 3 de 2024
+        2. Selecionar tributação conjunta
+        3. Ver resultados — taxa efetiva incorreta
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Valores esperados vs obtidos
+      description: Se é um problema de cálculo, indique os valores da AT (liquidação) e os do FiscalPT.
+      placeholder: |
+        AT (liquidação): Coleta líquida = €2,345.67, Taxa efetiva = 12.5%
+        FiscalPT: Coleta líquida = €2,890.00, Taxa efetiva = 15.3%
+
+  - type: textarea
+    id: documents
+    attributes:
+      label: Documentos anonimizados
+      description: |
+        Anexe ficheiros XML/PDF **anonimizados** com `scripts/anonymize-doc.sh`.
+        Isto remove NIF, nomes, moradas e IBAN, mantendo os valores fiscais intactos.
+
+  - type: dropdown
+    id: year
+    attributes:
+      label: Ano fiscal
+      options:
+        - "2025"
+        - "2024"
+        - "2023"
+        - "2022"
+        - "2021"
+        - Outro / vários
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Edge
+        - Outro

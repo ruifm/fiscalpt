@@ -1,0 +1,31 @@
+name: 💡 Feature Request
+description: Sugerir uma funcionalidade ou melhoria
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema ou necessidade
+      description: Que problema esta funcionalidade resolve?
+      placeholder: Gostaria de poder comparar o IRS de 3 anos lado a lado...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solução proposta
+      description: Como imagina esta funcionalidade?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Motor fiscal (novos cálculos)
+        - Extração de documentos
+        - Interface / UX
+        - Relatórios / exportação
+        - Conteúdo (guias, blog)
+        - Outro

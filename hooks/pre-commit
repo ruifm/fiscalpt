@@ -1,0 +1,5 @@
+#!/bin/sh
+# Pre-commit hook: runs all quality checks before allowing a commit.
+# Install: just install-hooks
+
+exec npm run check

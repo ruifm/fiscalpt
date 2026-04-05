@@ -1,0 +1,72 @@
+name: 🔢 Divergência de Cálculo
+description: Os valores do FiscalPT não correspondem à liquidação da AT
+title: "[Cálculo]: "
+labels: ["bug", "calculation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Este template é para quando os cálculos do FiscalPT não correspondem aos da
+        Autoridade Tributária. Estes reports são prioritários — o motor deve ser exato.
+
+        ⚠️ **Anonimize os seus documentos** antes de os anexar com `scripts/anonymize-doc.sh`.
+
+  - type: input
+    id: year
+    attributes:
+      label: Ano fiscal
+      placeholder: "2024"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: filing
+    attributes:
+      label: Tipo de tributação
+      options:
+        - Individual (solteiro/a)
+        - Conjunta (casados)
+        - Separada (casados, cada um por si)
+    validations:
+      required: true
+
+  - type: textarea
+    id: at_values
+    attributes:
+      label: Valores da AT (liquidação)
+      description: Copie os valores principais da sua demonstração de liquidação.
+      placeholder: |
+        Rendimento bruto: €25,000.00
+        Coleta total: €3,456.78
+        Deduções à coleta: €1,234.56
+        Coleta líquida: €2,222.22
+        Taxa efetiva: 8.89%
+    validations:
+      required: true
+
+  - type: textarea
+    id: fiscalpt_values
+    attributes:
+      label: Valores do FiscalPT
+      description: Copie os valores correspondentes da análise do FiscalPT.
+      placeholder: |
+        Coleta líquida: €2,345.00
+        Taxa efetiva: 9.38%
+    validations:
+      required: true
+
+  - type: textarea
+    id: documents
+    attributes:
+      label: Documentos anonimizados
+      description: |
+        Anexe o XML Modelo 3 e/ou a liquidação PDF **após anonimizar** com:
+        ```bash
+        ./scripts/anonymize-doc.sh meu-modelo3.xml
+        ```
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notas adicionais
+      description: Algum contexto extra? IRS Jovem, NHR, regime simplificado, etc.

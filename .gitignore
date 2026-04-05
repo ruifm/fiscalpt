@@ -1,0 +1,42 @@
+# dependencies
+/node_modules
+
+# testing
+/coverage
+/test-results/
+/playwright-report/
+
+# next.js
+/.next/
+/out/
+
+# env files
+.env*
+!.env.local.example
+.env.sentry-build-plugin
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store
+
+# debug logs
+npm-debug.log*
+
+# analytics data (local only)
+/data/
+
+# internal docs and marketing (not for public repo)
+/internal/
+
+# copilot session state
+.copilot/
+
+# AI context files (contain local paths and dev preferences)
+AGENTS.md
+CLAUDE.md
