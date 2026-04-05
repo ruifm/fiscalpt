@@ -16,7 +16,6 @@ import {
   Shield,
   ClipboardPaste,
   Receipt,
-  LogIn,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -525,31 +524,32 @@ function DeductionSlotCard({
         {parsed && (
           <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" aria-hidden="true" />
         )}
-        <a
-          href={atUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline"
-        >
-          {t('upload.openPortal')}
-          <ExternalLink className="h-3 w-3" aria-hidden="true" />
-        </a>
       </div>
 
-      {!parsed && !hasError && showLoginHint && (
-        <div className="flex items-start gap-1.5 rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
-          <LogIn className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span>
-            {t('upload.selectYearHintPrefix')} <strong>{slot.year}</strong>{' '}
-            {t('upload.selectYearHintSuffix')}
-            {slot.hasLiquidacao && (
-              <>
-                {' '}
-                <em>{t('upload.loginHintLiqOptional')}</em>
-              </>
-            )}
+      {!parsed && (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <a
+            href={atUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <span className="text-base" aria-hidden="true">①</span>
+            {t('upload.openPortalStep')}
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          </a>
+          <span className="hidden sm:flex items-center text-muted-foreground" aria-hidden="true">→</span>
+          <span className="text-xs text-muted-foreground sm:flex-1">
+            <span className="text-base mr-1" aria-hidden="true">②</span>
+            {t('upload.copyPasteStep')}
           </span>
         </div>
+      )}
+
+      {!parsed && !hasError && showLoginHint && slot.hasLiquidacao && (
+        <p className="text-xs italic text-muted-foreground">
+          {t('upload.loginHintLiqOptional')}
+        </p>
       )}
 
       {!parsed && !hasError && !showLoginHint && slot.hasLiquidacao && (

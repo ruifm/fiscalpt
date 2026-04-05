@@ -316,6 +316,8 @@ const pt: Dictionary = {
     unknownYear: 'Ano desconhecido',
     howToGet: 'Como obter este ficheiro?',
     openPortal: 'Abrir no Portal',
+    openPortalStep: 'Abrir Portal das Finanças',
+    copyPasteStep: 'Selecione tudo (Ctrl+A), copie (Ctrl+C) e cole abaixo (Ctrl+V)',
     selectYear: 'Selecione o ano',
     pasteHere: 'Cole aqui o conteúdo da página do Portal das Finanças (Ctrl+V)…',
     pasteDeductionsFor: 'Colar deduções para NIF {nif}, ano {year}',

@@ -332,6 +332,20 @@ export function HouseholdQuestionnaire({
         </TooltipProvider>
       </div>
 
+      {/* Projection section — front and center */}
+      {projectionYear && (
+        <ProjectionSection
+          household={household}
+          projectionYear={projectionYear}
+          enabled={projectionEnabled}
+          onToggle={setProjectionEnabled}
+          incomes={projectedIncomes}
+          onIncomeChange={(key, value) =>
+            setProjectedIncomes((prev) => ({ ...prev, [key]: value }))
+          }
+        />
+      )}
+
       {/* Sections */}
       <Accordion multiple defaultValue={defaultOpenSections}>
         {sections.map((group) => {
@@ -373,20 +387,6 @@ export function HouseholdQuestionnaire({
           )
         })}
       </Accordion>
-
-      {/* Projection section */}
-      {projectionYear && (
-        <ProjectionSection
-          household={household}
-          projectionYear={projectionYear}
-          enabled={projectionEnabled}
-          onToggle={setProjectionEnabled}
-          incomes={projectedIncomes}
-          onIncomeChange={(key, value) =>
-            setProjectedIncomes((prev) => ({ ...prev, [key]: value }))
-          }
-        />
-      )}
 
       {/* Skip warning */}
       {showSkipWarning && (
