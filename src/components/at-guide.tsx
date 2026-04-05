@@ -77,9 +77,7 @@ export function ATGuide({
           <li key={step.screenshot} className="space-y-1.5">
             <div className="flex items-start gap-2">
               <StepNumber n={i + 1} />
-              <p className="pt-0.5 text-xs leading-relaxed text-muted-foreground">
-                {step.caption}
-              </p>
+              <p className="pt-0.5 text-xs leading-relaxed text-muted-foreground">{step.caption}</p>
             </div>
             <div className="pl-7">
               <StepImage step={step} onClick={() => setZoomedIndex(i)} />

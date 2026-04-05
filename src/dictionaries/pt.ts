@@ -391,8 +391,7 @@ const pt: Dictionary = {
     liquidacaoInstructions:
       '1. Aceda a irs.portaldasfinancas.gov.pt e autentique-se\n2. Vá a IRS → Consultar Declaração\n3. Selecione o ano e clique em "Pesquisar"\n4. Clique em "Ver Detalhe" na declaração pretendida\n5. Clique no ícone de download junto ao Número de Liquidação\n6. Carregue o ficheiro aqui',
     guideSteps: {
-      login:
-        'Aceda ao Portal das Finanças e autentique-se com o seu NIF e senha.',
+      login: 'Aceda ao Portal das Finanças e autentique-se com o seu NIF e senha.',
       multiAuth:
         'Escolha o método de autenticação (senha, Chave Móvel Digital, ou Cartão de Cidadão).',
       xmlEntregarDeclaracao:

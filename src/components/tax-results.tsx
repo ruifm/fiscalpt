@@ -60,7 +60,13 @@ function personRefund(p: PersonTaxDetail): number {
   return p.withholding_total - personTotalIrs(p)
 }
 
-export function TaxResults({ results, onBack, onReset, checkoutSessionId, sessionHash }: TaxResultsProps) {
+export function TaxResults({
+  results,
+  onBack,
+  onReset,
+  checkoutSessionId,
+  sessionHash,
+}: TaxResultsProps) {
   const t = useT()
   const amendableYears = new Set(getAmendableYears())
   const projectedYears = new Set(results.filter((r) => r.household.projected).map((r) => r.year))

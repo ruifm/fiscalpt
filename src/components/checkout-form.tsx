@@ -39,7 +39,7 @@ export function CheckoutForm({ analysisId, sessionHash, onComplete }: CheckoutFo
       setError(msg)
       throw err
     }
-  }, [analysisId])
+  }, [analysisId, sessionHash])
 
   if (!stripePromise) {
     return (

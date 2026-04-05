@@ -10,9 +10,7 @@ export default function NotFound() {
       <h1 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">
         Página não encontrada
       </h1>
-      <p className="mt-2 text-muted-foreground">
-        A página que procura não existe ou foi movida.
-      </p>
+      <p className="mt-2 text-muted-foreground">A página que procura não existe ou foi movida.</p>
       <div className="mt-8 flex gap-3">
         <Link
           href="/"

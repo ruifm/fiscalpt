@@ -36,11 +36,7 @@ function DialogDescription({ className, ...props }: DialogPrimitive.Description.
   )
 }
 
-function DialogContent({
-  className,
-  children,
-  ...props
-}: DialogPrimitive.Popup.Props) {
+function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.Props) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />

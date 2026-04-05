@@ -237,7 +237,11 @@ export function RecommendationsPaywall({
                 Cancelar
               </Button>
             </div>
-            <CheckoutForm analysisId={analysisId} sessionHash={sessionHash} onComplete={handlePaymentComplete} />
+            <CheckoutForm
+              analysisId={analysisId}
+              sessionHash={sessionHash}
+              onComplete={handlePaymentComplete}
+            />
           </CardContent>
         </Card>
       </div>
@@ -258,109 +262,109 @@ export function RecommendationsPaywall({
             <Lock className="h-6 w-6 text-primary" aria-hidden="true" />
           </div>
 
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold">Recomendações Personalizadas</h3>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Identificámos{' '}
-            <span className="font-semibold text-foreground">
-              {optimizationCount} {optimizationCount === 1 ? 'otimização' : 'otimizações'}
-            </span>{' '}
-            para o seu agregado. Desbloqueie o guia passo-a-passo para implementar cada uma.
-          </p>
-        </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold">Recomendações Personalizadas</h3>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Identificámos{' '}
+              <span className="font-semibold text-foreground">
+                {optimizationCount} {optimizationCount === 1 ? 'otimização' : 'otimizações'}
+              </span>{' '}
+              para o seu agregado. Desbloqueie o guia passo-a-passo para implementar cada uma.
+            </p>
+          </div>
 
-        <ul className="text-sm text-muted-foreground space-y-1.5 max-w-xs mx-auto text-left">
-          <li className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
-            Instruções passo-a-passo no Portal das Finanças
-          </li>
-          <li className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
-            Impacto estimado de cada alteração
-          </li>
-          <li className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
-            Links diretos para os formulários relevantes
-          </li>
-          <li className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
-            Consultor fiscal AI para tirar dúvidas
-          </li>
-        </ul>
+          <ul className="text-sm text-muted-foreground space-y-1.5 max-w-xs mx-auto text-left">
+            <li className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
+              Instruções passo-a-passo no Portal das Finanças
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
+              Impacto estimado de cada alteração
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
+              Links diretos para os formulários relevantes
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
+              Consultor fiscal AI para tirar dúvidas
+            </li>
+          </ul>
 
-        <Button size="lg" className="gap-2" onClick={() => setShowCheckout(true)}>
-          <Sparkles className="h-4 w-4" aria-hidden="true" />
-          {hasValidPartialDiscount
-            ? `Desbloquear com desconto de ${discountStatus.result!.discount_percent}%`
-            : 'Desbloquear por €9,99'}
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Button>
+          <Button size="lg" className="gap-2" onClick={() => setShowCheckout(true)}>
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            {hasValidPartialDiscount
+              ? `Desbloquear com desconto de ${discountStatus.result!.discount_percent}%`
+              : 'Desbloquear por €9,99'}
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Button>
 
-        {/* Discount code */}
-        <div className="space-y-2">
-          {!showDiscountInput ? (
-            <button
-              type="button"
-              onClick={() => setShowDiscountInput(true)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
-            >
-              <Tag className="inline h-3 w-3 mr-1" aria-hidden="true" />
-              Tem um código de desconto?
-            </button>
-          ) : (
-            <div className="flex items-center justify-center gap-2 max-w-xs mx-auto">
-              <label htmlFor="discount-code" className="sr-only">
-                Código de desconto
-              </label>
-              <input
-                ref={discountInputRef}
-                id="discount-code"
-                type="text"
-                value={discountCode}
-                onChange={(e) => {
-                  setDiscountCode(e.target.value)
-                  setDiscountStatus({ checking: false, result: null, error: null })
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') validateDiscount()
-                }}
-                placeholder="Código de desconto"
-                className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary/50"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={validateDiscount}
-                disabled={discountStatus.checking || !discountCode.trim()}
+          {/* Discount code */}
+          <div className="space-y-2">
+            {!showDiscountInput ? (
+              <button
+                type="button"
+                onClick={() => setShowDiscountInput(true)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
               >
-                {discountStatus.checking ? '...' : 'Aplicar'}
-              </Button>
-            </div>
-          )}
+                <Tag className="inline h-3 w-3 mr-1" aria-hidden="true" />
+                Tem um código de desconto?
+              </button>
+            ) : (
+              <div className="flex items-center justify-center gap-2 max-w-xs mx-auto">
+                <label htmlFor="discount-code" className="sr-only">
+                  Código de desconto
+                </label>
+                <input
+                  ref={discountInputRef}
+                  id="discount-code"
+                  type="text"
+                  value={discountCode}
+                  onChange={(e) => {
+                    setDiscountCode(e.target.value)
+                    setDiscountStatus({ checking: false, result: null, error: null })
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') validateDiscount()
+                  }}
+                  placeholder="Código de desconto"
+                  className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary/50"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={validateDiscount}
+                  disabled={discountStatus.checking || !discountCode.trim()}
+                >
+                  {discountStatus.checking ? '...' : 'Aplicar'}
+                </Button>
+              </div>
+            )}
 
-          {discountStatus.error && (
-            <p className="text-xs text-destructive" role="alert">
-              {discountStatus.error}
-            </p>
-          )}
-          {discountStatus.result && !discountStatus.result.valid && (
-            <p className="text-xs text-destructive" role="alert">
-              {discountStatus.result.message}
-            </p>
-          )}
-          {hasValidPartialDiscount && (
-            <p className="text-xs text-emerald-600 dark:text-emerald-400" role="status">
-              ✓ {discountStatus.result!.message}
-            </p>
-          )}
-        </div>
+            {discountStatus.error && (
+              <p className="text-xs text-destructive" role="alert">
+                {discountStatus.error}
+              </p>
+            )}
+            {discountStatus.result && !discountStatus.result.valid && (
+              <p className="text-xs text-destructive" role="alert">
+                {discountStatus.result.message}
+              </p>
+            )}
+            {hasValidPartialDiscount && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400" role="status">
+                ✓ {discountStatus.result!.message}
+              </p>
+            )}
+          </div>
 
-        <p className="text-xs text-muted-foreground">
-          Pagamento único · Sem subscrição · Reembolso garantido se insatisfeito
-        </p>
-        <p className="text-[10px] text-muted-foreground/70">Powered by Stripe</p>
-      </CardContent>
-    </Card>
+          <p className="text-xs text-muted-foreground">
+            Pagamento único · Sem subscrição · Reembolso garantido se insatisfeito
+          </p>
+          <p className="text-[10px] text-muted-foreground/70">Powered by Stripe</p>
+        </CardContent>
+      </Card>
     </div>
   )
 }

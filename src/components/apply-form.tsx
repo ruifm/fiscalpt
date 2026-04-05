@@ -81,9 +81,7 @@ export function ApplyForm({ roleTitle }: ApplyFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
-      >
+      <DialogTrigger className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors">
         <Send className="h-4 w-4" aria-hidden="true" />
         Candidatar-me
       </DialogTrigger>
@@ -196,8 +194,7 @@ export function ApplyForm({ roleTitle }: ApplyFormProps) {
                 <Button type="submit" disabled={state === 'submitting'} className="gap-1.5">
                   {state === 'submitting' ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                      A enviar...
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />A enviar...
                     </>
                   ) : (
                     <>

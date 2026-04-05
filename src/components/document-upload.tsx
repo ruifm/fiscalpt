@@ -479,7 +479,6 @@ function HelpToggle({ children }: { children: React.ReactNode }) {
   )
 }
 
-
 function DeductionSlotCard({
   slot,
   entry,
@@ -534,22 +533,26 @@ function DeductionSlotCard({
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <span className="text-base" aria-hidden="true">①</span>
+            <span className="text-base" aria-hidden="true">
+              ①
+            </span>
             {t('upload.openPortalStep')}
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
           </a>
-          <span className="hidden sm:flex items-center text-muted-foreground" aria-hidden="true">→</span>
+          <span className="hidden sm:flex items-center text-muted-foreground" aria-hidden="true">
+            →
+          </span>
           <span className="text-xs text-muted-foreground sm:flex-1">
-            <span className="text-base mr-1" aria-hidden="true">②</span>
+            <span className="text-base mr-1" aria-hidden="true">
+              ②
+            </span>
             {t('upload.copyPasteStep')}
           </span>
         </div>
       )}
 
       {!parsed && !hasError && showLoginHint && slot.hasLiquidacao && (
-        <p className="text-xs italic text-muted-foreground">
-          {t('upload.loginHintLiqOptional')}
-        </p>
+        <p className="text-xs italic text-muted-foreground">{t('upload.loginHintLiqOptional')}</p>
       )}
 
       {!parsed && !hasError && !showLoginHint && slot.hasLiquidacao && (
