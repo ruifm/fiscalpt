@@ -77,6 +77,13 @@ export default function AnalyzePage() {
     return match?.[1] ?? generateSessionId()
   })
 
+  // Capture Stripe checkout session_id before replaceState strips it
+  const [checkoutSessionId] = useState(() => {
+    if (typeof window === 'undefined') return null
+    const params = new URLSearchParams(window.location.search)
+    return params.get('session_id')
+  })
+
   // Primary household = most recent year (first in sorted-descending array)
   const primaryHousehold = households[0] ?? null
 
@@ -505,6 +512,7 @@ export default function AnalyzePage() {
                   results={results}
                   onBack={() => goToStep('questionnaire')}
                   onReset={handleClearAll}
+                  checkoutSessionId={checkoutSessionId}
                 />
               </div>
             )}

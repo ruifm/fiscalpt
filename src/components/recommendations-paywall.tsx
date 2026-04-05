@@ -47,6 +47,7 @@ interface RecommendationsPaywallProps {
   results: AnalysisResult[]
   totalSavings: number
   onUnlock?: (reports: ActionableReport[]) => void
+  checkoutSessionId?: string | null
   chatSlot?: React.ReactNode
 }
 
@@ -54,6 +55,7 @@ export function RecommendationsPaywall({
   results,
   totalSavings,
   onUnlock,
+  checkoutSessionId,
   chatSlot,
 }: RecommendationsPaywallProps) {
   const [showCheckout, setShowCheckout] = useState(false)
@@ -72,11 +74,9 @@ export function RecommendationsPaywall({
   const analysisId = `${results[0]?.year}-${Date.now()}`
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const sessionId = params.get('session_id')
-    if (sessionId) {
-      window.history.replaceState({}, '', window.location.pathname)
-      handlePaymentComplete(sessionId)
+    if (checkoutSessionId) {
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+      handlePaymentComplete(checkoutSessionId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

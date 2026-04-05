@@ -51,6 +51,7 @@ interface TaxResultsProps {
   results: AnalysisResult[]
   onBack: () => void
   onReset: () => void
+  checkoutSessionId?: string | null
 }
 
 // Refund for a single person
@@ -58,7 +59,7 @@ function personRefund(p: PersonTaxDetail): number {
   return p.withholding_total - personTotalIrs(p)
 }
 
-export function TaxResults({ results, onBack, onReset }: TaxResultsProps) {
+export function TaxResults({ results, onBack, onReset, checkoutSessionId }: TaxResultsProps) {
   const t = useT()
   const amendableYears = new Set(getAmendableYears())
   const projectedYears = new Set(results.filter((r) => r.household.projected).map((r) => r.year))
@@ -245,6 +246,7 @@ export function TaxResults({ results, onBack, onReset }: TaxResultsProps) {
           results={results}
           totalSavings={totalSavings}
           onUnlock={setUnlockedReports}
+          checkoutSessionId={checkoutSessionId}
           chatSlot={unlockedReports ? <TaxChat results={results} /> : undefined}
         />
       </div>
