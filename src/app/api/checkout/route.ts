@@ -21,10 +21,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { analysisId?: string; sessionHash?: string }
+    const body = (await request.json()) as {
+      analysisId?: string
+      sessionHash?: string
+      promotionCodeId?: string
+    }
     const hash = body.sessionHash ? `#s=${body.sessionHash}` : ''
 
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
       ui_mode: 'embedded_page',
       mode: 'payment',
       line_items: [
@@ -33,12 +37,20 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      allow_promotion_codes: true,
       metadata: {
         analysis_id: body.analysisId ?? '',
       },
       return_url: `${origin}/analyze?session_id={CHECKOUT_SESSION_ID}${hash}`,
-    })
+    }
+
+    // Pre-apply validated promo code, otherwise let user enter one in Stripe UI
+    if (body.promotionCodeId) {
+      sessionParams.discounts = [{ promotion_code: body.promotionCodeId }]
+    } else {
+      sessionParams.allow_promotion_codes = true
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams)
 
     return Response.json({ clientSecret: session.client_secret })
   } catch (err) {

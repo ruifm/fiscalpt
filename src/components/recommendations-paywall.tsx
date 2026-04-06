@@ -142,6 +142,11 @@ export function RecommendationsPaywall({
       }
 
       setDiscountStatus({ checking: false, result: data, error: null })
+
+      // Auto-open checkout when a 100% discount is validated
+      if (data.valid && data.discount_percent === 100) {
+        setShowCheckout(true)
+      }
     } catch {
       setDiscountStatus({ checking: false, result: null, error: 'Erro ao validar código' })
     }
@@ -209,6 +214,7 @@ export function RecommendationsPaywall({
             <CheckoutForm
               analysisId={analysisId}
               sessionHash={sessionHash}
+              promotionCodeId={discountStatus.result?.promotion_code_id}
               onComplete={handlePaymentComplete}
             />
           </CardContent>
@@ -217,11 +223,18 @@ export function RecommendationsPaywall({
     )
   }
 
+  const hasValidDiscount = discountStatus.result?.valid && discountStatus.result.type === 'stripe'
+  const discountPercent = discountStatus.result?.discount_percent ?? 0
+  const hasValidPartialDiscount = hasValidDiscount && discountPercent > 0 && discountPercent < 100
+  const hasFullDiscount = hasValidDiscount && discountPercent === 100
+
   const optimizationCount = results.reduce((sum, r) => sum + r.optimizations.length, 0)
-  const hasValidPartialDiscount =
-    discountStatus.result?.valid &&
-    discountStatus.result.type === 'stripe' &&
-    (discountStatus.result.discount_percent ?? 0) < 100
+
+  const buttonLabel = hasFullDiscount
+    ? 'Desbloquear gratuitamente'
+    : hasValidPartialDiscount
+      ? `Desbloquear com desconto de ${discountPercent}%`
+      : 'Desbloquear por €9,99'
 
   return (
     <div ref={containerRef}>
@@ -263,9 +276,7 @@ export function RecommendationsPaywall({
 
           <Button size="lg" className="gap-2" onClick={() => setShowCheckout(true)}>
             <Sparkles className="h-4 w-4" aria-hidden="true" />
-            {hasValidPartialDiscount
-              ? `Desbloquear com desconto de ${discountStatus.result!.discount_percent}%`
-              : 'Desbloquear por €9,99'}
+            {buttonLabel}
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Button>
 
@@ -321,8 +332,12 @@ export function RecommendationsPaywall({
                 {discountStatus.result.message}
               </p>
             )}
-            {hasValidPartialDiscount && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400" role="status">
+            {(hasValidPartialDiscount || hasFullDiscount) && (
+              <p
+                className="text-xs text-emerald-600 dark:text-emerald-400"
+                role="status"
+                data-testid="discount-message"
+              >
                 ✓ {discountStatus.result!.message}
               </p>
             )}
