@@ -102,11 +102,6 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
     return n >= MIN_BIRTH_YEAR && n <= currentYear ? null : 'Ano de nascimento inválido'
   }
 
-  const validateAtLeastOne = (value: string | number | boolean): string | null => {
-    const n = toNumber(value)
-    return n >= 1 ? null : 'Deve ser pelo menos 1'
-  }
-
   // ── Taxpayer birth years ─────────────────────────────────
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
@@ -221,7 +216,7 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
       const income = member.incomes[j]
       if (income.category !== 'F') continue
 
-      const hasRentalDuration = !!income.rental_contract_duration
+      const hasRentalDuration = income.rental_contract_duration !== undefined
       questions.push({
         id: `member.${i}.income.${j}.rental_duration`,
         section: 'income_options',
@@ -239,7 +234,10 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
         priority: hasRentalDuration ? 'optional' : 'important',
         path: `members.${i}.incomes.${j}.rental_contract_duration`,
         currentValue: hasRentalDuration ? String(income.rental_contract_duration) : undefined,
-        validate: validateAtLeastOne,
+        validate: (v: string | number | boolean): string | null => {
+          const n = toNumber(v)
+          return n >= 0 ? null : 'Valor inválido'
+        },
       })
     }
   }
@@ -248,6 +246,11 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
     if (!hasSpecialRegime(member, 'irs_jovem')) continue
+
+    // If member is > 35 and benefit year is unconfirmed, skip the benefit year
+    // question here — the proactive verification section below will ask for
+    // first_work_year/degree_year to verify eligibility instead.
+    if (member.birth_year && year - member.birth_year > 35 && !member.irs_jovem_year) continue
 
     const hasIrsJovemYear = !!member.irs_jovem_year
     const regime = getIrsJovemRegime(year)
@@ -320,16 +323,23 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
     }
   }
 
-  // ── IRS Jovem proactive detection ───────────────────────
-  // For members ≤35 without IRS Jovem who have Cat A/B income,
-  // ask about work/degree history to detect eligibility.
+  // ── IRS Jovem proactive detection / verification ────────
+  // For members without IRS Jovem who have Cat A/B income: probe eligibility.
+  // Also handles members with unconfirmed irs_jovem from XML (code 417)
+  // who are > 35 — they need work year verification before we ask benefit year.
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
-    if (hasSpecialRegime(member, 'irs_jovem')) continue
+    // Skip if IRS Jovem is fully confirmed (has benefit year set)
+    if (hasSpecialRegime(member, 'irs_jovem') && member.irs_jovem_year) continue
     if (!member.birth_year) continue
 
     const age = year - member.birth_year
-    if (age > 35) continue
+    const hasUnconfirmedIrsJovem = hasSpecialRegime(member, 'irs_jovem') && !member.irs_jovem_year
+    // New applicants: must be ≤ 35 at start of benefit
+    // Unconfirmed XML: could have started at ≤ 35, benefit up to 10 years → max age 44
+    const regime = getIrsJovemRegime(year)
+    const maxAge = hasUnconfirmedIrsJovem ? 35 + (regime?.maxBenefitYears ?? 10) - 1 : 35
+    if (age > maxAge) continue
 
     const hasCatAOrB = member.incomes.some((inc) => inc.category === 'A' || inc.category === 'B')
     if (!hasCatAOrB) continue
@@ -340,11 +350,12 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
         id: `member.${i}.first_work_year`,
         section: 'irs_jovem',
         label: `Em que ano ${member.name} começou a trabalhar em Portugal?`,
-        reason:
-          'A partir de 2025, o IRS Jovem aplica-se aos primeiros 10 anos de trabalho ' +
-          '(sem exigência de grau académico). Se elegível, pode isentar 25%-50% do rendimento.',
+        reason: hasUnconfirmedIrsJovem
+          ? 'IRS Jovem detetado na declaração. Indique o ano de início de atividade para verificar elegibilidade.'
+          : 'A partir de 2025, o IRS Jovem aplica-se aos primeiros 10 anos de trabalho ' +
+            '(sem exigência de grau académico). Se elegível, pode isentar 25%-50% do rendimento.',
         type: 'year',
-        priority: 'important',
+        priority: hasUnconfirmedIrsJovem ? 'critical' : 'important',
         path: `members.${i}.first_work_year`,
         validate: (value: string | number | boolean): string | null => {
           const n = toNumber(value)
@@ -357,11 +368,12 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
         id: `member.${i}.degree_year`,
         section: 'irs_jovem',
         label: `Em que ano ${member.name} concluiu o grau de ensino mais elevado?`,
-        reason:
-          'Até 2024, o IRS Jovem (Art. 12-F) aplica-se nos 5 anos após conclusão do ' +
-          'ensino superior. Se elegível, pode isentar 25%-100% do rendimento.',
+        reason: hasUnconfirmedIrsJovem
+          ? 'IRS Jovem detetado na declaração. Indique o ano de conclusão do grau para verificar elegibilidade.'
+          : 'Até 2024, o IRS Jovem (Art. 12-F) aplica-se nos 5 anos após conclusão do ' +
+            'ensino superior. Se elegível, pode isentar 25%-100% do rendimento.',
         type: 'year',
-        priority: 'important',
+        priority: hasUnconfirmedIrsJovem ? 'critical' : 'important',
         path: `members.${i}.degree_year`,
         validate: (value: string | number | boolean): string | null => {
           const n = toNumber(value)
@@ -472,9 +484,7 @@ export function applyAnswers(
       if (!member?.incomes[iIdx]) continue
 
       if (field === 'cat_b_activity_year') {
-        const n = toNumber(value)
-        // 0 means "3rd year or more" → no reduction, clear the field
-        member.incomes[iIdx].cat_b_activity_year = n > 0 ? n : undefined
+        member.incomes[iIdx].cat_b_activity_year = toNumber(value)
       } else if (field === 'rental_duration' || field === 'rental_contract_duration') {
         member.incomes[iIdx].rental_contract_duration = toNumber(value)
       } else if (field === 'englobamento') {

@@ -738,8 +738,8 @@ describe('applyAnswers', () => {
     })
     expect(result.members[0].birth_year).toBe(1995)
     expect(result.members[0].irs_jovem_year).toBe(2)
-    // value '0' means "3rd year or more, no reduction" → clears to undefined
-    expect(result.members[0].incomes[0].cat_b_activity_year).toBeUndefined()
+    // value '0' means "3rd year or more, no reduction" → preserved as 0
+    expect(result.members[0].incomes[0].cat_b_activity_year).toBe(0)
     expect(result.dependents[0].birth_year).toBe(2023)
   })
 
@@ -1105,9 +1105,8 @@ describe('question validators', () => {
       expect(getRentalDurationQuestion().validate!('10')).toBeNull()
     })
 
-    it('rejects value < 1', () => {
-      expect(getRentalDurationQuestion().validate!(0)).toBe('Deve ser pelo menos 1')
-      expect(getRentalDurationQuestion().validate!(-1)).toBe('Deve ser pelo menos 1')
+    it('accepts value 0 (no contract)', () => {
+      expect(getRentalDurationQuestion().validate!(0)).toBeNull()
     })
   })
 
@@ -1299,6 +1298,235 @@ describe('question validators', () => {
       })
       const updated = applyAnswers(h, { 'member.0.degree_year': 2015 })
       expect(updated.members[0].special_regimes).not.toContain('irs_jovem')
+    })
+  })
+
+  // Feature: Dynamic question accumulation
+  // Simulates the questionnaire flow: answering birth_year should trigger IRS Jovem questions
+  describe('dynamic question accumulation via applyAnswers → identifyMissingInputs', () => {
+    it('answering birth_year (≤35) triggers IRS Jovem first_work_year question (≥2025)', () => {
+      // Initial: no birth_year → no IRS Jovem question
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Rui',
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+            special_regimes: [],
+            // birth_year intentionally omitted (undefined from XML parser)
+          }),
+        ],
+      })
+      const initialQs = identifyMissingInputs(h)
+      expect(initialQs.find((q) => q.id === 'member.0.birth_year')).toBeDefined()
+      expect(initialQs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
+
+      // User answers birth_year = 1995 (age 30, ≤35)
+      const liveHousehold = applyAnswers(h, { 'member.0.birth_year': 1995 })
+      const liveQs = identifyMissingInputs(liveHousehold)
+
+      // Now IRS Jovem question should appear
+      expect(liveQs.find((q) => q.id === 'member.0.birth_year')).toBeUndefined() // already answered
+      expect(liveQs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
+    })
+
+    it('answering birth_year (>35) does NOT trigger IRS Jovem question', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Velho',
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const liveHousehold = applyAnswers(h, { 'member.0.birth_year': 1980 })
+      const liveQs = identifyMissingInputs(liveHousehold)
+      expect(liveQs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
+    })
+
+    it('answering birth_year (≤35) triggers degree_year question for pre-2025 years', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Ana',
+            incomes: [makeIncome({ category: 'A', gross: 20000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const initialQs = identifyMissingInputs(h)
+      expect(initialQs.find((q) => q.id === 'member.0.degree_year')).toBeUndefined()
+
+      const liveHousehold = applyAnswers(h, { 'member.0.birth_year': 1996 })
+      const liveQs = identifyMissingInputs(liveHousehold)
+      expect(liveQs.find((q) => q.id === 'member.0.degree_year')).toBeDefined()
+    })
+
+    it('accumulation preserves initial questions and adds new ones', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Rui',
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const initialQs = identifyMissingInputs(h)
+      const initialIds = new Set(initialQs.map((q) => q.id))
+
+      // Apply birth_year answer
+      const liveHousehold = applyAnswers(h, { 'member.0.birth_year': 1995 })
+      const liveQs = identifyMissingInputs(liveHousehold)
+      const liveIds = new Set(liveQs.map((q) => q.id))
+
+      // Union: all initial IDs + any new live IDs should be present
+      const unionIds = new Set([...initialIds, ...liveIds])
+      expect(unionIds.has('member.0.birth_year')).toBe(true) // from initial
+      expect(unionIds.has('member.0.first_work_year')).toBe(true) // from live (new)
+    })
+  })
+
+  // Bug fix: IRS Jovem benefit year NOT asked when member is > 35 and unconfirmed
+  describe('IRS Jovem age-based verification', () => {
+    it('does not ask benefit year for member > 35 with unconfirmed irs_jovem', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Micha',
+            birth_year: 1989, // age 36
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+            special_regimes: ['irs_jovem'], // from XML code 417
+            // irs_jovem_year intentionally NOT set
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      // Should NOT ask irs_jovem_year (unconfirmed, age > 35)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeUndefined()
+      // Should ask first_work_year to verify eligibility instead
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
+    })
+
+    it('asks benefit year for member ≤ 35 with irs_jovem from XML', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'João',
+            birth_year: 1995, // age 30
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+            special_regimes: ['irs_jovem'],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeDefined()
+    })
+
+    it('asks benefit year for member > 35 with CONFIRMED irs_jovem_year', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Micha',
+            birth_year: 1989, // age 36
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_year: 2, // confirmed: started at 35, now year 2
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      // Should ask (optional, already answered) since benefit year is confirmed
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeDefined()
+    })
+
+    it('asks first_work_year for member with unconfirmed XML irs_jovem and age ≤ 44', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Pedro',
+            birth_year: 1985, // age 40 — could have started at 35
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+            special_regimes: ['irs_jovem'],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeUndefined()
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
+    })
+
+    it('does not ask anything for member > 44 with unconfirmed irs_jovem', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Avô',
+            birth_year: 1975, // age 50 — definitely past eligibility
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+            special_regimes: ['irs_jovem'],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeUndefined()
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
+    })
+  })
+
+  // Bug fix: select value "0" should be preserved after applyAnswers
+  describe('applyAnswers preserves select value 0', () => {
+    it('preserves cat_b_activity_year = 0 (3rd year or more)', () => {
+      const h = makeHousehold({
+        members: [
+          makePerson({
+            incomes: [makeIncome({ category: 'B', gross: 20000 })],
+          }),
+        ],
+      })
+      const updated = applyAnswers(h, {
+        'member.0.income.0.cat_b_activity_year': '0',
+      })
+      // Should be 0, NOT undefined
+      expect(updated.members[0].incomes[0].cat_b_activity_year).toBe(0)
+    })
+
+    it('round-trips cat_b_activity_year = 0 through identifyMissingInputs', () => {
+      const h = makeHousehold({
+        members: [
+          makePerson({
+            incomes: [makeIncome({ category: 'B', gross: 20000, cat_b_activity_year: 0 })],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.income.0.cat_b_activity_year')
+      expect(q).toBeDefined()
+      expect(q!.currentValue).toBe('0')
+      expect(q!.priority).toBe('optional') // already answered
+    })
+
+    it('round-trips rental_contract_duration = 0 through identifyMissingInputs', () => {
+      const h = makeHousehold({
+        members: [
+          makePerson({
+            incomes: [makeIncome({ category: 'F', gross: 10000, rental_contract_duration: 0 })],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.income.0.rental_duration')
+      expect(q).toBeDefined()
+      expect(q!.currentValue).toBe('0')
+      expect(q!.priority).toBe('optional')
     })
   })
 })

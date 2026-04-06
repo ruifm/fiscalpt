@@ -72,21 +72,41 @@ export function HouseholdQuestionnaire({
   projectionYear,
 }: HouseholdQuestionnaireProps) {
   const t = useT()
-  const questions = useMemo(() => identifyMissingInputs(household), [household])
-  const sections = useMemo(() => groupBySection(questions), [questions])
+  const initialQuestions = useMemo(() => identifyMissingInputs(household), [household])
 
   // Pre-fill answers from questions that already have confirmed (non-placeholder) values
   const initialAnswers = useMemo(() => {
     const init: Record<string, string | number | boolean> = {}
-    for (const q of identifyMissingInputs(household)) {
+    for (const q of initialQuestions) {
       if (q.currentValue !== undefined && !q.isPlaceholder) {
         init[q.id] = q.currentValue
       }
     }
     return init
-  }, [household])
+  }, [initialQuestions])
   const history = useAnswerHistory(initialAnswers)
   const answers = history.state.current
+
+  // Dynamic question accumulation: apply current answers to get a live household,
+  // then re-identify missing inputs. This surfaces dependent questions (e.g. IRS
+  // Jovem after birth_year is answered). Union with initial questions to keep
+  // already-shown fields visible.
+  const liveQuestions = useMemo(() => {
+    if (Object.keys(answers).length === 0) return initialQuestions
+    const liveHousehold = applyAnswers(household, answers)
+    return identifyMissingInputs(liveHousehold)
+  }, [household, answers, initialQuestions])
+
+  const questions = useMemo(() => {
+    const seen = new Map<string, MissingInputQuestion>()
+    for (const q of initialQuestions) seen.set(q.id, q)
+    for (const q of liveQuestions) {
+      if (!seen.has(q.id)) seen.set(q.id, q)
+    }
+    return Array.from(seen.values())
+  }, [initialQuestions, liveQuestions])
+
+  const sections = useMemo(() => groupBySection(questions), [questions])
   const [showSkipWarning, setShowSkipWarning] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({})
   const containerRef = useRef<HTMLDivElement>(null)
@@ -137,10 +157,19 @@ export function HouseholdQuestionnaire({
   ).length
   const totalCount = questions.length
 
-  // Only open sections that have critical/important questions by default
-  const defaultOpenSections = sections
-    .filter((g) => g.questions.some((q) => q.priority === 'critical' || q.priority === 'important'))
-    .map((g) => `section-${sections.indexOf(g)}`)
+  // Sections that should start open — recomputed when question list changes
+  const defaultOpenSections = useMemo(
+    () =>
+      sections
+        .filter((g) =>
+          g.questions.some((q) => q.priority === 'critical' || q.priority === 'important'),
+        )
+        .map((g) => `section-${sections.indexOf(g)}`),
+    [sections],
+  )
+  // Key changes when section structure changes, causing the accordion to
+  // re-mount and apply the new defaultValue (auto-opens new sections like IRS Jovem).
+  const accordionKey = useMemo(() => sections.map((s) => s.section).join(','), [sections])
 
   function setAnswer(id: string, value: string | number | boolean) {
     const question = questions.find((q) => q.id === id)
@@ -347,7 +376,7 @@ export function HouseholdQuestionnaire({
       )}
 
       {/* Sections */}
-      <Accordion multiple defaultValue={defaultOpenSections}>
+      <Accordion multiple defaultValue={defaultOpenSections} key={accordionKey}>
         {sections.map((group) => {
           const sIdx = sections.indexOf(group)
           return (
