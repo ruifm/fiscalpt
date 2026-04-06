@@ -91,8 +91,14 @@ export const SECTION_LABELS: Record<QuestionSection, { title: string; descriptio
 /**
  * Analyze a household and return a list of questions for information
  * that is missing or has placeholder values.
+ *
+ * @param otherYearHouseholds — households from other tax years (used to infer
+ *   Cat B activity year from historical data).
  */
-export function identifyMissingInputs(household: Household): MissingInputQuestion[] {
+export function identifyMissingInputs(
+  household: Household,
+  otherYearHouseholds?: Household[],
+): MissingInputQuestion[] {
   const questions: MissingInputQuestion[] = []
   const year = household.year || 2025
   const currentYear = new Date().getFullYear()
@@ -186,6 +192,17 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
       if (income.category !== 'B') continue
 
       const hasCatBYear = income.cat_b_activity_year !== undefined
+
+      // Skip if we can infer ≥3rd year from historical data:
+      // member has Cat B income in ≥2 other tax years → past new-activity period
+      if (!hasCatBYear && otherYearHouseholds) {
+        const otherYearsWithCatB = otherYearHouseholds.filter((hh) => {
+          const match = findMatchingMember(member, hh.members)
+          return match?.incomes.some((inc) => inc.category === 'B')
+        }).length
+        if (otherYearsWithCatB >= 2) continue
+      }
+
       questions.push({
         id: `member.${i}.income.${j}.cat_b_activity_year`,
         section: 'cat_b_details',
@@ -526,6 +543,19 @@ function toNumber(value: string | number | boolean): number {
   if (typeof value === 'number') return sanitizeNumber(value)
   if (typeof value === 'boolean') return value ? 1 : 0
   return sanitizeNumber(parseInt(value))
+}
+
+/** Match a member to the same person in another year's household by NIF or name. */
+function findMatchingMember(member: Person, others: Person[]): Person | undefined {
+  if (member.nif) {
+    const byNif = others.find((m) => m.nif === member.nif)
+    if (byNif) return byNif
+  }
+  if (member.name) {
+    const normalized = member.name.toLowerCase()
+    return others.find((m) => m.name?.toLowerCase() === normalized)
+  }
+  return undefined
 }
 
 /** Returns true if there are any critical or important questions. */

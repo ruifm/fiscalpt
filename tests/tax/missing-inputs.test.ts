@@ -260,6 +260,70 @@ describe('identifyMissingInputs', () => {
       const qs = identifyMissingInputs(h)
       expect(qs.find((q) => q.id.includes('cat_b_activity_year'))).toBeUndefined()
     })
+
+    it('skips Cat B activity year when member has Cat B in ≥2 other years', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Rui',
+            nif: '123',
+            incomes: [makeIncome({ category: 'B', gross: 50000 })],
+          }),
+        ],
+      })
+      const otherYears: Household[] = [
+        makeHousehold({
+          year: 2023,
+          members: [
+            makePerson({
+              name: 'Rui',
+              nif: '123',
+              incomes: [makeIncome({ category: 'B', gross: 40000 })],
+            }),
+          ],
+        }),
+        makeHousehold({
+          year: 2024,
+          members: [
+            makePerson({
+              name: 'Rui',
+              nif: '123',
+              incomes: [makeIncome({ category: 'B', gross: 45000 })],
+            }),
+          ],
+        }),
+      ]
+      const qs = identifyMissingInputs(h, otherYears)
+      expect(qs.find((q) => q.id.includes('cat_b_activity_year'))).toBeUndefined()
+    })
+
+    it('still asks Cat B activity year when member has Cat B in only 1 other year', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Rui',
+            nif: '123',
+            incomes: [makeIncome({ category: 'B', gross: 50000 })],
+          }),
+        ],
+      })
+      const otherYears: Household[] = [
+        makeHousehold({
+          year: 2024,
+          members: [
+            makePerson({
+              name: 'Rui',
+              nif: '123',
+              incomes: [makeIncome({ category: 'B', gross: 45000 })],
+            }),
+          ],
+        }),
+      ]
+      const qs = identifyMissingInputs(h, otherYears)
+      expect(qs.find((q) => q.id.includes('cat_b_activity_year'))).toBeDefined()
+    })
   })
 
   describe('Cat F rental duration', () => {

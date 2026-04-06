@@ -557,6 +557,7 @@ export default function AnalyzePage() {
                   onBack={() => goToStep('upload')}
                   onSkip={handleQuestionnaireSkip}
                   projectionYear={projectionYear}
+                  otherYearHouseholds={households.slice(1)}
                 />
               </div>
             )}

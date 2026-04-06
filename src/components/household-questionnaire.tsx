@@ -45,6 +45,8 @@ interface HouseholdQuestionnaireProps {
   onSkip: () => void
   /** If set, show projection section for this year */
   projectionYear?: number
+  /** Households from other tax years (for cross-year inference, e.g. Cat B activity) */
+  otherYearHouseholds?: Household[]
 }
 
 const PRIORITY_BADGE_STYLES: Record<string, string> = {
@@ -70,9 +72,13 @@ export function HouseholdQuestionnaire({
   onBack,
   onSkip,
   projectionYear,
+  otherYearHouseholds,
 }: HouseholdQuestionnaireProps) {
   const t = useT()
-  const initialQuestions = useMemo(() => identifyMissingInputs(household), [household])
+  const initialQuestions = useMemo(
+    () => identifyMissingInputs(household, otherYearHouseholds),
+    [household, otherYearHouseholds],
+  )
 
   // Pre-fill answers from questions that already have confirmed (non-placeholder) values
   const initialAnswers = useMemo(() => {
@@ -94,8 +100,8 @@ export function HouseholdQuestionnaire({
   const liveQuestions = useMemo(() => {
     if (Object.keys(answers).length === 0) return initialQuestions
     const liveHousehold = applyAnswers(household, answers)
-    return identifyMissingInputs(liveHousehold)
-  }, [household, answers, initialQuestions])
+    return identifyMissingInputs(liveHousehold, otherYearHouseholds)
+  }, [household, answers, initialQuestions, otherYearHouseholds])
 
   const questions = useMemo(() => {
     const seen = new Map<string, MissingInputQuestion>()
@@ -411,7 +417,10 @@ export function HouseholdQuestionnaire({
           return (
             <AccordionItem key={group.section} value={`section-${sIdx}`}>
               <Card className="mb-4 border">
-                <AccordionTrigger className="w-full px-4 py-3 min-h-[44px] hover:no-underline">
+                <AccordionTrigger
+                  className="w-full px-4 py-3 min-h-[44px] hover:no-underline"
+                  tabIndex={-1}
+                >
                   <div className="flex items-center gap-3">
                     <span className="text-xl" aria-hidden="true">
                       {SECTION_ICONS[group.section]}
