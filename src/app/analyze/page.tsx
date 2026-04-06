@@ -195,7 +195,20 @@ export default function AnalyzePage() {
   function handleQuestionnaireComplete(h: Household, projectedHousehold?: Household) {
     trackEvent('questionnaire_complete')
     // Update primary household, propagate, then analyze all
-    const allHouseholds = households.map((hh, idx) => (idx === 0 ? h : propagateSharedData(h, hh)))
+    const allHouseholds = households.map((hh, idx) => {
+      if (idx === 0) return h
+      const propagated = propagateSharedData(h, hh)
+      // Log propagation details for debugging
+      console.info(
+        `[FiscalPT] Propagation year ${hh.year}:`,
+        hh.members.map(
+          (m, mi) =>
+            `target[${mi}]=${m.name}(nif=${m.nif ?? '?'}, regimes=[${m.special_regimes}], nhr_confirmed=${m.nhr_confirmed}) → ` +
+            `result regimes=[${propagated.members[mi]?.special_regimes}], nhr_confirmed=${propagated.members[mi]?.nhr_confirmed}`,
+        ),
+      )
+      return propagated
+    })
     if (projectedHousehold) allHouseholds.push(projectedHousehold)
     computeAndShowResults(allHouseholds)
   }
@@ -236,18 +249,24 @@ export default function AnalyzePage() {
       // Analyze non-projected first
       const allResults: AnalysisResult[] = nonProjected.map((hh) => analyzeHousehold(hh))
 
-      // Diagnostic: log per-year scenario data to help debug savings discrepancies
-      if (process.env.NODE_ENV === 'development') {
-        for (const r of allResults) {
-          const burdens = r.scenarios.map(
-            (s) => `${s.filing_status}=${s.total_tax_burden.toFixed(2)}`,
-          )
-          const optCount = r.optimizations.length
-          console.info(
-            `[FiscalPT] Year ${r.year}: members=${r.household.members.length}, ` +
-              `scenarios=[${burdens.join(', ')}], optimizations=${optCount}`,
-          )
-        }
+      // Diagnostic: log per-year member and scenario data
+      for (const r of allResults) {
+        const members = r.household.members.map(
+          (m) =>
+            `${m.name}(nif=${m.nif ?? '?'}, nhr=${m.special_regimes.includes('nhr')}, ` +
+            `nhr_confirmed=${m.nhr_confirmed ?? false}, nhr_start=${m.nhr_start_year ?? '?'}, ` +
+            `regimes=[${m.special_regimes.join(',')}])`,
+        )
+        const burdens = r.scenarios.map(
+          (s) => `${s.filing_status}=${s.total_tax_burden.toFixed(2)}`,
+        )
+        console.info(
+          `[FiscalPT] Year ${r.year} (${r.household.projected ? 'projected' : 'real'}):`,
+          `\n  members: ${members.join('; ')}`,
+          `\n  filing: ${r.household.filing_status}`,
+          `\n  scenarios: [${burdens.join(', ')}]`,
+          `\n  optimizations: ${r.optimizations.length}`,
+        )
       }
 
       // Enrich projected households with estimated retentions, then analyze
