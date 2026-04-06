@@ -377,9 +377,21 @@ describe('identifyMissingInputs', () => {
       expect(qs.find((q) => q.id === 'member.0.nhr_start_year')).toBeUndefined()
     })
 
-    it('does not ask when nhr_confirmed is true (Anexo L present)', () => {
+    it('asks start year with lower priority when nhr_confirmed (Anexo L present)', () => {
       const h = makeHousehold({
         members: [makePerson({ special_regimes: ['nhr'], nhr_confirmed: true })],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.nhr_start_year')
+      expect(q).toBeDefined()
+      expect(q!.priority).toBe('important') // lower than critical since confirmed for this year
+    })
+
+    it('does not ask when nhr_confirmed and start year already set', () => {
+      const h = makeHousehold({
+        members: [
+          makePerson({ special_regimes: ['nhr'], nhr_confirmed: true, nhr_start_year: 2020 }),
+        ],
       })
       const qs = identifyMissingInputs(h)
       expect(qs.find((q) => q.id === 'member.0.nhr_start_year')).toBeUndefined()

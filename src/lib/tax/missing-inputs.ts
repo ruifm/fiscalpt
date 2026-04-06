@@ -277,18 +277,19 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
     const member = household.members[i]
     if (!hasSpecialRegime(member, 'nhr')) continue
 
-    // If Anexo L was present, NHR is confirmed active — no need to ask start year
-    if (member.nhr_confirmed) continue
-
     if (!member.nhr_start_year) {
+      // nhr_confirmed (Anexo L present) confirms NHR for THIS year, but
+      // nhr_start_year is still needed to determine the 10-year window
+      // when propagating to other years. Lower priority if already confirmed.
       questions.push({
         id: `member.${i}.nhr_start_year`,
         section: 'nhr',
         label: `Ano de inscrição RNH de ${member.name}`,
-        reason:
-          'O regime RNH tem duração de 10 anos. Necessário para verificar se ainda está ativo. Novas inscrições a partir de 2024 foram revogadas (Lei 45-A/2024).',
+        reason: member.nhr_confirmed
+          ? 'RNH confirmado via Anexo L. O ano de inscrição permite calcular a janela de 10 anos para outros anos fiscais.'
+          : 'O regime RNH tem duração de 10 anos. Necessário para verificar se ainda está ativo. Novas inscrições a partir de 2024 foram revogadas (Lei 45-A/2024).',
         type: 'year',
-        priority: 'critical',
+        priority: member.nhr_confirmed ? 'important' : 'critical',
         path: `members.${i}.nhr_start_year`,
         validate: (value: string | number | boolean): string | null => {
           const n = toNumber(value)
