@@ -259,4 +259,34 @@ describe('generateActionableRecommendations', () => {
       expect(step.portal_path).toContain('portaldasfinancas')
     }
   })
+
+  it('does NOT duplicate filing recommendation when optimizations include joint-filing', () => {
+    const result = makeResult({
+      optimizations: [
+        {
+          id: 'joint-filing',
+          title: 'Tributação Conjunta',
+          description: 'Poupa €1550 com tributação conjunta.',
+          estimated_savings: 1550,
+        },
+        {
+          id: 'deduction-ppr',
+          title: 'Investir em PPR',
+          description: 'Pode poupar com PPR',
+          estimated_savings: 200,
+        },
+      ],
+    })
+
+    const report = generateActionableRecommendations(result)
+    const filingRecs = report.recommendations.filter(
+      (r) => r.id === 'joint-filing' || r.id.startsWith('filing'),
+    )
+    // Only the detailed filing recommendation from filingStatusRecommendation()
+    expect(filingRecs).toHaveLength(1)
+    expect(filingRecs[0].category).toBe('filing')
+    expect(filingRecs[0].priority).toBe('high')
+    // PPR should still be there
+    expect(report.recommendations.find((r) => r.id === 'deduction-ppr')).toBeDefined()
+  })
 })

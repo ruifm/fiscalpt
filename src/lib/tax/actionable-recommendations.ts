@@ -208,8 +208,12 @@ function nhrRecommendation(result: AnalysisResult): ActionableRecommendation | u
 function deductionRecommendations(result: AnalysisResult): ActionableRecommendation[] {
   const recs: ActionableRecommendation[] = []
 
+  // Skip filing optimizations — they're handled by filingStatusRecommendation()
+  const filingIds = new Set(['joint-filing', 'separate-filing'])
+
   for (const opt of result.optimizations) {
     if (opt.estimated_savings <= 0) continue
+    if (filingIds.has(opt.id)) continue
 
     const steps: ActionableStep[] = [
       {

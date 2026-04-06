@@ -362,6 +362,8 @@ function RecommendationsDisplay({
   reports: ActionableReport[]
   chatSlot?: React.ReactNode
 }) {
+  const nonEmptyReports = reports.filter((r) => r.recommendations.length > 0)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -371,9 +373,9 @@ function RecommendationsDisplay({
 
       {chatSlot}
 
-      {reports.map((report) => (
+      {nonEmptyReports.map((report) => (
         <div key={report.year} className="space-y-4">
-          {reports.length > 1 && (
+          {nonEmptyReports.length > 1 && (
             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Ano {report.year}
             </h3>
