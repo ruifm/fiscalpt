@@ -30,6 +30,16 @@ const guides = [
     title: 'Conjunto vs Separado',
     description: 'Quando compensa a tributação conjunta ou separada',
   },
+  {
+    href: '/guia/recibos-verdes',
+    title: 'Recibos Verdes e Cat. B',
+    description: 'Regime simplificado, coeficientes e Segurança Social',
+  },
+  {
+    href: '/guia/deducoes-coleta',
+    title: 'Deduções à Coleta',
+    description: 'Saúde, educação, habitação, PPR e como maximizar',
+  },
 ]
 
 export default function GuiaLayout({ children }: { children: React.ReactNode }) {

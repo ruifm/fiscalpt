@@ -23,6 +23,20 @@ export const metadata: Metadata = {
 
 const posts = [
   {
+    slug: 'taxa-efetiva-vs-marginal',
+    title: 'O Teu Patrão Desconta X% — Mas Quanto Pagas Realmente de IRS?',
+    description:
+      'Taxa marginal vs taxa efetiva: porque é que estar no escalão de 43,5% não significa que pagas 43,5% de imposto.',
+    date: 'Julho 2025',
+  },
+  {
+    slug: 'irs-expatriados-portugal',
+    title: 'Mudei-me para Portugal — E Agora, Como Declaro o IRS?',
+    description:
+      'Residência fiscal, NHR, primeiro ano de declaração, dupla tributação e erros comuns para quem se mudou para Portugal.',
+    date: 'Julho 2025',
+  },
+  {
     slug: 'nhr-tributacao-conjunta',
     title: 'NHR + Tributação Conjunta: O Maior Hack Fiscal (Não Intencional) em Portugal',
     description:
