@@ -157,19 +157,48 @@ export function HouseholdQuestionnaire({
   ).length
   const totalCount = questions.length
 
-  // Sections that should start open — recomputed when question list changes
-  const defaultOpenSections = useMemo(
+  // Controlled accordion: track which sections are open.
+  // Auto-open sections with critical/important questions; preserve user toggles.
+  const autoOpenSections = useMemo(
     () =>
-      sections
-        .filter((g) =>
-          g.questions.some((q) => q.priority === 'critical' || q.priority === 'important'),
-        )
-        .map((g) => `section-${sections.indexOf(g)}`),
+      new Set(
+        sections
+          .filter((g) =>
+            g.questions.some((q) => q.priority === 'critical' || q.priority === 'important'),
+          )
+          .map((g) => `section-${sections.indexOf(g)}`),
+      ),
     [sections],
   )
-  // Key changes when section structure changes, causing the accordion to
-  // re-mount and apply the new defaultValue (auto-opens new sections like IRS Jovem).
-  const accordionKey = useMemo(() => sections.map((s) => s.section).join(','), [sections])
+  // Tracks user-explicit open/close overrides (undefined = no override, use auto)
+  const [userToggles, setUserToggles] = useState<Record<string, boolean>>({})
+  const openSections = useMemo(() => {
+    const result: string[] = []
+    for (const g of sections) {
+      const id = `section-${sections.indexOf(g)}`
+      const userToggle = userToggles[id]
+      if (userToggle === true || (userToggle === undefined && autoOpenSections.has(id))) {
+        result.push(id)
+      }
+    }
+    return result
+  }, [sections, autoOpenSections, userToggles])
+
+  function handleAccordionChange(value: string[]) {
+    const valueSet = new Set(value)
+    setUserToggles((prev) => {
+      const next = { ...prev }
+      for (const g of sections) {
+        const id = `section-${sections.indexOf(g)}`
+        const isNowOpen = valueSet.has(id)
+        const wasOpen = openSections.includes(id)
+        if (isNowOpen !== wasOpen) {
+          next[id] = isNowOpen
+        }
+      }
+      return next
+    })
+  }
 
   function setAnswer(id: string, value: string | number | boolean) {
     const question = questions.find((q) => q.id === id)
@@ -376,7 +405,7 @@ export function HouseholdQuestionnaire({
       )}
 
       {/* Sections */}
-      <Accordion multiple defaultValue={defaultOpenSections} key={accordionKey}>
+      <Accordion multiple value={openSections} onValueChange={handleAccordionChange}>
         {sections.map((group) => {
           const sIdx = sections.indexOf(group)
           return (

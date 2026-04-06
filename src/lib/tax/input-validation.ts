@@ -165,12 +165,12 @@ export function validateIncome(income: Income, prefix = ''): ValidationError[] {
   }
 
   if (income.cat_b_activity_year !== undefined) {
-    if (income.cat_b_activity_year < 1) {
+    if (income.cat_b_activity_year < 0) {
       errors.push({
         severity: 'error',
         field: `${p}cat_b_activity_year`,
         code: 'OUT_OF_RANGE',
-        message: 'Ano de atividade de trabalho independente deve ser pelo menos 1',
+        message: 'Ano de atividade de trabalho independente inválido',
       })
     }
   }

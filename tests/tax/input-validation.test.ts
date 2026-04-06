@@ -186,11 +186,9 @@ describe('validateIncome', () => {
     expect(errors).toHaveLength(0)
   })
 
-  it('rejects cat_b_activity_year below 1', () => {
+  it('accepts cat_b_activity_year of 0 (3rd year or more, no reduction)', () => {
     const errors = validateIncome(validIncome({ category: 'B', cat_b_activity_year: 0 }))
-    expect(errors).toContainEqual(
-      expect.objectContaining({ field: 'cat_b_activity_year', code: 'OUT_OF_RANGE' }),
-    )
+    expect(errors.filter((e) => e.field === 'cat_b_activity_year')).toHaveLength(0)
   })
 
   it('accepts cat_b_activity_year of 3 or more', () => {
