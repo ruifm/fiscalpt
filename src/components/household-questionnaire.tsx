@@ -117,9 +117,27 @@ export function HouseholdQuestionnaire({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({})
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Projection state
-  const [projectionEnabled, setProjectionEnabled] = useState(false)
+  // Projection state — persisted in sessionStorage
+  const projectionStorageKey = `fiscalpt-projection-${household.year}`
+  const [projectionEnabled, setProjectionEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      const saved = sessionStorage.getItem(projectionStorageKey)
+      if (saved) return JSON.parse(saved).enabled ?? false
+    } catch {}
+    return false
+  })
   const [projectedIncomes, setProjectedIncomes] = useState<Record<string, number>>(() => {
+    // Try to restore from sessionStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem(projectionStorageKey)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (parsed.incomes && Object.keys(parsed.incomes).length > 0) return parsed.incomes
+        }
+      } catch {}
+    }
     // Initialize with primary year's gross incomes consolidated by category per member.
     // Multiple incomes of the same category (e.g. two Cat A from a job change) are summed.
     const initial: Record<string, number> = {}
@@ -132,6 +150,16 @@ export function HouseholdQuestionnaire({
     }
     return initial
   })
+
+  // Persist projection state on change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        projectionStorageKey,
+        JSON.stringify({ enabled: projectionEnabled, incomes: projectedIncomes }),
+      )
+    } catch {}
+  }, [projectionEnabled, projectedIncomes, projectionStorageKey])
 
   // Auto-scroll to the first unanswered mandatory question on mount
   useEffect(() => {

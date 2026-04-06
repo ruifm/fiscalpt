@@ -21,6 +21,7 @@ import type {
   ActionableReport,
   ActionableRecommendation,
 } from '@/lib/tax/actionable-recommendations'
+import { getAmendableYears } from '@/lib/tax/upload-validation'
 
 const CheckoutForm = dynamic(
   () => import('@/components/checkout-form').then((mod) => mod.CheckoutForm),
@@ -60,6 +61,11 @@ export function RecommendationsPaywall({
   sessionHash,
   chatSlot,
 }: RecommendationsPaywallProps) {
+  // Only show recommendations for amendable + projected years
+  const amendableYears = new Set(getAmendableYears())
+  const actionableResults = results.filter(
+    (r) => amendableYears.has(r.year) || r.household.projected,
+  )
   const [showCheckout, setShowCheckout] = useState(false)
   const [recommendations, setRecommendations] = useState<ActionableReport[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -105,7 +111,7 @@ export function RecommendationsPaywall({
         const recRes = await fetch('/api/recommendations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, results }),
+          body: JSON.stringify({ sessionId, results: actionableResults }),
         })
         if (!recRes.ok) throw new Error('Erro ao gerar recomendações')
 
@@ -152,7 +158,7 @@ export function RecommendationsPaywall({
     }
   }, [discountCode])
 
-  if (totalSavings <= 0) return null
+  if (totalSavings <= 0 || actionableResults.length === 0) return null
 
   if (recommendations) {
     return (
@@ -228,7 +234,7 @@ export function RecommendationsPaywall({
   const hasValidPartialDiscount = hasValidDiscount && discountPercent > 0 && discountPercent < 100
   const hasFullDiscount = hasValidDiscount && discountPercent === 100
 
-  const optimizationCount = results.reduce((sum, r) => sum + r.optimizations.length, 0)
+  const optimizationCount = actionableResults.reduce((sum, r) => sum + r.optimizations.length, 0)
 
   const buttonLabel = hasFullDiscount
     ? 'Desbloquear gratuitamente'

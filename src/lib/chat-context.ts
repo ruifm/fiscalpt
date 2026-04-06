@@ -57,7 +57,12 @@ function buildInputsSection(results: AnalysisResult[], pii: PiiMap): string {
 
       if (m.special_regimes.length > 0) {
         const regimes = m.special_regimes.map((sr) => {
-          if (sr === 'irs_jovem') return `irs_jovem (ano ${m.irs_jovem_year ?? '?'})`
+          if (sr === 'irs_jovem') {
+            const parts = [`irs_jovem (ano ${m.irs_jovem_year ?? '?'})`]
+            if (m.irs_jovem_first_work_year)
+              parts.push(`início de atividade: ${m.irs_jovem_first_work_year}`)
+            return parts.join(', ')
+          }
           if (sr === 'nhr') return `nhr (início: ${m.nhr_start_year ?? '?'})`
           return sr
         })

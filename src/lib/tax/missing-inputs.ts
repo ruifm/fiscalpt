@@ -443,15 +443,18 @@ export function applyAnswers(
       const member = h.members[idx]
       if (member) {
         const firstWorkYear = toNumber(value)
-        member.irs_jovem_first_work_year = firstWorkYear
-        const benefitYear = h.year - firstWorkYear + 1
-        const regime = getIrsJovemRegime(h.year)
-        const maxYears = regime?.maxBenefitYears ?? 10
-        if (benefitYear >= 1 && benefitYear <= maxYears) {
-          if (!member.special_regimes.includes('irs_jovem')) {
-            member.special_regimes = [...member.special_regimes, 'irs_jovem']
+        // Only set if it looks like a plausible year (not a partial keystroke like "20")
+        if (firstWorkYear >= MIN_BIRTH_YEAR) {
+          member.irs_jovem_first_work_year = firstWorkYear
+          const benefitYear = h.year - firstWorkYear + 1
+          const regime = getIrsJovemRegime(h.year)
+          const maxYears = regime?.maxBenefitYears ?? 10
+          if (benefitYear >= 1 && benefitYear <= maxYears) {
+            if (!member.special_regimes.includes('irs_jovem')) {
+              member.special_regimes = [...member.special_regimes, 'irs_jovem']
+            }
+            member.irs_jovem_year = benefitYear
           }
-          member.irs_jovem_year = benefitYear
         }
       }
     } else if (parts[0] === 'member' && parts[2] === 'degree_year') {
@@ -460,17 +463,19 @@ export function applyAnswers(
       const member = h.members[idx]
       if (member) {
         const degreeYear = toNumber(value)
-        // Pre-2025: benefit starts the year after degree completion
-        // Store as first_work_year equivalent: degree_year + 1
-        member.irs_jovem_first_work_year = degreeYear + 1
-        const benefitYear = h.year - degreeYear
-        const regime = getIrsJovemRegime(h.year)
-        const maxYears = regime?.maxBenefitYears ?? 5
-        if (benefitYear >= 1 && benefitYear <= maxYears) {
-          if (!member.special_regimes.includes('irs_jovem')) {
-            member.special_regimes = [...member.special_regimes, 'irs_jovem']
+        if (degreeYear >= MIN_BIRTH_YEAR) {
+          // Pre-2025: benefit starts the year after degree completion
+          // Store as first_work_year equivalent: degree_year + 1
+          member.irs_jovem_first_work_year = degreeYear + 1
+          const benefitYear = h.year - degreeYear
+          const regime = getIrsJovemRegime(h.year)
+          const maxYears = regime?.maxBenefitYears ?? 5
+          if (benefitYear >= 1 && benefitYear <= maxYears) {
+            if (!member.special_regimes.includes('irs_jovem')) {
+              member.special_regimes = [...member.special_regimes, 'irs_jovem']
+            }
+            member.irs_jovem_year = benefitYear
           }
-          member.irs_jovem_year = benefitYear
         }
       }
     } else if (parts[0] === 'member' && parts[2] === 'income') {
