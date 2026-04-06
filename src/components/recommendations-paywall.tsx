@@ -217,6 +217,10 @@ export function RecommendationsPaywall({
                 Cancelar
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              O email pedido a seguir é exigido pelo Stripe, o nosso processador de pagamentos. O
+              FiscalPT não armazena nem necessita do seu email.
+            </p>
             <CheckoutForm
               analysisId={analysisId}
               sessionHash={sessionHash}
