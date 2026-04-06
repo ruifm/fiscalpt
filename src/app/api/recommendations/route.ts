@@ -1,4 +1,3 @@
-import { isBypassCode } from '@/lib/bypass-codes'
 import { stripe } from '@/lib/stripe'
 import { generateActionableRecommendations } from '@/lib/tax/actionable-recommendations'
 import type { AnalysisResult } from '@/lib/tax/types'
@@ -6,7 +5,6 @@ import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
 
 interface RecommendationsRequest {
   sessionId?: string
-  bypassCode?: string
   results: AnalysisResult[]
 }
 
@@ -28,22 +26,18 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Missing results' }, { status: 400 })
   }
 
-  // Auth: bypass code OR Stripe payment
-  const isBypassed = isBypassCode(body.bypassCode ?? '')
+  // Auth: Stripe payment required
+  if (!body.sessionId) {
+    return Response.json({ error: 'Missing sessionId' }, { status: 400 })
+  }
 
-  if (!isBypassed) {
-    if (!body.sessionId) {
-      return Response.json({ error: 'Missing sessionId or bypassCode' }, { status: 400 })
+  try {
+    const session = await stripe.checkout.sessions.retrieve(body.sessionId)
+    if (session.payment_status !== 'paid') {
+      return Response.json({ error: 'Payment not verified' }, { status: 402 })
     }
-
-    try {
-      const session = await stripe.checkout.sessions.retrieve(body.sessionId)
-      if (session.payment_status !== 'paid') {
-        return Response.json({ error: 'Payment not verified' }, { status: 402 })
-      }
-    } catch {
-      return Response.json({ error: 'Invalid session' }, { status: 402 })
-    }
+  } catch {
+    return Response.json({ error: 'Invalid session' }, { status: 402 })
   }
 
   // Generate actionable recommendations server-side

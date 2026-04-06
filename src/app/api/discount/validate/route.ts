@@ -1,4 +1,3 @@
-import { isBypassCode } from '@/lib/bypass-codes'
 import { stripe } from '@/lib/stripe'
 import type Stripe from 'stripe'
 
@@ -13,16 +12,6 @@ export async function POST(request: Request) {
   const code = (body.code ?? '').trim().toUpperCase()
   if (!code) {
     return Response.json({ error: 'Missing code' }, { status: 400 })
-  }
-
-  // Check server-side bypass codes (hash-based comparison)
-  if (isBypassCode(code)) {
-    return Response.json({
-      valid: true,
-      type: 'bypass' as const,
-      discount_percent: 100,
-      message: 'Código de acesso total aplicado',
-    })
   }
 
   // Check Stripe promotion codes

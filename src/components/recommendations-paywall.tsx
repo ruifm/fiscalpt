@@ -36,7 +36,7 @@ const CheckoutForm = dynamic(
 
 interface DiscountValidation {
   valid: boolean
-  type?: 'bypass' | 'stripe'
+  type?: 'stripe'
   discount_percent?: number | null
   discount_amount?: number | null
   promotion_code_id?: string
@@ -121,31 +121,6 @@ export function RecommendationsPaywall({
     [results, onUnlock],
   )
 
-  const handleBypassUnlock = useCallback(
-    async (code: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const recRes = await fetch('/api/recommendations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bypassCode: code, results }),
-        })
-        if (!recRes.ok) throw new Error('Erro ao gerar recomendações')
-
-        const data = (await recRes.json()) as { recommendations: ActionableReport[] }
-        setRecommendations(data.recommendations)
-        onUnlock?.(data.recommendations)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro desconhecido')
-      } finally {
-        setLoading(false)
-      }
-    },
-    [results, onUnlock],
-  )
-
   const validateDiscount = useCallback(async () => {
     const code = discountCode.trim()
     if (!code) return
@@ -166,17 +141,11 @@ export function RecommendationsPaywall({
         return
       }
 
-      if (data.valid && (data.type === 'bypass' || data.discount_percent === 100)) {
-        setDiscountStatus({ checking: false, result: data, error: null })
-        await handleBypassUnlock(code)
-        return
-      }
-
       setDiscountStatus({ checking: false, result: data, error: null })
     } catch {
       setDiscountStatus({ checking: false, result: null, error: 'Erro ao validar código' })
     }
-  }, [discountCode, handleBypassUnlock])
+  }, [discountCode])
 
   if (totalSavings <= 0) return null
 
