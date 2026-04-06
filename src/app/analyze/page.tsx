@@ -215,8 +215,10 @@ export default function AnalyzePage() {
 
   function handleQuestionnaireComplete(h: Household, projectedHousehold?: Household) {
     trackEvent('questionnaire_complete')
+    // Strip any previously-appended projected households before rebuilding
+    const nonProjected = households.filter((hh) => !hh.projected)
     // Update primary household, propagate, then analyze all
-    const allHouseholds = households.map((hh, idx) => {
+    const allHouseholds = nonProjected.map((hh, idx) => {
       if (idx === 0) return h
       const propagated = propagateSharedData(h, hh)
       // Log propagation details for debugging
@@ -235,7 +237,7 @@ export default function AnalyzePage() {
   }
 
   function handleQuestionnaireSkip() {
-    computeAndShowResults(households)
+    computeAndShowResults(households.filter((hh) => !hh.projected))
   }
 
   function computeAndShowResults(allHouseholds: Household[]) {
@@ -298,7 +300,10 @@ export default function AnalyzePage() {
         )
         const personRates = r.scenarios[0]?.persons.map(
           (p) =>
-            `${p.name}: rate=${(p.effective_rate_irs * 100).toFixed(2)}%, irs_jovem_exempt=${p.irs_jovem_exemption.toFixed(2)}`,
+            `${p.name}: gross=${p.gross_income}, taxable=${p.taxable_income}, ` +
+            `rate=${(p.effective_rate_irs * 100).toFixed(2)}%, ` +
+            `irs_jovem_exempt=${p.irs_jovem_exemption.toFixed(2)}, ` +
+            `nhr_tax=${p.nhr_tax.toFixed(2)}, irs_after=${p.irs_after_deductions.toFixed(2)}`,
         )
         console.info(
           `[FiscalPT] Year ${r.year} (${r.household.projected ? 'projected' : 'real'}):`,

@@ -323,8 +323,14 @@ export function identifyMissingInputs(
   // currentValue so it stays visible in the questionnaire for editing.
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
-    // Legacy: skip if irs_jovem_year was set directly (old-style dropdown)
-    if (hasSpecialRegime(member, 'irs_jovem') && member.irs_jovem_year) continue
+    // Legacy: skip only if irs_jovem_year was set directly (old-style dropdown),
+    // NOT when it was derived from first_work_year by applyAnswers.
+    if (
+      hasSpecialRegime(member, 'irs_jovem') &&
+      member.irs_jovem_year &&
+      !member.irs_jovem_first_work_year
+    )
+      continue
     if (!member.birth_year) continue
 
     const age = year - member.birth_year

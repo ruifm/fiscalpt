@@ -1556,6 +1556,59 @@ describe('question validators', () => {
     })
   })
 
+  // Bug fix: first_work_year question must persist after applyAnswers sets irs_jovem_year
+  describe('IRS Jovem question persistence after applyAnswers', () => {
+    it('first_work_year question survives applyAnswers setting irs_jovem + irs_jovem_year', () => {
+      // Simulates the questionnaire flow: user types "2021" in first_work_year input
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Rui',
+            birth_year: 1993,
+            incomes: [makeIncome({ category: 'A', gross: 50000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      // Initial: question exists
+      const initialQs = identifyMissingInputs(h)
+      expect(initialQs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
+
+      // After applyAnswers: irs_jovem + irs_jovem_year are set
+      const applied = applyAnswers(h, { 'member.0.first_work_year': 2021 })
+      expect(applied.members[0].special_regimes).toContain('irs_jovem')
+      expect(applied.members[0].irs_jovem_year).toBe(5)
+      expect(applied.members[0].irs_jovem_first_work_year).toBe(2021)
+
+      // Re-running identifyMissingInputs on the applied household:
+      // question MUST still appear (with currentValue) so user can edit
+      const liveQs = identifyMissingInputs(applied)
+      const q = liveQs.find((q) => q.id === 'member.0.first_work_year')
+      expect(q).toBeDefined()
+      expect(q!.currentValue).toBe(2021)
+    })
+
+    it('legacy: skips question when irs_jovem_year set WITHOUT first_work_year', () => {
+      // Legacy data: irs_jovem_year was set directly (e.g. from old dropdown)
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Maria',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_year: 2,
+            // irs_jovem_first_work_year NOT set
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
+    })
+  })
+
   // Bug fix: select value "0" should be preserved after applyAnswers
   describe('applyAnswers preserves select value 0', () => {
     it('preserves cat_b_activity_year = 0 (3rd year or more)', () => {

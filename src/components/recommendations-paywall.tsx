@@ -158,7 +158,95 @@ export function RecommendationsPaywall({
     }
   }, [discountCode])
 
-  if (totalSavings <= 0 || actionableResults.length === 0) return null
+  // No actionable optimizations — show congrats + chat-only checkout
+  if (totalSavings <= 0 || actionableResults.length === 0) {
+    if (recommendations) {
+      // Chat was unlocked via checkout
+      return (
+        <div ref={containerRef}>
+          <Card className="border-emerald-200 dark:border-emerald-800/50 bg-gradient-to-br from-emerald-50/50 to-transparent dark:from-emerald-950/20 print:hidden">
+            <CardContent className="py-8 text-center space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                <CheckCircle
+                  className="h-6 w-6 text-emerald-600 dark:text-emerald-400"
+                  aria-hidden="true"
+                />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold">Declaração otimizada</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Não identificámos otimizações adicionais. A sua situação fiscal já está bem
+                  configurada.
+                </p>
+              </div>
+              {chatSlot}
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+
+    if (showCheckout) {
+      return (
+        <div ref={containerRef}>
+          <Card className="border-primary/30">
+            <CardContent className="py-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />
+                  <h3 className="font-semibold">Assistente Fiscal AI</h3>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setShowCheckout(false)}>
+                  Cancelar
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                O email pedido a seguir é exigido pelo Stripe, o nosso processador de pagamentos. O
+                FiscalPT não armazena nem necessita do seu email.
+              </p>
+              <CheckoutForm
+                analysisId={analysisId}
+                sessionHash={sessionHash}
+                promotionCodeId={discountStatus.result?.promotion_code_id}
+                onComplete={handlePaymentComplete}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+
+    return (
+      <div ref={containerRef}>
+        <Card className="border-emerald-200 dark:border-emerald-800/50 bg-gradient-to-br from-emerald-50/50 to-transparent dark:from-emerald-950/20 print:hidden">
+          <CardContent className="py-8 text-center space-y-5">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+              <CheckCircle
+                className="h-6 w-6 text-emerald-600 dark:text-emerald-400"
+                aria-hidden="true"
+              />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold">Declaração otimizada</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Não identificámos otimizações adicionais. A sua situação fiscal já está bem
+                configurada.
+              </p>
+            </div>
+            <div className="border-t pt-5 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Tem dúvidas sobre a sua declaração ou quer explorar cenários alternativos?
+              </p>
+              <Button variant="outline" className="gap-2" onClick={() => setShowCheckout(true)}>
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                Consultar assistente fiscal AI · €9,99
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   if (recommendations) {
     return (
