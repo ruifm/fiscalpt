@@ -884,11 +884,16 @@ function generateCatFDurationOptimizations(household: Household): Optimization[]
 // ─── Main Analysis ───────────────────────────────────────────
 
 export function analyzeHousehold(household: Household): AnalysisResult {
-  // Runtime validation — reject obviously invalid data before computing
-  const validationErrors = validateHousehold(household).filter((e) => e.severity === 'error')
-  if (validationErrors.length > 0) {
-    const msgs = validationErrors.map((e) => `${e.field}: ${e.message}`).join('; ')
-    throw new Error(`Dados inválidos: ${msgs}`)
+  // Log validation issues but never throw — sanitizeNumber already clamps
+  // invalid values, so the engine produces the best result it can.
+  if (process.env.NODE_ENV === 'development') {
+    const validationErrors = validateHousehold(household).filter((e) => e.severity === 'error')
+    if (validationErrors.length > 0) {
+      console.warn(
+        `[FiscalPT] Validation issues for year ${household.year}:`,
+        validationErrors.map((e) => `${e.field}: ${e.message}`),
+      )
+    }
   }
 
   const brackets = getBrackets(household.year)
