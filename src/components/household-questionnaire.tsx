@@ -80,7 +80,9 @@ export function HouseholdQuestionnaire({
     [household, otherYearHouseholds],
   )
 
-  // Pre-fill answers from questions that already have confirmed (non-placeholder) values
+  // Pre-fill answers from questions that already have confirmed (non-placeholder) values,
+  // then merge with any cached answers from a previous visit (sessionStorage).
+  const answersStorageKey = `fiscalpt-answers-${household.year}`
   const initialAnswers = useMemo(() => {
     const init: Record<string, string | number | boolean> = {}
     for (const q of initialQuestions) {
@@ -88,10 +90,32 @@ export function HouseholdQuestionnaire({
         init[q.id] = q.currentValue
       }
     }
+    // Restore cached answers from a previous session/navigation
+    try {
+      const raw = sessionStorage.getItem(answersStorageKey)
+      if (raw) {
+        const cached = JSON.parse(raw) as Record<string, string | number | boolean>
+        for (const [k, v] of Object.entries(cached)) {
+          if (v !== '' && v !== undefined) init[k] = v
+        }
+      }
+    } catch {}
     return init
-  }, [initialQuestions])
+  }, [initialQuestions, answersStorageKey])
   const history = useAnswerHistory(initialAnswers)
   const answers = history.state.current
+
+  // Persist answers to sessionStorage so they survive navigation
+  useEffect(() => {
+    try {
+      const nonEmpty = Object.fromEntries(
+        Object.entries(answers).filter(([, v]) => v !== '' && v !== undefined),
+      )
+      if (Object.keys(nonEmpty).length > 0) {
+        sessionStorage.setItem(answersStorageKey, JSON.stringify(nonEmpty))
+      }
+    } catch {}
+  }, [answers, answersStorageKey])
 
   // Dynamic question accumulation: apply current answers to get a live household,
   // then re-identify missing inputs. This surfaces dependent questions (e.g. IRS

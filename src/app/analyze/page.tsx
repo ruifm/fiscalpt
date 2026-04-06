@@ -67,6 +67,10 @@ export default function AnalyzePage() {
   const [calculating, setCalculating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const restoredRef = useRef(false)
+  // Keeps the households as originally parsed from documents, before
+  // questionnaire answers are baked in by applyAnswers. This allows the
+  // questionnaire to regenerate all questions when the user navigates back.
+  const uploadedHouseholdsRef = useRef<Household[]>([])
   const [furthestStep, setFurthestStep] = useState<number>(0)
   const mainContentRef = useRef<HTMLDivElement>(null)
   const errorBannerRef = useRef<HTMLDivElement>(null)
@@ -87,6 +91,10 @@ export default function AnalyzePage() {
 
   // Primary household = most recent year (first in sorted-descending array)
   const primaryHousehold = households[0] ?? null
+
+  // The household to pass to the questionnaire: always use the original
+  // uploaded household (before answers are baked in) so all questions appear.
+  const questionnaireHousehold = uploadedHouseholdsRef.current[0] ?? primaryHousehold
 
   function goToStep(target: Step) {
     setStep(target)
@@ -120,6 +128,14 @@ export default function AnalyzePage() {
       setIssues(saved.issues)
       setLiquidacao(saved.liquidacao)
       setFurthestStep(STEPS.indexOf(step as Step))
+
+      // Restore original uploaded households so questionnaire shows all questions
+      try {
+        const raw = sessionStorage.getItem(`fiscalpt-uploaded-${sessionId}`)
+        if (raw) {
+          uploadedHouseholdsRef.current = JSON.parse(raw) as Household[]
+        }
+      } catch {}
     }
 
     // Set URL hash so user can bookmark
@@ -172,6 +188,10 @@ export default function AnalyzePage() {
   function handleExtracted(hs: Household[], i: ValidationIssue[], liq?: LiquidacaoParsed) {
     trackEvent('upload_complete', { householdCount: hs.length })
     setHouseholds(hs)
+    uploadedHouseholdsRef.current = hs
+    try {
+      sessionStorage.setItem(`fiscalpt-uploaded-${sessionId}`, JSON.stringify(hs))
+    } catch {}
     setIssues(i)
     setResults([])
     const newLiq = liq ?? liquidacao
@@ -327,12 +347,22 @@ export default function AnalyzePage() {
   function handleClearAll() {
     setStep('upload')
     setHouseholds([])
+    uploadedHouseholdsRef.current = []
     setResults([])
     setIssues([])
     setLiquidacao(null)
     setError(null)
     setFurthestStep(0)
     clearSessionState(sessionId)
+    // Clear cached questionnaire data
+    try {
+      sessionStorage.removeItem(`fiscalpt-uploaded-${sessionId}`)
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith('fiscalpt-answers-') || key.startsWith('fiscalpt-projection-')) {
+          sessionStorage.removeItem(key)
+        }
+      }
+    } catch {}
     // Clear URL hash
     window.history.replaceState(null, '', window.location.pathname)
   }
@@ -552,7 +582,7 @@ export default function AnalyzePage() {
             {!calculating && step === 'questionnaire' && primaryHousehold && (
               <div data-testid="step-questionnaire">
                 <HouseholdQuestionnaire
-                  household={primaryHousehold}
+                  household={questionnaireHousehold ?? primaryHousehold}
                   onComplete={handleQuestionnaireComplete}
                   onBack={() => goToStep('upload')}
                   onSkip={handleQuestionnaireSkip}

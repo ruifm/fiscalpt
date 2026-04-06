@@ -319,11 +319,11 @@ export function identifyMissingInputs(
   // ── IRS Jovem proactive detection / verification ────────
   // For members without IRS Jovem who have Cat A/B income: probe eligibility.
   // Also handles members with unconfirmed irs_jovem from XML (code 417).
+  // When first_work_year is already known, we still generate the question with
+  // currentValue so it stays visible in the questionnaire for editing.
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
-    // Skip if first_work_year is already known (benefit year can be derived)
-    if (member.irs_jovem_first_work_year) continue
-    // Legacy: skip if irs_jovem_year was set directly
+    // Legacy: skip if irs_jovem_year was set directly (old-style dropdown)
     if (hasSpecialRegime(member, 'irs_jovem') && member.irs_jovem_year) continue
     if (!member.birth_year) continue
 
@@ -349,6 +349,7 @@ export function identifyMissingInputs(
           : 'A partir de 2025, o IRS Jovem aplica-se aos primeiros 10 anos de trabalho ' +
             '(sem exigência de grau académico). Se elegível, pode isentar 25%-50% do rendimento.',
         type: 'year',
+        currentValue: member.irs_jovem_first_work_year,
         priority: hasUnconfirmedIrsJovem ? 'critical' : 'important',
         path: `members.${i}.first_work_year`,
         validate: (value: string | number | boolean): string | null => {
@@ -358,6 +359,9 @@ export function identifyMissingInputs(
       })
     } else {
       // Pre-2025: requires degree completion
+      const degreeYear = member.irs_jovem_first_work_year
+        ? member.irs_jovem_first_work_year - 1
+        : undefined
       questions.push({
         id: `member.${i}.degree_year`,
         section: 'irs_jovem',
@@ -367,6 +371,7 @@ export function identifyMissingInputs(
           : 'Até 2024, o IRS Jovem (Art. 12-F) aplica-se nos 5 anos após conclusão do ' +
             'ensino superior. Se elegível, pode isentar 25%-100% do rendimento.',
         type: 'year',
+        currentValue: degreeYear,
         priority: hasUnconfirmedIrsJovem ? 'critical' : 'important',
         path: `members.${i}.degree_year`,
         validate: (value: string | number | boolean): string | null => {

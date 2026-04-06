@@ -1502,7 +1502,7 @@ describe('question validators', () => {
       expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
     })
 
-    it('skips first_work_year for member > 35 with confirmed irs_jovem_first_work_year', () => {
+    it('shows first_work_year with currentValue for member > 35 with confirmed irs_jovem_first_work_year', () => {
       const h = makeHousehold({
         year: 2025,
         members: [
@@ -1516,7 +1516,9 @@ describe('question validators', () => {
         ],
       })
       const qs = identifyMissingInputs(h)
-      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
+      const q = qs.find((q) => q.id === 'member.0.first_work_year')
+      expect(q).toBeDefined()
+      expect(q!.currentValue).toBe(2023)
     })
 
     it('asks first_work_year for member with unconfirmed XML irs_jovem and age ≤ 44', () => {
