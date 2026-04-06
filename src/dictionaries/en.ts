@@ -276,7 +276,6 @@ const en: Dictionary = {
     fiscalYears: '{count} fiscal years ({years})',
     loadNewDocs: 'Load new documents',
     errorTitle: 'Calculation error',
-    validationBlock: 'There are errors preventing calculation. Fix the indicated problems.',
     calcError: 'Error calculating taxes. Check the data and try again.',
     calcErrorPrefix: 'Calculation error: {message}',
   },
@@ -497,6 +496,7 @@ const en: Dictionary = {
 
   results: {
     title: 'Analysis Results',
+    dataWarningTitle: 'Some data may be incomplete',
     totalSavings: 'Total potential savings: {amount}',
     projected: 'Projected',
     projectedNote: 'Estimate based on the most recent known tax rules',

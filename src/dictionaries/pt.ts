@@ -279,7 +279,6 @@ const pt: Dictionary = {
     fiscalYears: '{count} anos fiscais ({years})',
     loadNewDocs: 'Carregar novos documentos',
     errorTitle: 'Erro no cálculo',
-    validationBlock: 'Existem erros que impedem o cálculo. Corrija os problemas indicados.',
     calcError: 'Erro ao calcular impostos. Verifique os dados e tente novamente.',
     calcErrorPrefix: 'Erro no cálculo: {message}',
   },
@@ -501,6 +500,7 @@ const pt: Dictionary = {
 
   results: {
     title: 'Resultado da Análise',
+    dataWarningTitle: 'Alguns dados podem estar incompletos',
     totalSavings: 'Poupança potencial total: {amount}',
     projected: 'Projetado',
     projectedNote: 'Estimativa baseada nas regras fiscais mais recentes conhecidas',

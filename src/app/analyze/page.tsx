@@ -205,12 +205,25 @@ export default function AnalyzePage() {
   }
 
   function computeAndShowResults(allHouseholds: Household[]) {
-    // Re-validate current households (not stale extraction issues)
+    // Validate but never block — the engine sanitizes values and produces
+    // the best result it can. Surface issues as warnings alongside results.
     const freshErrors = allHouseholds.flatMap((hh) => validateHousehold(hh))
-    const blocking = freshErrors.filter((e) => e.severity === 'error')
-    if (blocking.length > 0) {
-      setError(t('analyze.validationBlock'))
-      return
+    const validationWarnings: ValidationIssue[] = freshErrors
+      .filter((e) => e.severity === 'error')
+      .map((e) => ({
+        severity: 'warning' as const,
+        code: e.code,
+        message: e.message,
+        details: e.field,
+      }))
+    if (validationWarnings.length > 0) {
+      setIssues((prev) => {
+        const existing = new Set(prev.map((i) => `${i.code}:${i.message}`))
+        return [
+          ...prev,
+          ...validationWarnings.filter((w) => !existing.has(`${w.code}:${w.message}`)),
+        ]
+      })
     }
 
     setCalculating(true)
@@ -527,6 +540,7 @@ export default function AnalyzePage() {
               <div data-testid="step-results">
                 <TaxResults
                   results={results}
+                  issues={issues}
                   onBack={() => goToStep('questionnaire')}
                   onReset={handleClearAll}
                   checkoutSessionId={checkoutSessionId}

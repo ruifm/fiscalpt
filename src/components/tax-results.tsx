@@ -12,6 +12,7 @@ import {
   Printer,
   Lock,
   ArrowRight,
+  AlertTriangle,
 } from 'lucide-react'
 import { PdfExportButton } from '@/components/pdf-export-button'
 import { ShareResults } from '@/components/share-results'
@@ -31,7 +32,12 @@ import {
   Bar,
   CartesianGrid,
 } from 'recharts'
-import type { AnalysisResult, PersonTaxDetail, ScenarioResult } from '@/lib/tax/types'
+import type {
+  AnalysisResult,
+  PersonTaxDetail,
+  ScenarioResult,
+  ValidationIssue,
+} from '@/lib/tax/types'
 import { deriveResultsView, type ResultsView } from '@/lib/tax/results-view'
 import {
   personTotalIrs,
@@ -49,6 +55,7 @@ import type { ActionableReport } from '@/lib/tax/actionable-recommendations'
 
 interface TaxResultsProps {
   results: AnalysisResult[]
+  issues?: ValidationIssue[]
   onBack: () => void
   onReset: () => void
   checkoutSessionId?: string | null
@@ -62,6 +69,7 @@ function personRefund(p: PersonTaxDetail): number {
 
 export function TaxResults({
   results,
+  issues = [],
   onBack,
   onReset,
   checkoutSessionId,
@@ -125,6 +133,38 @@ export function TaxResults({
           </p>
         )}
       </div>
+
+      {/* Data quality warnings */}
+      {issues.filter((i) => i.severity === 'warning' || i.severity === 'error').length > 0 && (
+        <div
+          className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4 print:hidden"
+          role="status"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                {t('results.dataWarningTitle')}
+              </p>
+              <ul className="text-sm text-amber-700 dark:text-amber-300 list-disc list-inside space-y-0.5">
+                {issues
+                  .filter((i) => i.severity === 'warning' || i.severity === 'error')
+                  .map((issue, i) => (
+                    <li key={i}>
+                      {issue.message}
+                      {issue.details && (
+                        <span className="text-amber-600/70 dark:text-amber-400/70">
+                          {' '}
+                          ({issue.details})
+                        </span>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Teaser CTA — visible only when there are savings and paywall is locked */}
       {totalSavings > 0 && optimizationCount > 0 && (
