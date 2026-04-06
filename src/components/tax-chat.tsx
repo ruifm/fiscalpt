@@ -5,7 +5,8 @@ import { MessageCircle, Send, X, AlertCircle, Shield, Sparkles } from 'lucide-re
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import type { AnalysisResult } from '@/lib/tax/types'
-import { useT } from '@/lib/i18n'
+import type { ActionableReport } from '@/lib/tax/actionable-recommendations'
+import { useT, useLocale } from '@/lib/i18n'
 
 const MAX_MESSAGES = 20
 
@@ -16,10 +17,12 @@ interface Message {
 
 interface TaxChatProps {
   results: AnalysisResult[]
+  recommendations?: ActionableReport[]
 }
 
-export function TaxChat({ results }: TaxChatProps) {
+export function TaxChat({ results, recommendations }: TaxChatProps) {
   const t = useT()
+  const { locale } = useLocale()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -54,7 +57,7 @@ export function TaxChat({ results }: TaxChatProps) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, results }),
+        body: JSON.stringify({ messages: newMessages, results, locale, recommendations }),
       })
 
       if (res.status === 429) {
@@ -119,7 +122,7 @@ export function TaxChat({ results }: TaxChatProps) {
     } finally {
       setStreaming(false)
     }
-  }, [input, streaming, limitReached, messages, results, t])
+  }, [input, streaming, limitReached, messages, results, locale, recommendations, t])
 
   return (
     <>

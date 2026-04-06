@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { streamChat, type ChatMessage } from '@/lib/llm'
+import { buildChatSystemPrompt } from '@/lib/chat-context'
 import type { AnalysisResult } from '@/lib/tax/types'
+import type { ActionableReport } from '@/lib/tax/actionable-recommendations'
+import type { Locale } from '@/lib/i18n'
 import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
 
 const MAX_MESSAGES = 20
@@ -9,62 +12,14 @@ const MAX_MESSAGE_LENGTH = 2000
 interface ChatRequestBody {
   messages: { role: 'user' | 'assistant'; content: string }[]
   results: AnalysisResult[]
-}
-
-function buildSystemPrompt(results: AnalysisResult[]): string {
-  // Redact PII: replace names with generic labels
-  let memberIndex = 0
-  const resultsSummary = JSON.stringify(
-    results.map((r) => ({
-      year: r.year,
-      household: {
-        filing_status: r.household.filing_status,
-        members: r.household.members.map((m) => ({
-          name: `Membro ${++memberIndex}`,
-          incomes: m.incomes,
-          deductions: m.deductions,
-          special_regimes: m.special_regimes,
-        })),
-        dependents: r.household.dependents.map((d, i) => ({
-          name: `Dependente ${i + 1}`,
-          birth_year: d.birth_year,
-        })),
-      },
-      scenarios: r.scenarios,
-      recommended_scenario: r.recommended_scenario,
-      optimizations: r.optimizations,
-    })),
-    null,
-    2,
-  )
-
-  return `You are a Portuguese tax consultant AI assistant for FiscalPT.
-You help individual taxpayers understand their tax situation based on a deterministic analysis that has already been computed by a verified tax engine.
-
-CONTEXT:
-- All numbers in the data below were computed by a deterministic tax engine — they are mathematically verified, not AI-generated.
-- Your role is to EXPLAIN these results, not compute or modify them.
-- Personal names have been redacted for privacy (shown as "Membro 1", "Membro 2", etc.).
-
-CRITICAL RULES:
-- You MUST only discuss the user's specific tax data provided below. Never invent numbers.
-- You explain results — you do NOT compute taxes. The engine already did that.
-- If the user asks about something not covered in their data, say so clearly.
-- Be practical and actionable. Explain in simple language.
-- Respond in the same language the user writes in (Portuguese or English).
-- Keep responses concise — 2-3 paragraphs max unless the user asks for detail.
-- Use € formatting (e.g., €1.234,56) for amounts.
-- Reference specific values from the analysis when explaining.
-- Never provide legal advice — you provide tax information and explain calculations.
-
-USER'S TAX ANALYSIS DATA (PII redacted):
-${resultsSummary}`
+  locale?: Locale
+  recommendations?: ActionableReport[]
 }
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as ChatRequestBody
-    const { messages, results } = body
+    const { messages, results, locale, recommendations } = body
 
     if (!messages || !results || !Array.isArray(messages) || !Array.isArray(results)) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
@@ -83,7 +38,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Message too long' }, { status: 400 })
     }
 
-    const systemPrompt = buildSystemPrompt(results)
+    const systemPrompt = buildChatSystemPrompt({ results, locale, recommendations })
     const chatMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),

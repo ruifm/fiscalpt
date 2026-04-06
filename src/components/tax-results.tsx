@@ -255,7 +255,7 @@ export function TaxResults({
           onUnlock={setUnlockedReports}
           checkoutSessionId={checkoutSessionId}
           sessionHash={sessionHash}
-          chatSlot={unlockedReports ? <TaxChat results={results} /> : undefined}
+          chatSlot={unlockedReports ? <TaxChat results={results} recommendations={unlockedReports} /> : undefined}
         />
       </div>
 
