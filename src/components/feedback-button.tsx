@@ -48,10 +48,11 @@ export function FeedbackButton({ stage }: FeedbackButtonProps) {
           setSent(false)
           setOpen(true)
         }}
-        className="fixed bottom-4 right-4 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-muted/90 text-muted-foreground shadow-lg ring-1 ring-border/50 backdrop-blur-sm transition-all hover:bg-muted hover:text-foreground hover:scale-105 print:hidden"
+        className="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2.5 text-white shadow-lg ring-1 ring-amber-600/30 transition-all hover:bg-amber-600 hover:scale-105 hover:shadow-xl print:hidden"
         aria-label="Enviar feedback"
       >
         <MessageSquareWarning className="h-5 w-5" aria-hidden="true" />
+        <span className="text-sm font-medium">Feedback</span>
       </button>
     )
   }
