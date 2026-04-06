@@ -15,7 +15,12 @@ interface CheckoutFormProps {
   onComplete: (sessionId: string) => void
 }
 
-export function CheckoutForm({ analysisId, sessionHash, promotionCodeId, onComplete }: CheckoutFormProps) {
+export function CheckoutForm({
+  analysisId,
+  sessionHash,
+  promotionCodeId,
+  onComplete,
+}: CheckoutFormProps) {
   const [error, setError] = useState<string | null>(null)
 
   const fetchClientSecret = useCallback(async () => {

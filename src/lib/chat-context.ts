@@ -185,7 +185,9 @@ function buildOptimizationsSection(
     if (r.optimizations.length > 0) {
       lines.push(`### Otimizações proativas — ${r.year}`)
       for (const opt of r.optimizations) {
-        lines.push(`- **${opt.title}**: ${opt.description} (poupança estimada: €${opt.estimated_savings})`)
+        lines.push(
+          `- **${opt.title}**: ${opt.description} (poupança estimada: €${opt.estimated_savings})`,
+        )
       }
       lines.push('')
     }
