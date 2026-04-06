@@ -29,6 +29,7 @@ const TaxResults = dynamic(() => import('@/components/tax-results').then((mod) =
 })
 import type { Household, AnalysisResult, ValidationIssue } from '@/lib/tax/types'
 import { analyzeHousehold } from '@/lib/tax'
+import { validateHousehold } from '@/lib/tax/input-validation'
 import { validateAgainstLiquidacao, type LiquidacaoParsed } from '@/lib/tax/pdf-extractor'
 import {
   saveSessionState,
@@ -204,8 +205,10 @@ export default function AnalyzePage() {
   }
 
   function computeAndShowResults(allHouseholds: Household[]) {
-    const errors = issues.filter((i) => i.severity === 'error')
-    if (errors.length > 0) {
+    // Re-validate current households (not stale extraction issues)
+    const freshErrors = allHouseholds.flatMap((hh) => validateHousehold(hh))
+    const blocking = freshErrors.filter((e) => e.severity === 'error')
+    if (blocking.length > 0) {
       setError(t('analyze.validationBlock'))
       return
     }
