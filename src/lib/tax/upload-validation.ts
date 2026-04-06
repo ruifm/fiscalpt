@@ -436,6 +436,7 @@ export function mergeSpouseHouseholds(
 function mergePersonData(placeholder: Person, source: Person): Person {
   return {
     name: source.name || placeholder.name,
+    nif: source.nif ?? placeholder.nif,
     birth_year: source.birth_year ?? placeholder.birth_year,
     incomes: source.incomes.length > 0 ? source.incomes : placeholder.incomes,
     deductions: source.deductions.length > 0 ? source.deductions : placeholder.deductions,

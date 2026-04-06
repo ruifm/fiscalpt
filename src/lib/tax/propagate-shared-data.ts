@@ -6,8 +6,9 @@ import type { Household } from './types'
  * This handles cases where Subject A/B order differs across years
  * (e.g., Rui's XML has him as Subject A, but Micha's XML has her as Subject A).
  *
- * Propagated fields: name, nif, birth_year, nhr_start_year, nhr_confirmed,
- * special_regimes (only if target has none).
+ * Propagated fields: name, nif, birth_year, nhr_start_year.
+ * NOT propagated: nhr_confirmed, special_regimes — these are year-specific
+ * and come from each year's own XML data.
  */
 export function propagateSharedData(primary: Household, target: Household): Household {
   // Build NIF→primary member lookup
@@ -28,10 +29,10 @@ export function propagateSharedData(primary: Household, target: Household): Hous
         name: match.name,
         nif: match.nif ?? member.nif,
         birth_year: match.birth_year ?? member.birth_year,
+        // nhr_start_year is stable across years — propagate from primary
         nhr_start_year: match.nhr_start_year ?? member.nhr_start_year,
-        nhr_confirmed: member.nhr_confirmed ?? match.nhr_confirmed,
-        special_regimes:
-          member.special_regimes.length > 0 ? member.special_regimes : match.special_regimes,
+        // nhr_confirmed and special_regimes are year-specific (from each
+        // year's Anexo L / income codes) — keep target's own values
       }
     }),
   }

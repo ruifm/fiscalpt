@@ -837,6 +837,30 @@ describe('mergeSpouseHouseholds', () => {
     expect(result!.household.members).toHaveLength(2)
     expect(result!.household.members[1].incomes[0].gross).toBe(18000)
   })
+
+  it('preserves NIF when merging spouse data onto placeholder', () => {
+    const result = mergeSpouseHouseholds([
+      makeDecl({
+        nif: '111',
+        nifConjuge: '222',
+        household: makeHousehold(2024, [
+          makePerson('Alice', { nif: '111' }),
+          makePerson('Titular B (222)', { nif: '222' }),
+        ]),
+      }),
+      makeDecl({
+        nif: '222',
+        nifConjuge: '111',
+        household: makeHousehold(2024, [
+          makePerson('Bob', { nif: '222', incomes: [{ category: 'A', gross: 20000 }] }),
+          makePerson('Titular B (111)', { nif: '111' }),
+        ]),
+      }),
+    ])
+
+    expect(result!.household.members[1].name).toBe('Bob')
+    expect(result!.household.members[1].nif).toBe('222')
+  })
 })
 
 // ─── maxPreviousYearsFiles ─────────────────────────────────
