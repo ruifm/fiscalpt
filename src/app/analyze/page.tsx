@@ -223,6 +223,20 @@ export default function AnalyzePage() {
       // Analyze non-projected first
       const allResults: AnalysisResult[] = nonProjected.map((hh) => analyzeHousehold(hh))
 
+      // Diagnostic: log per-year scenario data to help debug savings discrepancies
+      if (process.env.NODE_ENV === 'development') {
+        for (const r of allResults) {
+          const burdens = r.scenarios.map(
+            (s) => `${s.filing_status}=${s.total_tax_burden.toFixed(2)}`,
+          )
+          const optCount = r.optimizations.length
+          console.info(
+            `[FiscalPT] Year ${r.year}: members=${r.household.members.length}, ` +
+              `scenarios=[${burdens.join(', ')}], optimizations=${optCount}`,
+          )
+        }
+      }
+
       // Enrich projected households with estimated retentions, then analyze
       const primaryHH = nonProjected[0]
       const primaryResult = allResults.find((r) => r.year === primaryHH?.year)
