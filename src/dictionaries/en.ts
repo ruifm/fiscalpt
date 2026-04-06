@@ -390,10 +390,18 @@ const en: Dictionary = {
       login: 'Go to the Portal das Finanças and sign in with your NIF and password.',
       multiAuth:
         'Choose your authentication method (password, Mobile Digital Key, or Citizen Card).',
-      xmlEntregarDeclaracao:
+      xmlSubmittedTitle: 'For already submitted years:',
+      xmlCorrigirDeclaracao:
         'In the sidebar, click "Entregar Declaração" then "Corrigir Declaração" for the desired year.',
-      xmlGravar:
+      xmlCorrigirGravar:
         'With the declaration open, click the save icon (floppy disk) in the toolbar to download the XML file.',
+      xmlCurrentTitle: 'For the current year (not yet submitted):',
+      xmlCurrentEntregarDeclaracao:
+        'In the sidebar, click "Entregar Declaração" and select "Preencher Declaração" for the current year.',
+      xmlCurrentPrefill:
+        'Request the automatic pre-fill. Validate the data, fill in any missing fields, and validate again.',
+      xmlCurrentGravar:
+        'Click the save icon (floppy disk) to download the XML — no need to submit. In this case, there is no settlement document (liquidação).',
       pdfComprovativo:
         'In the declarations list, click the "COMPROVATIVO" button for the desired year to download the PDF.',
       liqConsultar:

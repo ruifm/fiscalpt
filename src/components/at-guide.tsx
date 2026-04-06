@@ -45,18 +45,35 @@ function StepNumber({ n }: { n: number }) {
   )
 }
 
+interface GuideSection {
+  title: string
+  steps: GuideStep[]
+}
+
 export function ATGuide({
   url,
   urlLabel,
   steps,
+  sections,
 }: {
   url: string
   urlLabel: string
-  steps: GuideStep[]
+  steps?: GuideStep[]
+  sections?: GuideSection[]
 }) {
+  // Flatten all steps for the lightbox
+  const allSteps = sections ? sections.flatMap((s) => s.steps) : (steps ?? [])
   const [zoomedIndex, setZoomedIndex] = useState<number | null>(null)
 
-  const zoomedStep = zoomedIndex !== null ? steps[zoomedIndex] : null
+  const zoomedStep = zoomedIndex !== null ? allSteps[zoomedIndex] : null
+
+  // Get a global index for a step within a section
+  function globalIndex(sectionIdx: number, stepIdx: number): number {
+    if (!sections) return stepIdx
+    let offset = 0
+    for (let i = 0; i < sectionIdx; i++) offset += sections[i].steps.length
+    return offset + stepIdx
+  }
 
   return (
     <div className="space-y-3">
@@ -71,20 +88,50 @@ export function ATGuide({
         <ExternalLink className="h-3 w-3" aria-hidden="true" />
       </a>
 
-      {/* Steps */}
-      <ol className="space-y-3">
-        {steps.map((step, i) => (
-          <li key={step.screenshot} className="space-y-1.5">
-            <div className="flex items-start gap-2">
-              <StepNumber n={i + 1} />
-              <p className="pt-0.5 text-xs leading-relaxed text-muted-foreground">{step.caption}</p>
+      {/* Flat steps (legacy) */}
+      {steps && !sections && (
+        <ol className="space-y-3">
+          {steps.map((step, i) => (
+            <li key={`${step.screenshot}-${i}`} className="space-y-1.5">
+              <div className="flex items-start gap-2">
+                <StepNumber n={i + 1} />
+                <p className="pt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  {step.caption}
+                </p>
+              </div>
+              <div className="pl-7">
+                <StepImage step={step} onClick={() => setZoomedIndex(i)} />
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {/* Grouped sections */}
+      {sections && (
+        <div className="space-y-4">
+          {sections.map((section, si) => (
+            <div key={section.title} className="space-y-2">
+              <p className="text-xs font-semibold text-foreground">{section.title}</p>
+              <ol className="space-y-3">
+                {section.steps.map((step, i) => (
+                  <li key={`${step.screenshot}-${si}-${i}`} className="space-y-1.5">
+                    <div className="flex items-start gap-2">
+                      <StepNumber n={i + 1} />
+                      <p className="pt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        {step.caption}
+                      </p>
+                    </div>
+                    <div className="pl-7">
+                      <StepImage step={step} onClick={() => setZoomedIndex(globalIndex(si, i))} />
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
-            <div className="pl-7">
-              <StepImage step={step} onClick={() => setZoomedIndex(i)} />
-            </div>
-          </li>
-        ))}
-      </ol>
+          ))}
+        </div>
+      )}
 
       {/* Lightbox */}
       <Dialog open={zoomedIndex !== null} onOpenChange={(open) => !open && setZoomedIndex(null)}>
@@ -138,20 +185,48 @@ export function XmlGuide() {
     <ATGuide
       url="https://irs.portaldasfinancas.gov.pt/entregaIRSForm.action"
       urlLabel={t('upload.openPortalFinancas')}
-      steps={[
-        { ...LOGIN_STEP, caption: t('upload.guideSteps.login') },
-        { ...MULTI_AUTH_STEP, caption: t('upload.guideSteps.multiAuth') },
+      sections={[
         {
-          screenshot: '/screenshots/at/02-corrigir-declaracao.png',
-          width: 1800,
-          height: 860,
-          caption: t('upload.guideSteps.xmlEntregarDeclaracao'),
+          title: t('upload.guideSteps.xmlSubmittedTitle'),
+          steps: [
+            { ...LOGIN_STEP, caption: t('upload.guideSteps.login') },
+            { ...MULTI_AUTH_STEP, caption: t('upload.guideSteps.multiAuth') },
+            {
+              screenshot: '/screenshots/at/02-corrigir-declaracao.png',
+              width: 1800,
+              height: 860,
+              caption: t('upload.guideSteps.xmlCorrigirDeclaracao'),
+            },
+            {
+              screenshot: '/screenshots/at/04-declaration-modal.png',
+              width: 1800,
+              height: 874,
+              caption: t('upload.guideSteps.xmlCorrigirGravar'),
+            },
+          ],
         },
         {
-          screenshot: '/screenshots/at/04-declaration-modal.png',
-          width: 1800,
-          height: 874,
-          caption: t('upload.guideSteps.xmlGravar'),
+          title: t('upload.guideSteps.xmlCurrentTitle'),
+          steps: [
+            {
+              screenshot: '/screenshots/at/02-corrigir-declaracao.png',
+              width: 1800,
+              height: 860,
+              caption: t('upload.guideSteps.xmlCurrentEntregarDeclaracao'),
+            },
+            {
+              screenshot: '/screenshots/at/04-declaration-modal.png',
+              width: 1800,
+              height: 874,
+              caption: t('upload.guideSteps.xmlCurrentPrefill'),
+            },
+            {
+              screenshot: '/screenshots/at/04-declaration-modal.png',
+              width: 1800,
+              height: 874,
+              caption: t('upload.guideSteps.xmlCurrentGravar'),
+            },
+          ],
         },
       ]}
     />

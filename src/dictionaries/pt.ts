@@ -393,10 +393,18 @@ const pt: Dictionary = {
       login: 'Aceda ao Portal das Finanças e autentique-se com o seu NIF e senha.',
       multiAuth:
         'Escolha o método de autenticação (senha, Chave Móvel Digital, ou Cartão de Cidadão).',
-      xmlEntregarDeclaracao:
+      xmlSubmittedTitle: 'Para anos já submetidos:',
+      xmlCorrigirDeclaracao:
         'No menu lateral, clique em "Entregar Declaração" e depois em "Corrigir Declaração" para o ano pretendido.',
-      xmlGravar:
+      xmlCorrigirGravar:
         'Com a declaração aberta, clique no ícone de gravar (disquete) na barra de ferramentas para descarregar o ficheiro XML.',
+      xmlCurrentTitle: 'Para o ano corrente (ainda não submetido):',
+      xmlCurrentEntregarDeclaracao:
+        'No menu lateral, clique em "Entregar Declaração" e selecione "Preencher Declaração" para o ano corrente.',
+      xmlCurrentPrefill:
+        'Solicite o pré-preenchimento automático. Valide os dados, preencha o que faltar, e valide novamente.',
+      xmlCurrentGravar:
+        'Clique no ícone de gravar (disquete) para descarregar o XML — não é necessário submeter. Neste caso, não existe demonstração de liquidação.',
       pdfComprovativo:
         'Na lista de declarações, clique no botão "COMPROVATIVO" do ano pretendido para descarregar o PDF.',
       liqConsultar:
