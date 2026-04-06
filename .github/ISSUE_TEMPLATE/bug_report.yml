@@ -1,7 +1,7 @@
 name: 🐛 Bug Report
 description: Reportar um problema com cálculos, extração de documentos ou interface
-title: "[Bug]: "
-labels: ["bug"]
+title: '[Bug]: '
+labels: ['bug']
 body:
   - type: markdown
     attributes:
@@ -67,11 +67,11 @@ body:
     attributes:
       label: Ano fiscal
       options:
-        - "2025"
-        - "2024"
-        - "2023"
-        - "2022"
-        - "2021"
+        - '2025'
+        - '2024'
+        - '2023'
+        - '2022'
+        - '2021'
         - Outro / vários
 
   - type: dropdown

@@ -1,7 +1,7 @@
 name: 💡 Feature Request
 description: Sugerir uma funcionalidade ou melhoria
-title: "[Feature]: "
-labels: ["enhancement"]
+title: '[Feature]: '
+labels: ['enhancement']
 body:
   - type: textarea
     id: problem

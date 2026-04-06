@@ -61,7 +61,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 
 - **Atomic commits**: each commit is a complete, self-contained, passing unit.
 - Run `just check` before every commit. Never commit failing code.
-- Write descriptive commit messages that explain *what* and *why*.
+- Write descriptive commit messages that explain _what_ and _why_.
 
 ## Pull Request Process
 

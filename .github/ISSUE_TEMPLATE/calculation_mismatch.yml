@@ -1,7 +1,7 @@
 name: 🔢 Divergência de Cálculo
 description: Os valores do FiscalPT não correspondem à liquidação da AT
-title: "[Cálculo]: "
-labels: ["bug", "calculation"]
+title: '[Cálculo]: '
+labels: ['bug', 'calculation']
 body:
   - type: markdown
     attributes:
@@ -15,7 +15,7 @@ body:
     id: year
     attributes:
       label: Ano fiscal
-      placeholder: "2024"
+      placeholder: '2024'
     validations:
       required: true
 

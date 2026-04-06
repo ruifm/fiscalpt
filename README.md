@@ -39,13 +39,13 @@ filing scenario.
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js · React 19 · TypeScript |
-| Styling | Tailwind CSS · base-ui components |
-| Tax Engine | Pure TypeScript — deterministic, ~96% code coverage |
-| Testing | Vitest · Playwright · fast-check (property-based) |
-| Task Runner | [Just](https://github.com/casey/just) |
+| Layer       | Technology                                          |
+| ----------- | --------------------------------------------------- |
+| Framework   | Next.js · React 19 · TypeScript                     |
+| Styling     | Tailwind CSS · base-ui components                   |
+| Tax Engine  | Pure TypeScript — deterministic, ~96% code coverage |
+| Testing     | Vitest · Playwright · fast-check (property-based)   |
+| Task Runner | [Just](https://github.com/casey/just)               |
 
 ## Contributing
 
