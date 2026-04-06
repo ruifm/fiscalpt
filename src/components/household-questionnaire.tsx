@@ -141,7 +141,8 @@ export function HouseholdQuestionnaire({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({})
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Projection state — persisted in sessionStorage
+  // Projection state — persisted in sessionStorage.
+  // Default ON when household year is the current IRS reporting year (e.g. 2025 in 2026).
   const projectionStorageKey = `fiscalpt-projection-${household.year}`
   const [projectionEnabled, setProjectionEnabled] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -149,7 +150,8 @@ export function HouseholdQuestionnaire({
       const saved = sessionStorage.getItem(projectionStorageKey)
       if (saved) return JSON.parse(saved).enabled ?? false
     } catch {}
-    return false
+    // Default: enable when projectionYear is available (current IRS year)
+    return !!projectionYear
   })
   const [projectedIncomes, setProjectedIncomes] = useState<Record<string, number>>(() => {
     // Try to restore from sessionStorage
