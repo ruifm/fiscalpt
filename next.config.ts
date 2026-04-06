@@ -22,6 +22,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['localhost'],
+  env: {
+    NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN ?? '',
+  },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]
   },
