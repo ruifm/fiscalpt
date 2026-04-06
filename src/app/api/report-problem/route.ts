@@ -12,30 +12,37 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { email?: string; description?: string }
-    const { email, description } = body
+    const body = (await request.json()) as {
+      email?: string
+      description?: string
+      stage?: string
+    }
+    const { email, description, stage } = body
 
-    if (!email || !description) {
+    if (!description) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     const timestamp = new Date().toISOString()
-    console.info('[report-problem]', { email, description, timestamp })
+    console.info('[report-problem]', { email, description, stage, timestamp })
 
     if (RESEND_API_KEY) {
       const resend = new Resend(RESEND_API_KEY)
+      const replyTo = email?.trim() || undefined
+      const sender = replyTo ? `utilizador (${replyTo})` : 'utilizador anónimo'
       await resend.emails.send({
         from: REPORT_FROM,
         to: REPORT_TO,
-        replyTo: email,
-        subject: `[FiscalPT] Problema reportado por ${email}`,
+        ...(replyTo ? { replyTo } : {}),
+        subject: `[FiscalPT] Feedback de ${sender}${stage ? ` (${stage})` : ''}`,
         text: [
-          `Novo problema reportado em FiscalPT`,
+          `Novo feedback em FiscalPT`,
           ``,
-          `Email: ${email}`,
+          ...(replyTo ? [`Email: ${replyTo}`] : []),
+          ...(stage ? [`Etapa: ${stage}`] : []),
           `Data: ${timestamp}`,
           ``,
-          `Descrição:`,
+          `Mensagem:`,
           description,
         ].join('\n'),
       })

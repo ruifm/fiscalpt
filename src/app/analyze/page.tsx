@@ -44,6 +44,7 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LocaleToggle } from '@/components/locale-toggle'
 import { OnboardingOverlay } from '@/components/onboarding-overlay'
+import { FeedbackButton } from '@/components/feedback-button'
 import { useT } from '@/lib/i18n'
 import { trackEvent } from '@/lib/analytics'
 
@@ -650,6 +651,8 @@ export default function AnalyzePage() {
           </p>
         </div>
       </footer>
+
+      <FeedbackButton stage={step} />
     </div>
   )
 }
