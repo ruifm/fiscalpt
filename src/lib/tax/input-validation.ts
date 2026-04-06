@@ -329,14 +329,16 @@ export function validatePerson(person: Person, taxYear: number, prefix = ''): Va
 
   // Special regime consistency
   if (person.special_regimes.includes('irs_jovem')) {
-    if (!person.irs_jovem_year) {
+    // irs_jovem_year can be derived from first_work_year — only require one
+    if (!person.irs_jovem_year && !person.irs_jovem_first_work_year) {
       errors.push({
-        severity: 'error',
+        severity: 'warning',
         field: `${p}irs_jovem_year`,
         code: 'REQUIRED',
-        message: 'Ano de IRS Jovem é obrigatório quando o regime está ativo',
+        message:
+          'Ano de início de atividade necessário para o IRS Jovem — responda no questionário',
       })
-    } else if (person.irs_jovem_year < 1 || person.irs_jovem_year > 10) {
+    } else if (person.irs_jovem_year && (person.irs_jovem_year < 1 || person.irs_jovem_year > 10)) {
       errors.push({
         severity: 'error',
         field: `${p}irs_jovem_year`,

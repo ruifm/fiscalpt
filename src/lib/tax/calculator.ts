@@ -30,7 +30,11 @@ import {
   computeDependentDisabilityDeductions,
   computeAscendantDisabilityDeductions,
 } from './deductions'
-import { computeIrsJovemExemption, isEligibleForIrsJovem } from './irs-jovem'
+import {
+  computeIrsJovemExemption,
+  isEligibleForIrsJovem,
+  deriveIrsJovemBenefitYear,
+} from './irs-jovem'
 import { isNhrActive, computeNhrTax } from './nhr'
 import { generateProactiveOptimizations } from './proactive-optimizations'
 import { round2, round4, sumGross, formatEuro } from './utils'
@@ -213,9 +217,16 @@ function computeTaxableIncome(person: Person, taxYear: number): TaxableIncomeRes
   const hasNhr =
     person.special_regimes.includes('nhr') &&
     isNhrActive(person.nhr_start_year, taxYear, person.nhr_confirmed)
+
+  // Derive benefit year from stable first_work_year when available
+  const effectiveBenefitYear = deriveIrsJovemBenefitYear(
+    person.irs_jovem_year,
+    person.irs_jovem_first_work_year,
+    taxYear,
+  )
   const hasIrsJovem =
     person.special_regimes.includes('irs_jovem') &&
-    isEligibleForIrsJovem(person.irs_jovem_year, taxYear)
+    isEligibleForIrsJovem(effectiveBenefitYear, taxYear)
 
   const grossTotal = sumGross(person.incomes)
   const specificDeductionCatA = computeSpecificDeduction(person.incomes, 'A', taxYear)
@@ -271,8 +282,8 @@ function computeTaxableIncome(person: Person, taxYear: number): TaxableIncomeRes
     }
 
     // Apply IRS Jovem exemption (only on Cat A + B qualifying income)
-    if (hasIrsJovem && person.irs_jovem_year !== undefined) {
-      irsJovemExemption = computeIrsJovemExemption(person.incomes, person.irs_jovem_year, taxYear)
+    if (hasIrsJovem && effectiveBenefitYear !== undefined) {
+      irsJovemExemption = computeIrsJovemExemption(person.incomes, effectiveBenefitYear, taxYear)
       taxableForBrackets = Math.max(0, taxableForBrackets - irsJovemExemption)
     }
   }
@@ -764,24 +775,25 @@ function generateIrsJovemOptimizations(household: Household): {
   let totalSavings = 0
 
   for (const person of household.members) {
+    const benefitYear = deriveIrsJovemBenefitYear(
+      person.irs_jovem_year,
+      person.irs_jovem_first_work_year,
+      household.year,
+    )
     if (
       !person.special_regimes.includes('irs_jovem') ||
-      !isEligibleForIrsJovem(person.irs_jovem_year, household.year)
+      !isEligibleForIrsJovem(benefitYear, household.year)
     )
       continue
 
-    const exemption = computeIrsJovemExemption(
-      person.incomes,
-      person.irs_jovem_year!,
-      household.year,
-    )
+    const exemption = computeIrsJovemExemption(person.incomes, benefitYear!, household.year)
     if (exemption > 0) {
       const savings = round2(exemption * IRS_JOVEM_MARGINAL_RATE_ESTIMATE)
       totalSavings += savings
       optimizations.push({
         id: `irs-jovem-${person.name}`,
         title: `IRS Jovem — ${person.name}`,
-        description: `${person.name} beneficia do IRS Jovem (ano ${person.irs_jovem_year}): isenção de €${exemption.toFixed(2)} no rendimento tributável.`,
+        description: `${person.name} beneficia do IRS Jovem (ano ${benefitYear}): isenção de €${exemption.toFixed(2)} no rendimento tributável.`,
         estimated_savings: savings,
       })
     }

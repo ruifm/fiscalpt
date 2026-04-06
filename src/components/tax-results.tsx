@@ -444,13 +444,15 @@ function ScenarioSummary({
 
       {isMulti && (
         <div className="grid gap-4 sm:grid-cols-2">
-          {scenario.persons.map((person) => (
-            <PersonCard
-              key={person.name}
-              person={person}
-              baseline={baseline?.persons.find((p) => p.name === person.name)}
-            />
-          ))}
+          {[...scenario.persons]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((person) => (
+              <PersonCard
+                key={person.name}
+                person={person}
+                baseline={baseline?.persons.find((p) => p.name === person.name)}
+              />
+            ))}
         </div>
       )}
     </div>

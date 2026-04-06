@@ -104,7 +104,8 @@ export interface Person {
   incomes: Income[]
   deductions: Deduction[]
   special_regimes: SpecialRegime[]
-  irs_jovem_year?: number // 1-10: which year of benefit
+  irs_jovem_year?: number // 1-10: which year of benefit (derived or legacy)
+  irs_jovem_first_work_year?: number // stable: year the person first worked in Portugal
   nhr_start_year?: number
   // Set when Anexo L is present — NHR is definitively active for this tax year
   nhr_confirmed?: boolean

@@ -33,12 +33,20 @@ export function buildProjectedHousehold(
     members: primary.members.map((member) => {
       const adjusted = member.nif ? adjustedIncomes?.get(member.nif) : undefined
 
-      const newIrsJovemYear = member.irs_jovem_year ? member.irs_jovem_year + 1 : undefined
-      const irsJovemActive = newIrsJovemYear !== undefined && newIrsJovemYear <= maxBenefitYears
+      // Derive benefit year for projected year from stable first_work_year
+      const derivedBenefitYear = member.irs_jovem_first_work_year
+        ? projectedYear - member.irs_jovem_first_work_year + 1
+        : member.irs_jovem_year
+          ? member.irs_jovem_year + 1
+          : undefined
+      const irsJovemActive =
+        derivedBenefitYear !== undefined &&
+        derivedBenefitYear >= 1 &&
+        derivedBenefitYear <= maxBenefitYears
 
       return {
         ...member,
-        irs_jovem_year: irsJovemActive ? newIrsJovemYear : undefined,
+        irs_jovem_year: irsJovemActive ? derivedBenefitYear : undefined,
         special_regimes: irsJovemActive
           ? member.special_regimes
           : member.special_regimes.filter((r) => r !== 'irs_jovem'),

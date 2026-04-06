@@ -5,6 +5,7 @@ import {
   computeIrsJovemExemption,
   isEligibleForIrsJovem,
   getIrsJovemRegime,
+  deriveIrsJovemBenefitYear,
 } from '@/lib/tax/irs-jovem'
 import type { Income } from '@/lib/tax/types'
 import { IAS } from '@/lib/tax/types'
@@ -327,5 +328,30 @@ describe('IRS Jovem — edge cases', () => {
   it('getIrsJovemExemptionRate returns 0 for out-of-range benefit year', () => {
     expect(getIrsJovemExemptionRate(0, 2025)).toBe(0)
     expect(getIrsJovemExemptionRate(11, 2025)).toBe(0)
+  })
+})
+
+describe('deriveIrsJovemBenefitYear', () => {
+  it('derives benefit year from firstWorkYear and taxYear', () => {
+    expect(deriveIrsJovemBenefitYear(undefined, 2020, 2025)).toBe(6)
+    expect(deriveIrsJovemBenefitYear(undefined, 2025, 2025)).toBe(1)
+    expect(deriveIrsJovemBenefitYear(undefined, 2016, 2025)).toBe(10)
+  })
+
+  it('uses explicit irsJovemYear when firstWorkYear is not set', () => {
+    expect(deriveIrsJovemBenefitYear(3, undefined, 2025)).toBe(3)
+  })
+
+  it('prefers firstWorkYear over explicit irsJovemYear', () => {
+    // firstWorkYear=2020, taxYear=2025 → year 6, ignore explicit 3
+    expect(deriveIrsJovemBenefitYear(3, 2020, 2025)).toBe(6)
+  })
+
+  it('returns undefined when neither is set', () => {
+    expect(deriveIrsJovemBenefitYear(undefined, undefined, 2025)).toBeUndefined()
+  })
+
+  it('returns undefined when firstWorkYear is after taxYear', () => {
+    expect(deriveIrsJovemBenefitYear(undefined, 2026, 2025)).toBeUndefined()
   })
 })

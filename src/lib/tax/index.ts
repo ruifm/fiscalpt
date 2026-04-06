@@ -28,6 +28,7 @@ export {
   getIrsJovemCap,
   isEligibleForIrsJovem,
   getIrsJovemRegime,
+  deriveIrsJovemBenefitYear,
 } from './irs-jovem'
 export {
   isNhrActive,

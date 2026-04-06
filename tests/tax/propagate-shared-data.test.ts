@@ -202,4 +202,12 @@ describe('propagateSharedData', () => {
     expect(result.members[1].special_regimes).toEqual([])
     expect(result.members[1].nhr_confirmed).toBeUndefined()
   })
+
+  it('propagates irs_jovem_first_work_year from primary to target', () => {
+    const primary = makeHousehold(2025, [makePerson('Rui', { irs_jovem_first_work_year: 2020 })])
+    const target = makeHousehold(2023, [makePerson('RUI MIGUEL')])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].irs_jovem_first_work_year).toBe(2020)
+  })
 })

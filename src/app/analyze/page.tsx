@@ -249,26 +249,6 @@ export default function AnalyzePage() {
       // Analyze non-projected first
       const allResults: AnalysisResult[] = nonProjected.map((hh) => analyzeHousehold(hh))
 
-      // Diagnostic: log per-year member and scenario data
-      for (const r of allResults) {
-        const members = r.household.members.map(
-          (m) =>
-            `${m.name}(nif=${m.nif ?? '?'}, nhr=${m.special_regimes.includes('nhr')}, ` +
-            `nhr_confirmed=${m.nhr_confirmed ?? false}, nhr_start=${m.nhr_start_year ?? '?'}, ` +
-            `regimes=[${m.special_regimes.join(',')}])`,
-        )
-        const burdens = r.scenarios.map(
-          (s) => `${s.filing_status}=${s.total_tax_burden.toFixed(2)}`,
-        )
-        console.info(
-          `[FiscalPT] Year ${r.year} (${r.household.projected ? 'projected' : 'real'}):`,
-          `\n  members: ${members.join('; ')}`,
-          `\n  filing: ${r.household.filing_status}`,
-          `\n  scenarios: [${burdens.join(', ')}]`,
-          `\n  optimizations: ${r.optimizations.length}`,
-        )
-      }
-
       // Enrich projected households with estimated retentions, then analyze
       const primaryHH = nonProjected[0]
       const primaryResult = allResults.find((r) => r.year === primaryHH?.year)
@@ -281,6 +261,32 @@ export default function AnalyzePage() {
             : proj
         enrichedHouseholds.push(enriched)
         allResults.push(analyzeHousehold(enriched))
+      }
+
+      // Diagnostic: log per-year member and scenario data (all years including projected)
+      for (const r of allResults) {
+        const members = r.household.members.map(
+          (m) =>
+            `${m.name}(nif=${m.nif ?? '?'}, nhr=${m.special_regimes.includes('nhr')}, ` +
+            `nhr_confirmed=${m.nhr_confirmed ?? false}, nhr_start=${m.nhr_start_year ?? '?'}, ` +
+            `regimes=[${m.special_regimes.join(',')}], ` +
+            `irs_jovem_year=${m.irs_jovem_year ?? '?'}, first_work=${m.irs_jovem_first_work_year ?? '?'})`,
+        )
+        const burdens = r.scenarios.map(
+          (s) => `${s.filing_status}=${s.total_tax_burden.toFixed(2)}`,
+        )
+        const personRates = r.scenarios[0]?.persons.map(
+          (p) =>
+            `${p.name}: rate=${(p.effective_rate_irs * 100).toFixed(2)}%, irs_jovem_exempt=${p.irs_jovem_exemption.toFixed(2)}`,
+        )
+        console.info(
+          `[FiscalPT] Year ${r.year} (${r.household.projected ? 'projected' : 'real'}):`,
+          `\n  members: ${members.join('; ')}`,
+          `\n  filing: ${r.household.filing_status}`,
+          `\n  scenarios: [${burdens.join(', ')}]`,
+          `\n  person rates: [${personRates?.join('; ') ?? 'n/a'}]`,
+          `\n  optimizations: ${r.optimizations.length}`,
+        )
       }
 
       setHouseholds(enrichedHouseholds)

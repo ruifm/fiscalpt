@@ -99,6 +99,25 @@ describe('buildProjectedHousehold', () => {
     expect(projected.members[0].irs_jovem_year).toBe(4)
   })
 
+  it('derives irs_jovem_year from irs_jovem_first_work_year', () => {
+    const h = makeHousehold()
+    h.members[0].irs_jovem_first_work_year = 2020
+    h.members[0].irs_jovem_year = undefined
+    const projected = buildProjectedHousehold(h)
+    // projectedYear = 2026, firstWorkYear = 2020 → year 7
+    expect(projected.members[0].irs_jovem_year).toBe(7)
+    expect(projected.members[0].special_regimes).toContain('irs_jovem')
+  })
+
+  it('drops IRS Jovem when derived year from first_work_year exceeds max', () => {
+    const h = makeHousehold()
+    h.members[0].irs_jovem_first_work_year = 2015
+    // projectedYear = 2026, firstWorkYear = 2015 → year 12 > 10
+    const projected = buildProjectedHousehold(h)
+    expect(projected.members[0].irs_jovem_year).toBeUndefined()
+    expect(projected.members[0].special_regimes).not.toContain('irs_jovem')
+  })
+
   it('increments cat_b_activity_year by 1', () => {
     const h = makeHousehold()
     const projected = buildProjectedHousehold(h)

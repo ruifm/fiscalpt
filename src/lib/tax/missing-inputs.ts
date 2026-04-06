@@ -242,35 +242,10 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
     }
   }
 
-  // ── IRS Jovem details ────────────────────────────────────
-  for (let i = 0; i < household.members.length; i++) {
-    const member = household.members[i]
-    if (!hasSpecialRegime(member, 'irs_jovem')) continue
-
-    // If member is > 35 and benefit year is unconfirmed, skip the benefit year
-    // question here — the proactive verification section below will ask for
-    // first_work_year/degree_year to verify eligibility instead.
-    if (member.birth_year && year - member.birth_year > 35 && !member.irs_jovem_year) continue
-
-    const hasIrsJovemYear = !!member.irs_jovem_year
-    const regime = getIrsJovemRegime(year)
-    const maxBenefitYears = regime?.maxBenefitYears ?? 10
-    questions.push({
-      id: `member.${i}.irs_jovem_year`,
-      section: 'irs_jovem',
-      label: `Ano de benefício IRS Jovem de ${member.name}`,
-      reason: irsJovemYearReason(year),
-      type: 'select',
-      options: irsJovemYearOptions(year),
-      priority: hasIrsJovemYear ? 'optional' : 'critical',
-      path: `members.${i}.irs_jovem_year`,
-      currentValue: hasIrsJovemYear ? String(member.irs_jovem_year) : undefined,
-      validate: (value: string | number | boolean): string | null => {
-        const n = toNumber(value)
-        return n >= 1 && n <= maxBenefitYears ? null : `Deve ser entre 1 e ${maxBenefitYears}`
-      },
-    })
-  }
+  // ── IRS Jovem — benefit year is derived from first_work_year ──
+  // No dropdown question needed; the proactive section below asks
+  // for first_work_year (or degree_year for pre-2025) and derives
+  // the benefit year automatically via applyAnswers.
 
   // ── NHR details ──────────────────────────────────────────
   for (let i = 0; i < household.members.length; i++) {
@@ -326,11 +301,12 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
 
   // ── IRS Jovem proactive detection / verification ────────
   // For members without IRS Jovem who have Cat A/B income: probe eligibility.
-  // Also handles members with unconfirmed irs_jovem from XML (code 417)
-  // who are > 35 — they need work year verification before we ask benefit year.
+  // Also handles members with unconfirmed irs_jovem from XML (code 417).
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
-    // Skip if IRS Jovem is fully confirmed (has benefit year set)
+    // Skip if first_work_year is already known (benefit year can be derived)
+    if (member.irs_jovem_first_work_year) continue
+    // Legacy: skip if irs_jovem_year was set directly
     if (hasSpecialRegime(member, 'irs_jovem') && member.irs_jovem_year) continue
     if (!member.birth_year) continue
 
@@ -450,6 +426,7 @@ export function applyAnswers(
       const member = h.members[idx]
       if (member) {
         const firstWorkYear = toNumber(value)
+        member.irs_jovem_first_work_year = firstWorkYear
         const benefitYear = h.year - firstWorkYear + 1
         const regime = getIrsJovemRegime(h.year)
         const maxYears = regime?.maxBenefitYears ?? 10
@@ -467,6 +444,8 @@ export function applyAnswers(
       if (member) {
         const degreeYear = toNumber(value)
         // Pre-2025: benefit starts the year after degree completion
+        // Store as first_work_year equivalent: degree_year + 1
+        member.irs_jovem_first_work_year = degreeYear + 1
         const benefitYear = h.year - degreeYear
         const regime = getIrsJovemRegime(h.year)
         const maxYears = regime?.maxBenefitYears ?? 5
@@ -547,38 +526,6 @@ function toNumber(value: string | number | boolean): number {
   if (typeof value === 'number') return sanitizeNumber(value)
   if (typeof value === 'boolean') return value ? 1 : 0
   return sanitizeNumber(parseInt(value))
-}
-
-function irsJovemYearReason(taxYear: number): string {
-  if (taxYear >= 2025) {
-    return 'Lei 45-A/2024: Anos 1-5 → 50% isenção (limite 55×IAS); Anos 6-10 → 25% isenção (limite 55×IAS).'
-  }
-  return 'Art. 12-F CIRS: Anos 1-5 → isenção decrescente (100%→25%); cap depende do ano.'
-}
-
-function irsJovemYearOptions(taxYear: number): { value: string; label: string }[] {
-  if (taxYear >= 2025) {
-    return [
-      { value: '1', label: '1.º ano (50% isenção)' },
-      { value: '2', label: '2.º ano (50% isenção)' },
-      { value: '3', label: '3.º ano (50% isenção)' },
-      { value: '4', label: '4.º ano (50% isenção)' },
-      { value: '5', label: '5.º ano (50% isenção)' },
-      { value: '6', label: '6.º ano (25% isenção)' },
-      { value: '7', label: '7.º ano (25% isenção)' },
-      { value: '8', label: '8.º ano (25% isenção)' },
-      { value: '9', label: '9.º ano (25% isenção)' },
-      { value: '10', label: '10.º ano (25% isenção)' },
-    ]
-  }
-  // Pre-2025 (Art. 12-B / 12-F original)
-  return [
-    { value: '1', label: '1.º ano (100% isenção)' },
-    { value: '2', label: '2.º ano (75% isenção)' },
-    { value: '3', label: '3.º ano (50% isenção)' },
-    { value: '4', label: '4.º ano (50% isenção)' },
-    { value: '5', label: '5.º ano (25% isenção)' },
-  ]
 }
 
 /** Returns true if there are any critical or important questions. */

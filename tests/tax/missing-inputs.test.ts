@@ -301,51 +301,45 @@ describe('identifyMissingInputs', () => {
   })
 
   describe('IRS Jovem', () => {
-    it('asks for benefit year when IRS Jovem active but year not set', () => {
+    it('no longer asks for benefit year dropdown — derives from first_work_year', () => {
       const h = makeHousehold({
         members: [makePerson({ special_regimes: ['irs_jovem'] })],
       })
       const qs = identifyMissingInputs(h)
-      const q = qs.find((q) => q.id === 'member.0.irs_jovem_year')
-      expect(q).toBeDefined()
-      expect(q!.priority).toBe('critical')
-      expect(q!.section).toBe('irs_jovem')
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeUndefined()
     })
 
-    it('provides 10 year options for 2025+', () => {
+    it('asks for first_work_year when IRS Jovem detected from XML (≥2025)', () => {
       const h = makeHousehold({
         year: 2025,
-        members: [makePerson({ special_regimes: ['irs_jovem'] })],
-      })
-      const qs = identifyMissingInputs(h)
-      const q = qs.find((q) => q.id === 'member.0.irs_jovem_year')
-      expect(q!.options).toHaveLength(10)
-    })
-
-    it('provides 5 year options for pre-2025', () => {
-      const h = makeHousehold({
-        year: 2024,
-        members: [makePerson({ special_regimes: ['irs_jovem'] })],
-      })
-      const qs = identifyMissingInputs(h)
-      const q = qs.find((q) => q.id === 'member.0.irs_jovem_year')
-      expect(q!.options).toHaveLength(5)
-    })
-
-    it('asks with optional priority when benefit year already set', () => {
-      const h = makeHousehold({
         members: [
           makePerson({
             special_regimes: ['irs_jovem'],
-            irs_jovem_year: 3,
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
           }),
         ],
       })
       const qs = identifyMissingInputs(h)
-      const q = qs.find((q) => q.id === 'member.0.irs_jovem_year')
+      const q = qs.find((q) => q.id === 'member.0.first_work_year')
       expect(q).toBeDefined()
-      expect(q!.priority).toBe('optional')
-      expect(q!.currentValue).toBe('3')
+      expect(q!.section).toBe('irs_jovem')
+      expect(q!.priority).toBe('critical')
+    })
+
+    it('skips first_work_year when irs_jovem_first_work_year already set', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            special_regimes: ['irs_jovem'],
+            birth_year: 1995,
+            irs_jovem_first_work_year: 2020,
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
     })
 
     it('does not ask when IRS Jovem not active', () => {
@@ -354,6 +348,7 @@ describe('identifyMissingInputs', () => {
       })
       const qs = identifyMissingInputs(h)
       expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeUndefined()
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
     })
   })
 
@@ -494,8 +489,9 @@ describe('identifyMissingInputs', () => {
       // Child has placeholder birth year
       expect(qs.find((q) => q.id === 'dependent.0.birth_year')).toBeDefined()
 
-      // Rui: IRS Jovem year + Cat B activity year
-      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeDefined()
+      // Rui: no irs_jovem_year dropdown (derived from first_work_year)
+      // But birth_year not set, so first_work_year question won't appear yet
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeUndefined()
       expect(qs.find((q) => q.id === 'member.0.income.1.cat_b_activity_year')).toBeDefined()
 
       // Micha: NHR start year
@@ -525,9 +521,11 @@ describe('identifyMissingInputs', () => {
 describe('groupBySection', () => {
   it('groups questions by section with metadata', () => {
     const h = makeHousehold({
+      year: 2025,
       members: [
         makePerson({
           special_regimes: ['irs_jovem'],
+          birth_year: 1995,
           incomes: [makeIncome({ category: 'B', gross: 50000 })],
         }),
       ],
@@ -535,9 +533,9 @@ describe('groupBySection', () => {
     const qs = identifyMissingInputs(h)
     const groups = groupBySection(qs)
 
-    // Should have taxpayer_info, cat_b_details, irs_jovem sections (NOT deductions)
+    // Should have cat_b_details, irs_jovem sections (NOT deductions)
+    // taxpayer_info may not appear if birth_year is already set
     const sectionNames = groups.map((g) => g.section)
-    expect(sectionNames).toContain('taxpayer_info')
     expect(sectionNames).toContain('cat_b_details')
     expect(sectionNames).toContain('irs_jovem')
     expect(sectionNames).not.toContain('deductions')
@@ -970,8 +968,8 @@ describe('question validators', () => {
     })
   })
 
-  describe('irs_jovem_year', () => {
-    function getIrsJovemYearQuestion(taxYear: number) {
+  describe('first_work_year (IRS Jovem)', () => {
+    function getFirstWorkYearQuestion(taxYear: number) {
       const h = makeHousehold({
         year: taxYear,
         members: [
@@ -979,44 +977,41 @@ describe('question validators', () => {
             name: 'João',
             birth_year: 2000,
             special_regimes: ['irs_jovem'],
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
           }),
         ],
       })
       const qs = identifyMissingInputs(h)
-      return qs.find((q) => q.id === 'member.0.irs_jovem_year')!
+      return qs.find((q) => q.id === 'member.0.first_work_year')!
     }
 
-    it('has a validate function (2025 regime, max 10)', () => {
-      const q = getIrsJovemYearQuestion(2025)
-      expect(q.validate).toBeDefined()
+    it('asks first_work_year for 2025+ regime', () => {
+      const q = getFirstWorkYearQuestion(2025)
+      expect(q).toBeDefined()
+      expect(q.type).toBe('year')
+      expect(q.section).toBe('irs_jovem')
     })
 
-    it('accepts year 1 (2025 regime)', () => {
-      expect(getIrsJovemYearQuestion(2025).validate!(1)).toBeNull()
-      expect(getIrsJovemYearQuestion(2025).validate!('1')).toBeNull()
+    it('validates year range', () => {
+      const q = getFirstWorkYearQuestion(2025)
+      expect(q.validate!(2020)).toBeNull()
+      expect(q.validate!(1800)).not.toBeNull()
     })
 
-    it('accepts year 10 (2025 regime, max)', () => {
-      expect(getIrsJovemYearQuestion(2025).validate!(10)).toBeNull()
-    })
-
-    it('rejects year 0 (2025 regime)', () => {
-      expect(getIrsJovemYearQuestion(2025).validate!(0)).toBe('Deve ser entre 1 e 10')
-    })
-
-    it('rejects year 11 (2025 regime, over max)', () => {
-      expect(getIrsJovemYearQuestion(2025).validate!(11)).toBe('Deve ser entre 1 e 10')
-    })
-
-    it('uses correct max for 2024 regime (max 5)', () => {
-      const q = getIrsJovemYearQuestion(2024)
-      expect(q.validate!(5)).toBeNull()
-      expect(q.validate!(6)).toBe('Deve ser entre 1 e 5')
-    })
-
-    it('handles string input', () => {
-      expect(getIrsJovemYearQuestion(2025).validate!('5')).toBeNull()
-      expect(getIrsJovemYearQuestion(2025).validate!('11')).toBe('Deve ser entre 1 e 10')
+    it('no longer generates irs_jovem_year dropdown question', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'João',
+            birth_year: 2000,
+            special_regimes: ['irs_jovem'],
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeUndefined()
     })
   })
 
@@ -1425,7 +1420,7 @@ describe('question validators', () => {
       expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
     })
 
-    it('asks benefit year for member ≤ 35 with irs_jovem from XML', () => {
+    it('asks first_work_year for member ≤ 35 with irs_jovem from XML', () => {
       const h = makeHousehold({
         year: 2025,
         members: [
@@ -1438,10 +1433,12 @@ describe('question validators', () => {
         ],
       })
       const qs = identifyMissingInputs(h)
-      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeDefined()
+      // No dropdown, but should ask first_work_year
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeUndefined()
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
     })
 
-    it('asks benefit year for member > 35 with CONFIRMED irs_jovem_year', () => {
+    it('skips first_work_year for member > 35 with confirmed irs_jovem_first_work_year', () => {
       const h = makeHousehold({
         year: 2025,
         members: [
@@ -1450,13 +1447,12 @@ describe('question validators', () => {
             birth_year: 1989, // age 36
             incomes: [makeIncome({ category: 'A', gross: 30000 })],
             special_regimes: ['irs_jovem'],
-            irs_jovem_year: 2, // confirmed: started at 35, now year 2
+            irs_jovem_first_work_year: 2023,
           }),
         ],
       })
       const qs = identifyMissingInputs(h)
-      // Should ask (optional, already answered) since benefit year is confirmed
-      expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeDefined()
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
     })
 
     it('asks first_work_year for member with unconfirmed XML irs_jovem and age ≤ 44', () => {
