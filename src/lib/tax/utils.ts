@@ -18,3 +18,8 @@ export function sumGross(
   const filtered = categories ? incomes.filter((i) => categories.includes(i.category)) : incomes
   return filtered.reduce((sum, i) => sum + i.gross, 0)
 }
+
+/** Format a number as a euro amount (integer, no decimals). */
+export function formatEuro(amount: number): string {
+  return `€${amount.toFixed(0)}`
+}

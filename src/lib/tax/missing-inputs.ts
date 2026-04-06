@@ -320,6 +320,57 @@ export function identifyMissingInputs(household: Household): MissingInputQuestio
     }
   }
 
+  // ── IRS Jovem proactive detection ───────────────────────
+  // For members ≤35 without IRS Jovem who have Cat A/B income,
+  // ask about work/degree history to detect eligibility.
+  for (let i = 0; i < household.members.length; i++) {
+    const member = household.members[i]
+    if (hasSpecialRegime(member, 'irs_jovem')) continue
+    if (!member.birth_year) continue
+
+    const age = year - member.birth_year
+    if (age > 35) continue
+
+    const hasCatAOrB = member.incomes.some((inc) => inc.category === 'A' || inc.category === 'B')
+    if (!hasCatAOrB) continue
+
+    if (year >= 2025) {
+      // New regime: no degree required, just first year of work in Portugal
+      questions.push({
+        id: `member.${i}.first_work_year`,
+        section: 'irs_jovem',
+        label: `Em que ano ${member.name} começou a trabalhar em Portugal?`,
+        reason:
+          'A partir de 2025, o IRS Jovem aplica-se aos primeiros 10 anos de trabalho ' +
+          '(sem exigência de grau académico). Se elegível, pode isentar 25%-50% do rendimento.',
+        type: 'year',
+        priority: 'important',
+        path: `members.${i}.first_work_year`,
+        validate: (value: string | number | boolean): string | null => {
+          const n = toNumber(value)
+          return n >= MIN_BIRTH_YEAR && n <= currentYear ? null : 'Ano inválido'
+        },
+      })
+    } else {
+      // Pre-2025: requires degree completion
+      questions.push({
+        id: `member.${i}.degree_year`,
+        section: 'irs_jovem',
+        label: `Em que ano ${member.name} concluiu o grau de ensino mais elevado?`,
+        reason:
+          'Até 2024, o IRS Jovem (Art. 12-F) aplica-se nos 5 anos após conclusão do ' +
+          'ensino superior. Se elegível, pode isentar 25%-100% do rendimento.',
+        type: 'year',
+        priority: 'important',
+        path: `members.${i}.degree_year`,
+        validate: (value: string | number | boolean): string | null => {
+          const n = toNumber(value)
+          return n >= MIN_BIRTH_YEAR && n <= currentYear ? null : 'Ano inválido'
+        },
+      })
+    }
+  }
+
   return questions
 }
 
@@ -380,6 +431,39 @@ export function applyAnswers(
     } else if (parts[0] === 'member' && parts[2] === 'nhr_start_year') {
       const idx = parseInt(parts[1])
       if (h.members[idx]) h.members[idx].nhr_start_year = toNumber(value)
+    } else if (parts[0] === 'member' && parts[2] === 'first_work_year') {
+      // IRS Jovem proactive detection (≥2025): derive benefit year from first work year
+      const idx = parseInt(parts[1])
+      const member = h.members[idx]
+      if (member) {
+        const firstWorkYear = toNumber(value)
+        const benefitYear = h.year - firstWorkYear + 1
+        const regime = getIrsJovemRegime(h.year)
+        const maxYears = regime?.maxBenefitYears ?? 10
+        if (benefitYear >= 1 && benefitYear <= maxYears) {
+          if (!member.special_regimes.includes('irs_jovem')) {
+            member.special_regimes = [...member.special_regimes, 'irs_jovem']
+          }
+          member.irs_jovem_year = benefitYear
+        }
+      }
+    } else if (parts[0] === 'member' && parts[2] === 'degree_year') {
+      // IRS Jovem proactive detection (≤2024): derive benefit year from degree year
+      const idx = parseInt(parts[1])
+      const member = h.members[idx]
+      if (member) {
+        const degreeYear = toNumber(value)
+        // Pre-2025: benefit starts the year after degree completion
+        const benefitYear = h.year - degreeYear
+        const regime = getIrsJovemRegime(h.year)
+        const maxYears = regime?.maxBenefitYears ?? 5
+        if (benefitYear >= 1 && benefitYear <= maxYears) {
+          if (!member.special_regimes.includes('irs_jovem')) {
+            member.special_regimes = [...member.special_regimes, 'irs_jovem']
+          }
+          member.irs_jovem_year = benefitYear
+        }
+      }
     } else if (parts[0] === 'member' && parts[2] === 'income') {
       const mIdx = parseInt(parts[1])
       const iIdx = parseInt(parts[3])

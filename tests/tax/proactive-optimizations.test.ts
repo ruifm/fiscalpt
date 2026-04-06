@@ -304,4 +304,187 @@ describe('generateProactiveOptimizations', () => {
     expect(opts.find((o) => o.id === 'ppr-alice')).toBeDefined()
     expect(opts.find((o) => o.id === 'ppr-bob')).toBeDefined()
   })
+
+  // Feature 5: PPR under-cap detection
+  describe('PPR under-cap detection', () => {
+    it('suggests maximizing PPR when contribution is below age-based cap', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Alice',
+            nif: '123',
+            birth_year: 1995, // age 31 → cap €400
+            incomes: [{ category: 'A', gross: 30000 }],
+            deductions: [{ category: 'ppr', amount: 1000 }], // invested €1000, deduction = €200
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson()]))
+      const opts = generateProactiveOptimizations(h, result)
+      const pprOpt = opts.find((o) => o.id === 'ppr-maximize-alice')
+      expect(pprOpt).toBeDefined()
+      expect(pprOpt!.estimated_savings).toBeGreaterThan(0)
+      expect(pprOpt!.description).toContain('1000') // additional €1000 needed
+    })
+
+    it('does not suggest PPR maximize when already at cap', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Alice',
+            nif: '123',
+            birth_year: 1995, // cap €400
+            incomes: [{ category: 'A', gross: 30000 }],
+            deductions: [{ category: 'ppr', amount: 2000 }], // 2000 × 0.2 = 400 = cap
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson()]))
+      const opts = generateProactiveOptimizations(h, result)
+      expect(opts.find((o) => o.id === 'ppr-maximize-alice')).toBeUndefined()
+      expect(opts.find((o) => o.id === 'ppr-alice')).toBeUndefined()
+    })
+
+    it('uses age-based cap for 35-50 bracket', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Bob',
+            nif: '456',
+            birth_year: 1980, // age 46 → cap €350
+            incomes: [{ category: 'A', gross: 30000 }],
+            deductions: [{ category: 'ppr', amount: 500 }], // 500 × 0.2 = 100 < 350
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson({ name: 'Bob' })]))
+      const opts = generateProactiveOptimizations(h, result)
+      const pprOpt = opts.find((o) => o.id === 'ppr-maximize-bob')
+      expect(pprOpt).toBeDefined()
+      // Gap: 350 - 100 = 250. Need additional: (350/0.2) - 500 = 1250
+      expect(pprOpt!.estimated_savings).toBe(250)
+    })
+  })
+
+  // Feature 1: Cat B Simplified vs Organized
+  describe('Cat B regime comparison', () => {
+    it('suggests organized regime when break-even point is reasonable', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Alice',
+            nif: '123',
+            birth_year: 1990,
+            incomes: [
+              {
+                category: 'B',
+                gross: 40000,
+                cat_b_regime: 'simplified',
+                cat_b_income_code: 403, // coefficient 0.75
+              },
+            ],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson()]))
+      const opts = generateProactiveOptimizations(h, result)
+      const catBOpt = opts.find((o) => o.id === 'cat-b-regime-alice')
+      expect(catBOpt).toBeDefined()
+      // Simplified taxable = 40000 × 0.75 = 30000
+      // Break-even expenses = gross - simplified = 40000 - 30000 = 10000
+      // As % of gross: 10000/40000 = 25%
+      expect(catBOpt!.description).toContain('10000') // break-even point
+    })
+
+    it('does not suggest for organized regime', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Alice',
+            nif: '123',
+            birth_year: 1990,
+            incomes: [
+              {
+                category: 'B',
+                gross: 40000,
+                cat_b_regime: 'organized',
+                expenses: 20000,
+              },
+            ],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson()]))
+      const opts = generateProactiveOptimizations(h, result)
+      expect(opts.find((o) => o.id === 'cat-b-regime-alice')).toBeUndefined()
+    })
+
+    it('does not suggest for non-projected households', () => {
+      const h = makeHousehold({
+        projected: false,
+        members: [
+          {
+            name: 'Alice',
+            nif: '123',
+            birth_year: 1990,
+            incomes: [{ category: 'B', gross: 40000, cat_b_regime: 'simplified' }],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson()]))
+      const opts = generateProactiveOptimizations(h, result)
+      expect(opts.find((o) => o.id === 'cat-b-regime-alice')).toBeUndefined()
+    })
+  })
+
+  // Feature 4: e-Fatura category correction
+  describe('e-Fatura category correction', () => {
+    it('suggests checking e-fatura categories for projected years', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Alice',
+            nif: '123',
+            birth_year: 1990,
+            incomes: [{ category: 'A', gross: 30000 }],
+            deductions: [{ category: 'general', amount: 800 }],
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson()]))
+      const opts = generateProactiveOptimizations(h, result)
+      const faturaOpt = opts.find((o) => o.id === 'fatura-correction-alice')
+      expect(faturaOpt).toBeDefined()
+      expect(faturaOpt!.estimated_savings).toBe(0) // informational only
+    })
+
+    it('does not suggest e-fatura correction for non-projected years', () => {
+      const h = makeHousehold({
+        projected: false,
+        members: [
+          {
+            name: 'Alice',
+            nif: '123',
+            birth_year: 1990,
+            incomes: [{ category: 'A', gross: 30000 }],
+            deductions: [{ category: 'general', amount: 800 }],
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson()]))
+      const opts = generateProactiveOptimizations(h, result)
+      expect(opts.find((o) => o.id === 'fatura-correction-alice')).toBeUndefined()
+    })
+  })
 })

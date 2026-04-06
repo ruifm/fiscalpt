@@ -1,6 +1,12 @@
 import type { AnalysisResult, Household, Optimization, Person } from './types'
-import { CAT_B_MIN_EXPENSE_RATIO, FATURA_DEDUCTION_CAP, FATURA_DEDUCTION_RATE } from './types'
-import { round2 } from './utils'
+import {
+  CAT_B_MIN_EXPENSE_RATIO,
+  CAT_B_NEW_ACTIVITY_FACTORS,
+  FATURA_DEDUCTION_CAP,
+  FATURA_DEDUCTION_RATE,
+  getCatBCoefficient,
+} from './types'
+import { round2, formatEuro } from './utils'
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -101,18 +107,38 @@ function generateCatBAcrescimoOpt(
 }
 
 function generatePprOpt(person: Person, taxYear: number, slug: string): Optimization | undefined {
-  const hasPpr = person.deductions.some((d) => d.category === 'ppr')
-  if (hasPpr) return undefined
-
+  const pprDeductions = person.deductions.filter((d) => d.category === 'ppr')
+  const pprTotal = pprDeductions.reduce((s, d) => s + d.amount, 0)
   const cap = getPprCap(person.birth_year, taxYear)
-  const savings = round2(cap * PPR_RATE)
+  const currentDeduction = Math.min(pprTotal * PPR_RATE, cap)
 
-  return {
-    id: `ppr-${slug}`,
-    title: `Subscrever PPR (${person.name})`,
-    description: `Subscreva um PPR e deduza até ${formatEuro(cap)} (20% do investimento). Benefício máximo: ${formatEuro(savings)}.`,
-    estimated_savings: savings,
+  if (pprTotal === 0) {
+    // No PPR at all → suggest subscribing
+    const savings = round2(cap * PPR_RATE)
+    return {
+      id: `ppr-${slug}`,
+      title: `Subscrever PPR (${person.name})`,
+      description: `Subscreva um PPR e deduza até ${formatEuro(cap)} (20% do investimento). Benefício máximo: ${formatEuro(savings)}.`,
+      estimated_savings: savings,
+    }
   }
+
+  // Has PPR but under cap → suggest maximizing
+  if (currentDeduction < cap) {
+    const gap = round2(cap - currentDeduction)
+    const maxInvestment = Math.ceil(cap / PPR_RATE)
+    const additionalInvestment = maxInvestment - pprTotal
+    if (additionalInvestment <= 0) return undefined
+
+    return {
+      id: `ppr-maximize-${slug}`,
+      title: `Maximizar PPR (${person.name})`,
+      description: `Invista mais ${formatEuro(additionalInvestment)} em PPR para atingir a dedução máxima de ${formatEuro(cap)}. Benefício adicional: ${formatEuro(gap)}.`,
+      estimated_savings: gap,
+    }
+  }
+
+  return undefined
 }
 
 function generateFaturaOpt(
@@ -186,6 +212,72 @@ function generateExpenseGapOpts(person: Person, taxYear: number, slug: string): 
   return opts
 }
 
+// ─── Cat B regime comparison (simplified vs organized) ───────
+
+function generateCatBRegimeOpt(person: Person, slug: string): Optimization | undefined {
+  const catBIncomes = person.incomes.filter(
+    (i) => i.category === 'B' && i.cat_b_regime !== 'organized',
+  )
+  if (catBIncomes.length === 0) return undefined
+
+  for (const income of catBIncomes) {
+    const coefficient = getCatBCoefficient(income.cat_b_income_code)
+    let simplifiedTaxable = income.gross * coefficient
+
+    // Apply activity year reduction factor if applicable
+    const activityFactor = income.cat_b_activity_year
+      ? CAT_B_NEW_ACTIVITY_FACTORS[income.cat_b_activity_year]
+      : undefined
+    if (activityFactor !== undefined) {
+      simplifiedTaxable *= activityFactor
+    }
+
+    // Add acréscimo if applicable
+    if (income.cat_b_documented_expenses !== undefined) {
+      const minExpenses = income.gross * CAT_B_MIN_EXPENSE_RATIO
+      if (income.cat_b_documented_expenses < minExpenses) {
+        simplifiedTaxable += minExpenses - income.cat_b_documented_expenses
+      }
+    }
+
+    // Break-even: organized taxable = gross - expenses = simplifiedTaxable
+    // → expenses needed = gross - simplifiedTaxable
+    const breakEvenExpenses = round2(income.gross - simplifiedTaxable)
+    const breakEvenPct = Math.round((breakEvenExpenses / income.gross) * 100)
+
+    return {
+      id: `cat-b-regime-${slug}`,
+      title: `Regime organizado vs simplificado (${person.name})`,
+      description:
+        `Se as suas despesas de atividade excederem ${formatEuro(breakEvenExpenses)} ` +
+        `(${breakEvenPct}% do rendimento bruto), o regime de contabilidade organizada ` +
+        `reduz o rendimento tributável. Necessário optar até 31 de março.`,
+      estimated_savings: 0, // depends on actual expenses, informational
+    }
+  }
+
+  return undefined
+}
+
+// ─── e-Fatura category correction ────────────────────────────
+
+function generateFaturaCorrectionOpt(person: Person, slug: string): Optimization | undefined {
+  // Only suggest if person has any deductions (indicates they use e-fatura)
+  const hasDeductions = person.deductions.length > 0
+  if (!hasDeductions) return undefined
+
+  return {
+    id: `fatura-correction-${slug}`,
+    title: `Verificar categorias do e-fatura (${person.name})`,
+    description:
+      'Confirme que as suas despesas estão na categoria correta no e-fatura: ' +
+      'farmácia em "Saúde" (15%), supermercado com produtos de higiene em "Saúde", ' +
+      'e despesas em "Pendentes" corretamente atribuídas. ' +
+      'Uma recategorização pode aumentar as deduções.',
+    estimated_savings: 0, // informational
+  }
+}
+
 // ─── Main ───────────────────────────────────────────────────
 
 /**
@@ -212,18 +304,20 @@ export function generateProactiveOptimizations(
     const catBOpt = generateCatBAcrescimoOpt(person, i, result, slug)
     if (catBOpt) optimizations.push(catBOpt)
 
+    const catBRegimeOpt = generateCatBRegimeOpt(person, slug)
+    if (catBRegimeOpt) optimizations.push(catBRegimeOpt)
+
     const pprOpt = generatePprOpt(person, taxYear, slug)
     if (pprOpt) optimizations.push(pprOpt)
 
     const faturaOpt = generateFaturaOpt(person, taxYear, slug)
     if (faturaOpt) optimizations.push(faturaOpt)
 
+    const faturaCorrectionOpt = generateFaturaCorrectionOpt(person, slug)
+    if (faturaCorrectionOpt) optimizations.push(faturaCorrectionOpt)
+
     optimizations.push(...generateExpenseGapOpts(person, taxYear, slug))
   }
 
   return optimizations
-}
-
-function formatEuro(amount: number): string {
-  return `€${amount.toFixed(0)}`
 }

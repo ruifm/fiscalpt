@@ -33,7 +33,7 @@ import {
 import { computeIrsJovemExemption, isEligibleForIrsJovem } from './irs-jovem'
 import { isNhrActive, computeNhrTax } from './nhr'
 import { generateProactiveOptimizations } from './proactive-optimizations'
-import { round2, round4, sumGross } from './utils'
+import { round2, round4, sumGross, formatEuro } from './utils'
 
 // ─── Named Constants ─────────────────────────────────────────
 const SCENARIO_DIFF_THRESHOLD = 1 // €1 minimum to suggest filing change
@@ -842,6 +842,45 @@ function generateNhrWarnings(household: Household): Optimization[] {
   return warnings
 }
 
+function generateCatFDurationOptimizations(household: Household): Optimization[] {
+  const optimizations: Optimization[] = []
+
+  // Duration tiers in ascending order: [minYears, rate]
+  const tiers: { minYears: number; rate: number }[] = [
+    { minYears: 0, rate: AUTONOMOUS_RATE_CAT_F },
+    ...CAT_F_REDUCED_RATES.toSorted((a, b) => a.minYears - b.minYears),
+  ]
+
+  for (const person of household.members) {
+    for (const income of person.incomes) {
+      if (income.category !== 'F' || income.englobamento) continue
+
+      const currentDuration = income.rental_contract_duration ?? 0
+      const currentRate = getCatFAutonomousRate(currentDuration)
+      const taxableRental = Math.max(0, income.gross - (income.expenses ?? 0))
+
+      // Find the next tier that offers a lower rate
+      const nextTier = tiers.find((t) => t.minYears > currentDuration && t.rate < currentRate)
+      if (!nextTier) continue
+
+      const savings = round2(taxableRental * (currentRate - nextTier.rate))
+      if (savings <= 0) continue
+
+      optimizations.push({
+        id: `cat-f-duration-${person.name}-${income.gross}`,
+        title: `Contrato longa duração Cat. F — ${person.name}`,
+        description:
+          `Um contrato de arrendamento ≥${nextTier.minYears} anos reduz a taxa de ` +
+          `${(currentRate * 100).toFixed(0)}% para ${(nextTier.rate * 100).toFixed(0)}%, ` +
+          `poupando ${formatEuro(savings)}/ano neste rendimento.`,
+        estimated_savings: savings,
+      })
+    }
+  }
+
+  return optimizations
+}
+
 // ─── Main Analysis ───────────────────────────────────────────
 
 export function analyzeHousehold(household: Household): AnalysisResult {
@@ -874,6 +913,7 @@ export function analyzeHousehold(household: Household): AnalysisResult {
   optimizations.push(...irsJovem.optimizations)
   optimizations.push(...generateEnglobamentoOptimizations(household, scenarios))
   optimizations.push(...generateNhrWarnings(household))
+  optimizations.push(...generateCatFDurationOptimizations(household))
 
   // Find best scenario
   const best = scenarios.reduce((a, b) => (a.total_tax_burden <= b.total_tax_burden ? a : b))

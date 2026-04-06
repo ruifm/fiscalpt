@@ -1110,4 +1110,195 @@ describe('question validators', () => {
       expect(getRentalDurationQuestion().validate!(-1)).toBe('Deve ser pelo menos 1')
     })
   })
+
+  // Feature 3: IRS Jovem proactive detection
+  describe('IRS Jovem proactive detection', () => {
+    it('asks first work year for ≤35 member without IRS Jovem (tax year ≥ 2025)', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Maria',
+            birth_year: 1995, // age 30
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.first_work_year')
+      expect(q).toBeDefined()
+      expect(q!.section).toBe('irs_jovem')
+      expect(q!.type).toBe('year')
+      expect(q!.label).toContain('Maria')
+    })
+
+    it('asks degree year for ≤35 member without IRS Jovem (tax year ≤ 2024)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'João',
+            birth_year: 1995, // age 29
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.degree_year')
+      expect(q).toBeDefined()
+      expect(q!.section).toBe('irs_jovem')
+      expect(q!.type).toBe('year')
+    })
+
+    it('does not ask if member already has IRS Jovem', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Maria',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_year: 2,
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
+    })
+
+    it('does not ask if member is over 35', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Maria',
+            birth_year: 1980, // age 45
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
+    })
+
+    it('does not ask if member has no birth year', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Maria',
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
+    })
+
+    it('does not ask if member has no Cat A or Cat B income', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Maria',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'F', gross: 10000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeUndefined()
+    })
+
+    it('asks for Cat B income too', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Pedro',
+            birth_year: 1998,
+            incomes: [makeIncome({ category: 'B', gross: 20000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
+    })
+  })
+
+  // Feature 3 continued: applyAnswers for IRS Jovem detection
+  describe('applyAnswers — IRS Jovem detection', () => {
+    it('enables IRS Jovem when first work year makes member eligible (≥2025)', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Maria',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const updated = applyAnswers(h, { 'member.0.first_work_year': 2023 })
+      expect(updated.members[0].special_regimes).toContain('irs_jovem')
+      expect(updated.members[0].irs_jovem_year).toBe(3) // 2025 - 2023 + 1
+    })
+
+    it('enables IRS Jovem when degree year makes member eligible (≤2024)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'João',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const updated = applyAnswers(h, { 'member.0.degree_year': 2022 })
+      expect(updated.members[0].special_regimes).toContain('irs_jovem')
+      expect(updated.members[0].irs_jovem_year).toBe(2) // 2024 - 2022
+    })
+
+    it('does not enable IRS Jovem when first work year is too old', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Maria',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const updated = applyAnswers(h, { 'member.0.first_work_year': 2010 })
+      expect(updated.members[0].special_regimes).not.toContain('irs_jovem')
+    })
+
+    it('does not enable IRS Jovem when degree year is too old (≤2024)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'João',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+            special_regimes: [],
+          }),
+        ],
+      })
+      const updated = applyAnswers(h, { 'member.0.degree_year': 2015 })
+      expect(updated.members[0].special_regimes).not.toContain('irs_jovem')
+    })
+  })
 })

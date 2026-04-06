@@ -2138,4 +2138,89 @@ describe('Single filer scenario', () => {
     // Single member → single scenario regardless of filing_status label
     expect(result.scenarios.length).toBeGreaterThanOrEqual(1)
   })
+
+  // Feature 2: Cat F rental contract duration optimization
+  describe('Cat F rental duration optimization', () => {
+    it('suggests longer contract when current duration is short', () => {
+      const household: Household = {
+        year: 2025,
+        filing_status: 'single',
+        members: [
+          {
+            name: 'Ana',
+            incomes: [{ category: 'F', gross: 12000, rental_contract_duration: 0 }],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+        dependents: [],
+      }
+      const result = analyzeHousehold(household)
+      const opt = result.optimizations.find((o) => o.id.startsWith('cat-f-duration-'))
+      expect(opt).toBeDefined()
+      // 28% → 26% at 2 years: savings = 12000 × (0.28 - 0.26) = 240
+      expect(opt!.estimated_savings).toBeGreaterThan(0)
+    })
+
+    it('suggests next tier for 2-year contract', () => {
+      const household: Household = {
+        year: 2025,
+        filing_status: 'single',
+        members: [
+          {
+            name: 'Ana',
+            incomes: [{ category: 'F', gross: 12000, rental_contract_duration: 3 }],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+        dependents: [],
+      }
+      const result = analyzeHousehold(household)
+      const opt = result.optimizations.find((o) => o.id.startsWith('cat-f-duration-'))
+      expect(opt).toBeDefined()
+      // 26% → 23% at 5 years
+      expect(opt!.estimated_savings).toBeGreaterThan(0)
+    })
+
+    it('does not suggest for 20+ year contracts', () => {
+      const household: Household = {
+        year: 2025,
+        filing_status: 'single',
+        members: [
+          {
+            name: 'Ana',
+            incomes: [{ category: 'F', gross: 12000, rental_contract_duration: 25 }],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+        dependents: [],
+      }
+      const result = analyzeHousehold(household)
+      const opt = result.optimizations.find((o) => o.id.startsWith('cat-f-duration-'))
+      expect(opt).toBeUndefined()
+    })
+
+    it('does not suggest for Cat F with englobamento', () => {
+      const household: Household = {
+        year: 2025,
+        filing_status: 'single',
+        members: [
+          {
+            name: 'Ana',
+            incomes: [
+              { category: 'F', gross: 12000, rental_contract_duration: 0, englobamento: true },
+            ],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+        dependents: [],
+      }
+      const result = analyzeHousehold(household)
+      const opt = result.optimizations.find((o) => o.id.startsWith('cat-f-duration-'))
+      expect(opt).toBeUndefined()
+    })
+  })
 })
