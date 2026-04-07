@@ -446,8 +446,6 @@ const en: Dictionary = {
     fileTooLarge: '"{name}" exceeds the {max} MB limit.',
     fileEmpty: '"{name}" is empty.',
     liquidacaoPdfOnly: '"{name}": the settlement must be a PDF file.',
-    liquidacaoInfoMessage:
-      'Settlement {year} (NIF …{nifSuffix}): official effective rate = {rate}%.',
     errorProcessingFile: 'Error processing file',
     effectiveRateLabel: 'Effective rate',
     or: 'or',

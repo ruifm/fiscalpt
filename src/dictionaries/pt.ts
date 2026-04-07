@@ -449,7 +449,6 @@ const pt: Dictionary = {
     fileTooLarge: '"{name}" excede o limite de {max} MB.',
     fileEmpty: '"{name}" está vazio.',
     liquidacaoPdfOnly: '"{name}": a liquidação deve ser um ficheiro PDF.',
-    liquidacaoInfoMessage: 'Liquidação {year} (NIF …{nifSuffix}): taxa efetiva oficial = {rate}%.',
     errorProcessingFile: 'Erro a processar ficheiro',
     effectiveRateLabel: 'Taxa efetiva',
     or: 'ou',

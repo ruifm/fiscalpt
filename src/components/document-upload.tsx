@@ -1441,19 +1441,8 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
           })
         }
 
-        if (liq.taxaEfetiva) {
-          const nif = liq.nif ?? ''
-          const nifSuffix = nif.length >= 3 ? nif.slice(-3) : nif
-          allIssues.push({
-            severity: 'warning',
-            code: 'LIQUIDACAO_INFO',
-            message: t('upload.liquidacaoInfoMessage', {
-              year: String(liq.year || ''),
-              nifSuffix,
-              rate: (liq.taxaEfetiva * 100).toFixed(2),
-            }),
-          })
-        }
+        // Taxa efetiva is used by validateAgainstLiquidacao for
+        // threshold-based cross-validation — no standalone message needed.
       }
     }
 
