@@ -108,16 +108,20 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=AW-18070272762"
-          strategy="afterInteractive"
-        />
-        <Script id="google-ads" strategy="afterInteractive">
-          {`window.dataLayer = window.dataLayer || [];
+        {process.env.VERCEL && (
+          <>
+            <Script
+              src="https://www.googletagmanager.com/gtag/js?id=AW-18070272762"
+              strategy="afterInteractive"
+            />
+            <Script id="google-ads" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', 'AW-18070272762');`}
-        </Script>
+            </Script>
+          </>
+        )}
       </head>
       <body className="min-h-full flex flex-col">
         <JsonLd data={webApplicationJsonLd} />
