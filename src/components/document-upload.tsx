@@ -1420,34 +1420,37 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
       allIssues.push(...first.issues)
     }
 
-    // Assemble liquidação
+    // Assemble liquidação — collect ALL results (one per person)
+    const allLiquidacaoResults: LiquidacaoParsed[] = []
     for (const uf of sectionFiles.liquidacao) {
       if (uf.status !== 'done') continue
 
       if (uf.parsedLiquidacao) {
-        liquidacaoResult = uf.parsedLiquidacao
+        const liq = uf.parsedLiquidacao
+        allLiquidacaoResults.push(liq)
+        liquidacaoResult = liq // keep last for validation backward compat
 
-        if (liquidacaoResult.year && declarationYear && liquidacaoResult.year !== declarationYear) {
+        if (liq.year && declarationYear && liq.year !== declarationYear) {
           allIssues.push({
             severity: 'error',
             code: 'YEAR_MISMATCH',
             message: t('upload.liquidacaoYearMismatch', {
-              liqYear: liquidacaoResult.year,
+              liqYear: liq.year,
               declYear: declarationYear,
             }),
           })
         }
 
-        if (liquidacaoResult.taxaEfetiva) {
-          const nif = liquidacaoResult.nif ?? ''
+        if (liq.taxaEfetiva) {
+          const nif = liq.nif ?? ''
           const nifSuffix = nif.length >= 3 ? nif.slice(-3) : nif
           allIssues.push({
             severity: 'warning',
             code: 'LIQUIDACAO_INFO',
             message: t('upload.liquidacaoInfoMessage', {
-              year: String(liquidacaoResult.year || ''),
+              year: String(liq.year || ''),
               nifSuffix,
-              rate: (liquidacaoResult.taxaEfetiva * 100).toFixed(2),
+              rate: (liq.taxaEfetiva * 100).toFixed(2),
             }),
           })
         }
@@ -1567,8 +1570,13 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
       }
 
       // Fallback: derive deductions from liquidação for members without pasted data
-      if (liquidacaoResult && household.year === liquidacaoResult.year) {
-        const memberCount = household.members.length
+      if (allLiquidacaoResults.length > 0 && household.year === (liquidacaoResult?.year ?? 0)) {
+        // Build NIF → LiquidacaoParsed lookup for per-person matching
+        const liqByNif = new Map<string, LiquidacaoParsed>()
+        for (const liq of allLiquidacaoResults) {
+          if (liq.nif) liqByNif.set(liq.nif, liq)
+        }
+
         household = {
           ...household,
           members: household.members.map((member, mi) => {
@@ -1579,15 +1587,20 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
             const memberNif = mi === 0 ? declFile?.meta?.nif : declFile?.meta?.nifConjuge
             if (memberNif && pastedNifs.has(memberNif)) return member // already has AT paste data
 
-            // Reverse-engineer expense amounts from liquidação deductions
-            // Split evenly between members (AT already applied per-person caps,
-            // so household_total / N ≤ per-person cap — exact reconstruction)
+            // Match this member's liquidação by NIF, or fall back to single liquidação
+            const memberLiq =
+              (memberNif ? liqByNif.get(memberNif) : undefined) ??
+              (allLiquidacaoResults.length === 1 ? allLiquidacaoResults[0] : undefined)
+
+            if (!memberLiq) return member
+
+            // Reverse-engineer expense amounts from this member's liquidação deductions
             const newDeductions = [...member.deductions]
             for (const mapping of LIQUIDACAO_DEDUCTION_MAP) {
-              const deductionAmount = liquidacaoResult![mapping.field] as number | undefined
+              const deductionAmount = memberLiq[mapping.field] as number | undefined
               if (!deductionAmount || deductionAmount <= 0) continue
-              const perMemberDeduction = deductionAmount / memberCount
-              const expenseAmount = perMemberDeduction / mapping.rate
+              // Use the full amount — it's already per-person from AT
+              const expenseAmount = deductionAmount / mapping.rate
 
               const existing = newDeductions.findIndex((d) => d.category === mapping.category)
               if (existing >= 0) {
