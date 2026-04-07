@@ -1609,6 +1609,178 @@ describe('question validators', () => {
     })
   })
 
+  // Cross-year question generation: when households span both sides of 2025,
+  // both IRS Jovem question types should be generated.
+  describe('cross-year IRS Jovem questions', () => {
+    it('asks both first_work_year AND degree_year when primary is 2025 with 2024 previous', () => {
+      const primary = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Rui',
+            birth_year: 1993,
+            incomes: [makeIncome({ category: 'A', gross: 50000 })],
+          }),
+        ],
+      })
+      const prev2024 = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Rui',
+            birth_year: 1993,
+            incomes: [makeIncome({ category: 'A', gross: 45000 })],
+          }),
+        ],
+      })
+
+      const qs = identifyMissingInputs(primary, [prev2024])
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
+      expect(qs.find((q) => q.id === 'member.0.degree_year')).toBeDefined()
+    })
+
+    it('asks both questions when primary is 2024 with 2025 previous', () => {
+      const primary = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Ana',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+          }),
+        ],
+      })
+      const prev2025 = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Ana',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 32000 })],
+          }),
+        ],
+      })
+
+      const qs = identifyMissingInputs(primary, [prev2025])
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
+      expect(qs.find((q) => q.id === 'member.0.degree_year')).toBeDefined()
+    })
+
+    it('only asks first_work_year when all years are >= 2025', () => {
+      const primary = makeHousehold({
+        year: 2026,
+        members: [
+          makePerson({
+            name: 'João',
+            birth_year: 1996,
+            incomes: [makeIncome({ category: 'A', gross: 25000 })],
+          }),
+        ],
+      })
+      const prev2025 = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'João',
+            birth_year: 1996,
+            incomes: [makeIncome({ category: 'A', gross: 24000 })],
+          }),
+        ],
+      })
+
+      const qs = identifyMissingInputs(primary, [prev2025])
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
+      expect(qs.find((q) => q.id === 'member.0.degree_year')).toBeUndefined()
+    })
+
+    it('probes IRS Jovem when member has Cat A/B only in other-year household', () => {
+      const primary = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Maria',
+            birth_year: 1995,
+            incomes: [], // No income in 2025
+          }),
+        ],
+      })
+      const prev2024 = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Maria',
+            birth_year: 1995,
+            incomes: [makeIncome({ category: 'A', gross: 20000 })],
+          }),
+        ],
+      })
+
+      const qs = identifyMissingInputs(primary, [prev2024])
+      // Should still ask because 2024 member has Cat A income
+      expect(qs.find((q) => q.id === 'member.0.first_work_year')).toBeDefined()
+      expect(qs.find((q) => q.id === 'member.0.degree_year')).toBeDefined()
+    })
+  })
+
+  // Cross-year NHR: nhr_start_year asked when NHR present in any year
+  describe('cross-year NHR questions', () => {
+    it('asks nhr_start_year when NHR is only in other-year household', () => {
+      const primary = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Micha',
+            birth_year: 1990,
+            incomes: [makeIncome({ category: 'A', gross: 40000 })],
+            special_regimes: [], // No NHR in 2025
+          }),
+        ],
+      })
+      const prev2024 = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Micha',
+            birth_year: 1990,
+            incomes: [makeIncome({ category: 'A', gross: 40000 })],
+            special_regimes: ['nhr'],
+            nhr_confirmed: true,
+          }),
+        ],
+      })
+
+      const qs = identifyMissingInputs(primary, [prev2024])
+      expect(qs.find((q) => q.id === 'member.0.nhr_start_year')).toBeDefined()
+    })
+
+    it('does not ask nhr_start_year when already set', () => {
+      const primary = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Micha',
+            birth_year: 1990,
+            incomes: [makeIncome({ category: 'A', gross: 40000 })],
+            special_regimes: [],
+            nhr_start_year: 2019,
+          }),
+        ],
+      })
+      const prev2024 = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Micha',
+            special_regimes: ['nhr'],
+          }),
+        ],
+      })
+
+      const qs = identifyMissingInputs(primary, [prev2024])
+      expect(qs.find((q) => q.id === 'member.0.nhr_start_year')).toBeUndefined()
+    })
+  })
+
   // Bug fix: select value "0" should be preserved after applyAnswers
   describe('applyAnswers preserves select value 0', () => {
     it('preserves cat_b_activity_year = 0 (3rd year or more)', () => {

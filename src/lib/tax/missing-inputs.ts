@@ -92,8 +92,11 @@ export const SECTION_LABELS: Record<QuestionSection, { title: string; descriptio
  * Analyze a household and return a list of questions for information
  * that is missing or has placeholder values.
  *
- * @param otherYearHouseholds — households from other tax years (used to infer
- *   Cat B activity year from historical data).
+ * Person-level questions (birth_year, nhr_start_year, IRS Jovem) consider
+ * ALL year households — not just the primary — so that cross-year needs
+ * are captured (e.g. pre-2025 IRS Jovem degree_year when primary is 2025).
+ *
+ * @param otherYearHouseholds — households from other tax years.
  */
 export function identifyMissingInputs(
   household: Household,
@@ -265,23 +268,28 @@ export function identifyMissingInputs(
   // the benefit year automatically via applyAnswers.
 
   // ── NHR details ──────────────────────────────────────────
+  // Check if the member has NHR in ANY year (primary or other),
+  // since nhr_start_year is person-level data needed for all years.
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
-    if (!hasSpecialRegime(member, 'nhr')) continue
+    const otherMembers = (otherYearHouseholds ?? [])
+      .map((h) => findMatchingMember(member, h.members) ?? h.members[i])
+      .filter(Boolean)
+    const anyHasNhr =
+      hasSpecialRegime(member, 'nhr') || otherMembers.some((m) => hasSpecialRegime(m, 'nhr'))
+    if (!anyHasNhr) continue
 
     if (!member.nhr_start_year) {
-      // nhr_confirmed (Anexo L present) confirms NHR for THIS year, but
-      // nhr_start_year is still needed to determine the 10-year window
-      // when propagating to other years. Lower priority if already confirmed.
+      const nhrConfirmedAny = member.nhr_confirmed || otherMembers.some((m) => m.nhr_confirmed)
       questions.push({
         id: `member.${i}.nhr_start_year`,
         section: 'nhr',
         label: `Ano de inscrição RNH de ${member.name}`,
-        reason: member.nhr_confirmed
+        reason: nhrConfirmedAny
           ? 'RNH confirmado via Anexo L. O ano de inscrição permite calcular a janela de 10 anos para outros anos fiscais.'
           : 'O regime RNH tem duração de 10 anos. Necessário para verificar se ainda está ativo. Novas inscrições a partir de 2024 foram revogadas (Lei 45-A/2024).',
         type: 'year',
-        priority: member.nhr_confirmed ? 'important' : 'critical',
+        priority: nhrConfirmedAny ? 'important' : 'critical',
         path: `members.${i}.nhr_start_year`,
         validate: (value: string | number | boolean): string | null => {
           const n = toNumber(value)
@@ -317,10 +325,17 @@ export function identifyMissingInputs(
   }
 
   // ── IRS Jovem proactive detection / verification ────────
-  // For members without IRS Jovem who have Cat A/B income: probe eligibility.
-  // Also handles members with unconfirmed irs_jovem from XML (code 417).
-  // When first_work_year is already known, we still generate the question with
-  // currentValue so it stays visible in the questionnaire for editing.
+  // For members who have IRS Jovem or may be eligible in ANY year: probe eligibility.
+  // When households span both sides of 2025, both question types are generated
+  // because the two regimes use different eligibility criteria:
+  //   - 2025+: first year of work in Portugal (no degree requirement)
+  //   - ≤2024: year degree was completed (benefit starts the year after)
+  //
+  // Each question is asked at most once per member (deduplicated by id).
+  const allYears = [year, ...(otherYearHouseholds ?? []).map((h) => h.year)]
+  const hasPost2025 = allYears.some((y) => y >= 2025)
+  const hasPre2025 = allYears.some((y) => y < 2025)
+
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
     // Legacy: skip only if irs_jovem_year was set directly (old-style dropdown),
@@ -333,18 +348,31 @@ export function identifyMissingInputs(
       continue
     if (!member.birth_year) continue
 
+    // Check this member AND matching members in other year households
+    const otherMembers = (otherYearHouseholds ?? [])
+      .map((h) => findMatchingMember(member, h.members) ?? h.members[i])
+      .filter(Boolean)
+
     const age = year - member.birth_year
     const hasUnconfirmedIrsJovem = hasSpecialRegime(member, 'irs_jovem') && !member.irs_jovem_year
+    const anyHasIrsJovem =
+      hasSpecialRegime(member, 'irs_jovem') ||
+      otherMembers.some((m) => hasSpecialRegime(m, 'irs_jovem'))
     // New applicants: must be ≤ 35 at start of benefit
     // Unconfirmed XML: could have started at ≤ 35, benefit up to 10 years → max age 44
     const regime = getIrsJovemRegime(year)
-    const maxAge = hasUnconfirmedIrsJovem ? 35 + (regime?.maxBenefitYears ?? 10) - 1 : 35
+    const maxAge =
+      hasUnconfirmedIrsJovem || anyHasIrsJovem ? 35 + (regime?.maxBenefitYears ?? 10) - 1 : 35
     if (age > maxAge) continue
 
-    const hasCatAOrB = member.incomes.some((inc) => inc.category === 'A' || inc.category === 'B')
+    const hasCatAOrB =
+      member.incomes.some((inc) => inc.category === 'A' || inc.category === 'B') ||
+      otherMembers.some((m) =>
+        m.incomes.some((inc) => inc.category === 'A' || inc.category === 'B'),
+      )
     if (!hasCatAOrB) continue
 
-    if (year >= 2025) {
+    if (hasPost2025) {
       // New regime: no degree required, just first year of work in Portugal
       questions.push({
         id: `member.${i}.first_work_year`,
@@ -363,7 +391,9 @@ export function identifyMissingInputs(
           return n >= MIN_BIRTH_YEAR && n <= currentYear ? null : 'Ano inválido'
         },
       })
-    } else {
+    }
+
+    if (hasPre2025) {
       // Pre-2025: requires degree completion
       const degreeYear = member.irs_jovem_first_work_year
         ? member.irs_jovem_first_work_year - 1
