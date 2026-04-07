@@ -219,9 +219,13 @@ export default function AnalyzePage() {
       const propagated = propagateSharedData(h, hh)
       // Log propagation details for debugging
       console.info('[FiscalPT] Propagation year:', hh.year, {
-        members: hh.members.map((m, mi) => ({
-          target: `${m.name}(nif=${m.nif ?? '?'}, regimes=[${m.special_regimes}], nhr_confirmed=${m.nhr_confirmed})`,
-          result: `regimes=[${propagated.members[mi]?.special_regimes}], nhr_confirmed=${propagated.members[mi]?.nhr_confirmed}`,
+        members: propagated.members.map((m) => ({
+          name: m.name,
+          nif: m.nif ?? '?',
+          regimes: m.special_regimes,
+          nhr_confirmed: m.nhr_confirmed,
+          nhr_start_year: m.nhr_start_year,
+          irs_jovem_first_work_year: m.irs_jovem_first_work_year,
         })),
       })
       return propagated

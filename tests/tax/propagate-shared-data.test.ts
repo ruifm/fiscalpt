@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Household, Person } from '@/lib/tax/types'
-import { propagateSharedData } from '@/lib/tax/propagate-shared-data'
+import { propagateSharedData, findMatchingMember } from '@/lib/tax/propagate-shared-data'
 
 function makePerson(name: string, overrides: Partial<Person> = {}): Person {
   return {
@@ -26,15 +26,53 @@ function makeHousehold(
   }
 }
 
+// ─── findMatchingMember ───────────────────────────────────────
+
+describe('findMatchingMember', () => {
+  it('matches by NIF (exact)', () => {
+    const member = makePerson('Rui', { nif: '111' })
+    const others = [makePerson('RUI MIGUEL', { nif: '111' }), makePerson('Micha', { nif: '222' })]
+    expect(findMatchingMember(member, others)).toBe(others[0])
+  })
+
+  it('matches by name (case-insensitive) when no NIF', () => {
+    const member = makePerson('Rui')
+    const others = [makePerson('RUI'), makePerson('Micha')]
+    expect(findMatchingMember(member, others)).toBe(others[0])
+  })
+
+  it('prefers NIF over name', () => {
+    const member = makePerson('Rui', { nif: '111' })
+    const others = [
+      makePerson('Rui', { nif: '999' }), // name matches but NIF doesn't
+      makePerson('Different Name', { nif: '111' }), // NIF matches
+    ]
+    expect(findMatchingMember(member, others)).toBe(others[1])
+  })
+
+  it('returns undefined when no NIF or name match', () => {
+    const member = makePerson('Charlie', { nif: '333' })
+    const others = [makePerson('Rui', { nif: '111' }), makePerson('Micha', { nif: '222' })]
+    expect(findMatchingMember(member, others)).toBeUndefined()
+  })
+
+  it('returns undefined for empty others list', () => {
+    const member = makePerson('Rui', { nif: '111' })
+    expect(findMatchingMember(member, [])).toBeUndefined()
+  })
+})
+
+// ─── propagateSharedData ──────────────────────────────────────
+
 describe('propagateSharedData', () => {
-  it('propagates birth_year from primary to target by position', () => {
+  it('propagates birth_year from primary to target by NIF', () => {
     const primary = makeHousehold(2025, [
-      makePerson('Rui', { birth_year: 1990 }),
-      makePerson('Micha', { birth_year: 1992 }),
+      makePerson('Rui', { nif: '111', birth_year: 1990 }),
+      makePerson('Micha', { nif: '222', birth_year: 1992 }),
     ])
     const target = makeHousehold(2023, [
-      makePerson('RUI MIGUEL FERREIRA', {}),
-      makePerson('Titular B (123456789)', {}),
+      makePerson('RUI MIGUEL', { nif: '111' }),
+      makePerson('Titular B', { nif: '222' }),
     ])
 
     const result = propagateSharedData(primary, target)
@@ -42,11 +80,14 @@ describe('propagateSharedData', () => {
     expect(result.members[1].birth_year).toBe(1992)
   })
 
-  it('propagates name from primary to target by position', () => {
-    const primary = makeHousehold(2025, [makePerson('Rui'), makePerson('Micha')])
+  it('propagates name from primary to target by NIF', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Rui', { nif: '111' }),
+      makePerson('Micha', { nif: '222' }),
+    ])
     const target = makeHousehold(2023, [
-      makePerson('RUI MIGUEL FERREIRA'),
-      makePerson('Titular B (123456789)'),
+      makePerson('RUI MIGUEL FERREIRA', { nif: '111' }),
+      makePerson('Titular B (123456789)', { nif: '222' }),
     ])
 
     const result = propagateSharedData(primary, target)
@@ -54,9 +95,43 @@ describe('propagateSharedData', () => {
     expect(result.members[1].name).toBe('Micha')
   })
 
-  it('does not propagate name when target has fewer members', () => {
-    const primary = makeHousehold(2025, [makePerson('Rui'), makePerson('Micha')])
-    const target = makeHousehold(2023, [makePerson('RUI MIGUEL')], {
+  it('propagates by name when NIFs match', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Rui', { birth_year: 1990 }),
+      makePerson('Micha', { birth_year: 1992 }),
+    ])
+    const target = makeHousehold(2023, [makePerson('Rui'), makePerson('Micha')])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].birth_year).toBe(1990)
+    expect(result.members[1].birth_year).toBe(1992)
+  })
+
+  it('does not propagate to unmatched members', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Rui', { nif: '111', birth_year: 1990 }),
+      makePerson('Micha', { nif: '222', birth_year: 1992 }),
+    ])
+    // Target has a member that doesn't exist in primary
+    const target = makeHousehold(2023, [
+      makePerson('RUI MIGUEL', { nif: '111' }),
+      makePerson('Charlie', { nif: '333' }),
+    ])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].birth_year).toBe(1990)
+    // Charlie has no match → keeps own data
+    expect(result.members[1].name).toBe('Charlie')
+    expect(result.members[1].nif).toBe('333')
+    expect(result.members[1].birth_year).toBeUndefined()
+  })
+
+  it('handles target with fewer members than primary', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Rui', { nif: '111' }),
+      makePerson('Micha', { nif: '222' }),
+    ])
+    const target = makeHousehold(2023, [makePerson('Rui', { nif: '111' })], {
       filing_status: 'single',
     })
 
@@ -65,10 +140,27 @@ describe('propagateSharedData', () => {
     expect(result.members[0].name).toBe('Rui')
   })
 
+  it('handles target with more members than primary (single→married)', () => {
+    const primary = makeHousehold(2024, [makePerson('Alice', { nif: '111', birth_year: 1990 })], {
+      filing_status: 'single',
+    })
+    const target = makeHousehold(2025, [
+      makePerson('Alice', { nif: '111' }),
+      makePerson('Bob', { nif: '222', birth_year: 1988 }),
+    ])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members).toHaveLength(2)
+    expect(result.members[0].birth_year).toBe(1990) // Alice matched
+    expect(result.members[1].name).toBe('Bob') // Bob unmatched, kept as-is
+    expect(result.members[1].birth_year).toBe(1988)
+  })
+
   it('preserves target-specific data (incomes, deductions)', () => {
-    const primary = makeHousehold(2025, [makePerson('Rui', { birth_year: 1990 })])
+    const primary = makeHousehold(2025, [makePerson('Rui', { nif: '111', birth_year: 1990 })])
     const target = makeHousehold(2023, [
-      makePerson('RUI MIGUEL', {
+      makePerson('Rui', {
+        nif: '111',
         incomes: [{ category: 'A', gross: 30000 }],
         deductions: [{ category: 'general', amount: 250 }],
       }),
@@ -81,50 +173,81 @@ describe('propagateSharedData', () => {
   })
 
   it('propagates nhr_start_year from primary', () => {
-    const primary = makeHousehold(2025, [makePerson('Rui', { nhr_start_year: 2020 })])
-    const target = makeHousehold(2023, [makePerson('RUI MIGUEL')])
+    const primary = makeHousehold(2025, [makePerson('Rui', { nif: '111', nhr_start_year: 2020 })])
+    const target = makeHousehold(2023, [makePerson('Rui', { nif: '111' })])
 
     const result = propagateSharedData(primary, target)
     expect(result.members[0].nhr_start_year).toBe(2020)
   })
 
   it('keeps target nhr_confirmed — does not inherit from primary', () => {
-    const primary = makeHousehold(2025, [makePerson('Rui', { nhr_confirmed: true })])
-    const target = makeHousehold(2023, [makePerson('RUI MIGUEL')])
+    const primary = makeHousehold(2025, [makePerson('Rui', { nif: '111', nhr_confirmed: true })])
+    const target = makeHousehold(2023, [makePerson('Rui', { nif: '111' })])
 
     const result = propagateSharedData(primary, target)
-    // nhr_confirmed is year-specific — target keeps its own value (undefined)
     expect(result.members[0].nhr_confirmed).toBeUndefined()
   })
 
-  it('propagates dependent birth_year by position', () => {
-    const primary = makeHousehold(2025, [makePerson('Rui')], {
-      dependents: [{ name: 'Child', birth_year: 2020 }],
+  it('propagates dependent birth_year by name match', () => {
+    const primary = makeHousehold(2025, [makePerson('Rui', { nif: '111' })], {
+      dependents: [{ name: 'Sofia', birth_year: 2020 }],
     })
-    const target = makeHousehold(2023, [makePerson('RUI MIGUEL')], {
-      dependents: [
-        { name: 'Dependente 1 (111111111)', birth_year: undefined as unknown as number },
-      ],
+    const target = makeHousehold(2023, [makePerson('Rui', { nif: '111' })], {
+      dependents: [{ name: 'Sofia', birth_year: undefined as unknown as number }],
     })
 
     const result = propagateSharedData(primary, target)
     expect(result.dependents[0].birth_year).toBe(2020)
   })
 
+  it('does not propagate dependent data when names differ', () => {
+    const primary = makeHousehold(2025, [makePerson('Rui', { nif: '111' })], {
+      dependents: [{ name: 'Sofia', birth_year: 2020 }],
+    })
+    const target = makeHousehold(2024, [makePerson('Rui', { nif: '111' })], {
+      dependents: [{ name: 'Tomás', birth_year: 2023 }],
+    })
+
+    const result = propagateSharedData(primary, target)
+    expect(result.dependents[0].name).toBe('Tomás')
+    expect(result.dependents[0].birth_year).toBe(2023)
+  })
+
+  it('handles different dependent counts across years (new child)', () => {
+    const primary = makeHousehold(2025, [makePerson('Rui', { nif: '111' })], {
+      dependents: [
+        { name: 'Sofia', birth_year: 2020 },
+        { name: 'Tomás', birth_year: 2024 },
+      ],
+    })
+    const target = makeHousehold(2023, [makePerson('Rui', { nif: '111' })], {
+      dependents: [{ name: 'Sofia', birth_year: undefined as unknown as number }],
+    })
+
+    const result = propagateSharedData(primary, target)
+    expect(result.dependents).toHaveLength(1) // target's own count preserved
+    expect(result.dependents[0].birth_year).toBe(2020) // matched by name
+  })
+
   it('preserves target special_regimes — does not inherit from primary', () => {
-    const primary = makeHousehold(2025, [makePerson('Rui', { special_regimes: ['irs_jovem'] })])
-    const target = makeHousehold(2023, [makePerson('RUI MIGUEL', { special_regimes: ['nhr'] })])
+    const primary = makeHousehold(2025, [
+      makePerson('Rui', { nif: '111', special_regimes: ['irs_jovem'] }),
+    ])
+    const target = makeHousehold(2023, [
+      makePerson('Rui', { nif: '111', special_regimes: ['nhr'] }),
+    ])
 
     const result = propagateSharedData(primary, target)
     expect(result.members[0].special_regimes).toEqual(['nhr'])
   })
 
   it('does not copy primary special_regimes to target (year-specific)', () => {
-    const primary = makeHousehold(2025, [makePerson('Rui', { special_regimes: ['irs_jovem'] })])
-    const target = makeHousehold(2023, [makePerson('RUI MIGUEL')])
+    const primary = makeHousehold(2025, [
+      makePerson('Rui', { nif: '111', special_regimes: ['irs_jovem'] }),
+    ])
+    const target = makeHousehold(2023, [makePerson('Rui', { nif: '111' })])
 
     const result = propagateSharedData(primary, target)
-    // special_regimes are year-specific, not propagated
     expect(result.members[0].special_regimes).toEqual([])
   })
 
@@ -133,7 +256,6 @@ describe('propagateSharedData', () => {
       makePerson('Rui', { nif: '111', birth_year: 1990 }),
       makePerson('Micha', { nif: '222', birth_year: 1992 }),
     ])
-    // Target has reversed member order (different XML submitted first)
     const target = makeHousehold(2023, [
       makePerson('CONTRIBUINTE EXEMPLO B', {
         nif: '222',
@@ -146,45 +268,43 @@ describe('propagateSharedData', () => {
     ])
 
     const result = propagateSharedData(primary, target)
-    // Member at index 0 has NIF 222 → should get Micha's name and birth_year
     expect(result.members[0].name).toBe('Micha')
     expect(result.members[0].birth_year).toBe(1992)
-    expect(result.members[0].incomes[0].gross).toBe(25000) // preserves target data
-    // Member at index 1 has NIF 111 → should get Rui's name and birth_year
+    expect(result.members[0].incomes[0].gross).toBe(25000)
     expect(result.members[1].name).toBe('Rui')
     expect(result.members[1].birth_year).toBe(1990)
     expect(result.members[1].incomes[0].gross).toBe(35000)
   })
 
-  it('falls back to position matching when NIFs are not available', () => {
+  it('does not propagate when no NIF or name match (no position fallback)', () => {
     const primary = makeHousehold(2025, [
       makePerson('Rui', { birth_year: 1990 }),
       makePerson('Micha', { birth_year: 1992 }),
     ])
+    // Target names differ and no NIFs → no match possible
     const target = makeHousehold(2023, [makePerson('RUI MIGUEL'), makePerson('Titular B (123)')])
 
     const result = propagateSharedData(primary, target)
-    expect(result.members[0].name).toBe('Rui')
-    expect(result.members[0].birth_year).toBe(1990)
-    expect(result.members[1].name).toBe('Micha')
-    expect(result.members[1].birth_year).toBe(1992)
+    // No propagation: target data preserved as-is
+    expect(result.members[0].name).toBe('RUI MIGUEL')
+    expect(result.members[0].birth_year).toBeUndefined()
+    expect(result.members[1].name).toBe('Titular B (123)')
+    expect(result.members[1].birth_year).toBeUndefined()
   })
 
   it('propagates NIF from primary to target', () => {
     const primary = makeHousehold(2025, [makePerson('Rui', { nif: '111' })])
-    const target = makeHousehold(2023, [makePerson('RUI MIGUEL')])
+    const target = makeHousehold(2023, [makePerson('Rui')])
 
     const result = propagateSharedData(primary, target)
     expect(result.members[0].nif).toBe('111')
   })
 
   it('does not cross-contaminate NHR when member order differs and NIF unavailable', () => {
-    // Primary: Rui[0] (no NHR), Micha[1] (NHR)
     const primary = makeHousehold(2025, [
       makePerson('Rui', { nif: '111', special_regimes: [] }),
       makePerson('Micha', { nif: '222', special_regimes: ['nhr'], nhr_confirmed: true }),
     ])
-    // Target: Micha[0] (NHR, has NIF), Rui[1] (no NHR, NO NIF — the bug trigger)
     const target = makeHousehold(2024, [
       makePerson('Micha', {
         nif: '222',
@@ -192,22 +312,42 @@ describe('propagateSharedData', () => {
         nhr_confirmed: true,
       }),
       makePerson('Rui', {
-        // nif missing — index fallback would pick primary.members[1] = Micha
+        // nif missing but name matches
         special_regimes: [],
       }),
     ])
 
     const result = propagateSharedData(primary, target)
-    // Rui should NOT get NHR even though index fallback maps to Micha
     expect(result.members[1].special_regimes).toEqual([])
     expect(result.members[1].nhr_confirmed).toBeUndefined()
   })
 
   it('propagates irs_jovem_first_work_year from primary to target', () => {
-    const primary = makeHousehold(2025, [makePerson('Rui', { irs_jovem_first_work_year: 2020 })])
-    const target = makeHousehold(2023, [makePerson('RUI MIGUEL')])
+    const primary = makeHousehold(2025, [
+      makePerson('Rui', { nif: '111', irs_jovem_first_work_year: 2020 }),
+    ])
+    const target = makeHousehold(2023, [makePerson('Rui', { nif: '111' })])
 
     const result = propagateSharedData(primary, target)
     expect(result.members[0].irs_jovem_first_work_year).toBe(2020)
+  })
+
+  // Divorce/remarriage: different spouse across years
+  it('handles spouse change across years (remarriage)', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Alice', { nif: '111', birth_year: 1990 }),
+      makePerson('Charlie', { nif: '333', birth_year: 1985, nhr_start_year: 2018 }),
+    ])
+    const target = makeHousehold(2024, [
+      makePerson('Alice', { nif: '111' }),
+      makePerson('Bob', { nif: '222', birth_year: 1988, nhr_start_year: 2019 }),
+    ])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].birth_year).toBe(1990) // Alice matched
+    // Bob has no match in primary → keeps own data (not Charlie's)
+    expect(result.members[1].name).toBe('Bob')
+    expect(result.members[1].birth_year).toBe(1988)
+    expect(result.members[1].nhr_start_year).toBe(2019) // Bob's own, not Charlie's
   })
 })

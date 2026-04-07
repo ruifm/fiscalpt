@@ -9,6 +9,7 @@
 import type { DeductionCategory, Household, Person, SpecialRegime } from './types'
 import { getIrsJovemRegime } from './irs-jovem'
 import { sanitizeNumber } from './input-validation'
+import { findMatchingMember } from './propagate-shared-data'
 
 // ─── Question Types ──────────────────────────────────────────
 
@@ -273,8 +274,8 @@ export function identifyMissingInputs(
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
     const otherMembers = (otherYearHouseholds ?? [])
-      .map((h) => findMatchingMember(member, h.members) ?? h.members[i])
-      .filter(Boolean)
+      .map((h) => findMatchingMember(member, h.members))
+      .filter((m): m is Person => m !== undefined)
     const anyHasNhr =
       hasSpecialRegime(member, 'nhr') || otherMembers.some((m) => hasSpecialRegime(m, 'nhr'))
     if (!anyHasNhr) continue
@@ -350,8 +351,8 @@ export function identifyMissingInputs(
 
     // Check this member AND matching members in other year households
     const otherMembers = (otherYearHouseholds ?? [])
-      .map((h) => findMatchingMember(member, h.members) ?? h.members[i])
-      .filter(Boolean)
+      .map((h) => findMatchingMember(member, h.members))
+      .filter((m): m is Person => m !== undefined)
 
     const age = year - member.birth_year
     const hasUnconfirmedIrsJovem = hasSpecialRegime(member, 'irs_jovem') && !member.irs_jovem_year
@@ -589,19 +590,6 @@ function toNumber(value: string | number | boolean): number {
   if (typeof value === 'number') return sanitizeNumber(value)
   if (typeof value === 'boolean') return value ? 1 : 0
   return sanitizeNumber(parseInt(value))
-}
-
-/** Match a member to the same person in another year's household by NIF or name. */
-function findMatchingMember(member: Person, others: Person[]): Person | undefined {
-  if (member.nif) {
-    const byNif = others.find((m) => m.nif === member.nif)
-    if (byNif) return byNif
-  }
-  if (member.name) {
-    const normalized = member.name.toLowerCase()
-    return others.find((m) => m.name?.toLowerCase() === normalized)
-  }
-  return undefined
 }
 
 /** Returns true if there are any critical or important questions. */
