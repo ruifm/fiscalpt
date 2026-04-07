@@ -16,7 +16,7 @@ typecheck:
 
 # Lint with ESLint
 lint:
-    npx eslint .
+    npx eslint --max-warnings 0 .
 
 # Fix auto-fixable lint issues
 lint-fix:
