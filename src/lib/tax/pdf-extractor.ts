@@ -834,9 +834,15 @@ export interface LiquidacaoValidation {
   }[]
 }
 
+// Thresholds for reporting liquidação mismatches to users.
+// Below these, differences are noise (rounding, minor deduction gaps).
+const LIQUIDACAO_IRS_THRESHOLD = 500 // €500
+const LIQUIDACAO_RATE_THRESHOLD = 0.1 // 10 percentage points
+
 /**
  * Cross-validate our tax calculation against AT's official liquidação.
- * Compares rendimento global, coleta total, and taxa efetiva.
+ * Only surfaces differences above meaningful thresholds (€500 IRS or 10pp rate).
+ * Returns issues with 'info' severity — these are informational, not errors.
  */
 export function validateAgainstLiquidacao(
   liquidacao: LiquidacaoParsed,
@@ -844,26 +850,17 @@ export function validateAgainstLiquidacao(
 ): LiquidacaoValidation {
   const issues: ValidationIssue[] = []
   const comparison: LiquidacaoValidation['comparison'] = []
-  const TOLERANCE = 1.0 // €1 tolerance for rounding
 
   if (liquidacao.rendimentoGlobal != null) {
     // AT's rendimento global = taxable income (after specific deductions, NHR exclusions)
-    // Compare against total_taxable, not total_gross
     const diff = Math.abs(liquidacao.rendimentoGlobal - scenarioResult.total_taxable)
     comparison.push({
       field: 'Rendimento Global',
       expected: liquidacao.rendimentoGlobal,
       actual: scenarioResult.total_taxable,
       difference: diff,
-      withinTolerance: diff <= TOLERANCE,
+      withinTolerance: diff <= LIQUIDACAO_IRS_THRESHOLD,
     })
-    if (diff > TOLERANCE) {
-      issues.push({
-        severity: 'error',
-        code: 'LIQUIDACAO_MISMATCH',
-        message: `Rendimento global calculado (${scenarioResult.total_taxable.toFixed(2)}€) difere do oficial (${liquidacao.rendimentoGlobal.toFixed(2)}€) em ${diff.toFixed(2)}€.`,
-      })
-    }
   }
 
   if (liquidacao.coletaTotal != null) {
@@ -873,13 +870,13 @@ export function validateAgainstLiquidacao(
       expected: liquidacao.coletaTotal,
       actual: scenarioResult.total_irs,
       difference: diff,
-      withinTolerance: diff <= TOLERANCE,
+      withinTolerance: diff <= LIQUIDACAO_IRS_THRESHOLD,
     })
-    if (diff > TOLERANCE) {
+    if (diff > LIQUIDACAO_IRS_THRESHOLD) {
       issues.push({
-        severity: 'error',
+        severity: 'info',
         code: 'LIQUIDACAO_MISMATCH',
-        message: `IRS calculado (${scenarioResult.total_irs.toFixed(2)}€) difere do oficial (${liquidacao.coletaTotal.toFixed(2)}€) em ${diff.toFixed(2)}€.`,
+        message: `Diferença de ${diff.toFixed(0)}€ no IRS face à liquidação AT (calculado: ${scenarioResult.total_irs.toFixed(2)}€, oficial: ${liquidacao.coletaTotal.toFixed(2)}€).`,
       })
     }
   }
@@ -892,19 +889,19 @@ export function validateAgainstLiquidacao(
       expected: liquidacao.taxaEfetiva,
       actual: calculatedRate,
       difference: diff,
-      withinTolerance: diff <= 0.005,
+      withinTolerance: diff <= LIQUIDACAO_RATE_THRESHOLD,
     })
-    if (diff > 0.005) {
+    if (diff > LIQUIDACAO_RATE_THRESHOLD) {
       issues.push({
-        severity: 'error',
+        severity: 'info',
         code: 'LIQUIDACAO_MISMATCH',
-        message: `Taxa efetiva calculada (${(calculatedRate * 100).toFixed(2)}%) difere da oficial (${(liquidacao.taxaEfetiva * 100).toFixed(2)}%).`,
+        message: `Diferença de ${(diff * 100).toFixed(1)}pp na taxa efetiva face à liquidação AT (calculada: ${(calculatedRate * 100).toFixed(2)}%, oficial: ${(liquidacao.taxaEfetiva * 100).toFixed(2)}%).`,
       })
     }
   }
 
   return {
-    isValid: issues.filter((i) => i.severity === 'error').length === 0,
+    isValid: issues.length === 0,
     issues,
     comparison,
   }

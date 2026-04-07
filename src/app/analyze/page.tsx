@@ -313,11 +313,15 @@ export default function AnalyzePage() {
 
       setHouseholds(enrichedHouseholds)
 
-      // Cross-validate primary year against liquidação if available
-      if (liquidacao && primaryResult && primaryResult.scenarios.length > 0) {
-        const validation = validateAgainstLiquidacao(liquidacao, primaryResult.scenarios[0])
-        if (!validation.isValid) {
-          setIssues((prev) => [...prev, ...validation.issues])
+      // Cross-validate ALL years against liquidação if available
+      if (liquidacao) {
+        for (const result of allResults) {
+          if (result.year !== liquidacao.year) continue
+          if (result.scenarios.length === 0) continue
+          const validation = validateAgainstLiquidacao(liquidacao, result.scenarios[0])
+          if (!validation.isValid) {
+            setIssues((prev) => [...prev, ...validation.issues])
+          }
         }
       }
 
@@ -530,22 +534,67 @@ export default function AnalyzePage() {
                         </div>
                       </div>
                     </div>
-                    {issues.filter((i) => i.severity === 'warning').length > 0 && (
+                    {issues.filter((i) => i.severity === 'warning' || i.severity === 'info')
+                      .length > 0 && (
                       <div className="space-y-2">
                         {issues
-                          .filter((i) => i.severity === 'warning')
+                          .filter((i) => i.severity === 'warning' || i.severity === 'info')
                           .map((issue, i) => (
                             <div
-                              key={`warn-${i}`}
-                              className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-3"
+                              key={`issue-${i}`}
+                              className={`flex items-start gap-2 rounded-lg p-3 ${
+                                issue.severity === 'warning'
+                                  ? 'bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800'
+                                  : 'bg-sky-50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800'
+                              }`}
                             >
-                              <AlertTriangle
-                                className="h-4 w-4 text-amber-600 mt-0.5 shrink-0"
-                                aria-hidden="true"
-                              />
-                              <p className="text-sm text-amber-800 dark:text-amber-200">
-                                {issue.message}
-                              </p>
+                              {issue.severity === 'warning' ? (
+                                <AlertTriangle
+                                  className="h-4 w-4 text-amber-600 mt-0.5 shrink-0"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <AlertCircle
+                                  className="h-4 w-4 text-sky-600 mt-0.5 shrink-0"
+                                  aria-hidden="true"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p
+                                  className={`text-sm ${
+                                    issue.severity === 'warning'
+                                      ? 'text-amber-800 dark:text-amber-200'
+                                      : 'text-sky-800 dark:text-sky-200'
+                                  }`}
+                                >
+                                  {issue.message}
+                                </p>
+                                {issue.code === 'LIQUIDACAO_MISMATCH' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const description = `[Liquidação mismatch] ${issue.message}`
+                                      fetch('/api/report-problem', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                          description,
+                                          stage: 'results-validation',
+                                        }),
+                                      }).catch(() => {})
+                                      const btn = document.activeElement as HTMLButtonElement | null
+                                      if (btn) {
+                                        btn.textContent = t('analyze.reportSent')
+                                        btn.disabled = true
+                                      }
+                                    }}
+                                    className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-sky-700 dark:text-sky-300 hover:underline"
+                                  >
+                                    <Mail className="h-3 w-3" aria-hidden="true" />
+                                    {t('analyze.reportMismatch')}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           ))}
                       </div>

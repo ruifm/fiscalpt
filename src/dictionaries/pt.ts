@@ -281,6 +281,8 @@ const pt: Dictionary = {
     errorTitle: 'Erro no cálculo',
     calcError: 'Erro ao calcular impostos. Verifique os dados e tente novamente.',
     calcErrorPrefix: 'Erro no cálculo: {message}',
+    reportMismatch: 'Reportar diferença',
+    reportSent: 'Reportado ✓',
   },
 
   upload: {

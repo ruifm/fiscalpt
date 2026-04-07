@@ -278,6 +278,8 @@ const en: Dictionary = {
     errorTitle: 'Calculation error',
     calcError: 'Error calculating taxes. Check the data and try again.',
     calcErrorPrefix: 'Calculation error: {message}',
+    reportMismatch: 'Report discrepancy',
+    reportSent: 'Reported ✓',
   },
 
   upload: {

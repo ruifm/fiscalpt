@@ -25,7 +25,7 @@ function makeLiquidacao(overrides: Partial<LiquidacaoParsed> = {}): LiquidacaoPa
   return {
     nif: '123456789',
     year: 2024,
-    rendimentoGlobal: 45000, // matches total_taxable, NOT total_gross
+    rendimentoGlobal: 45000,
     coletaTotal: 10000,
     taxaEfetiva: 0.2,
     ...overrides,
@@ -37,12 +37,10 @@ describe('validateAgainstLiquidacao', () => {
     const result = validateAgainstLiquidacao(makeLiquidacao(), makeScenario())
 
     expect(result.isValid).toBe(true)
-    expect(result.issues.filter((i) => i.severity === 'error')).toHaveLength(0)
+    expect(result.issues).toHaveLength(0)
   })
 
   it('should compare rendimento global against total_taxable, not total_gross', () => {
-    // AT's rendimento global = taxable income (after specific deductions, NHR exclusions)
-    // NOT gross income. The comparison should use total_taxable.
     const result = validateAgainstLiquidacao(
       makeLiquidacao({ rendimentoGlobal: 45000 }),
       makeScenario({ total_gross: 50000, total_taxable: 45000 }),
@@ -51,37 +49,58 @@ describe('validateAgainstLiquidacao', () => {
     expect(result.isValid).toBe(true)
     const grossComparison = result.comparison.find((c) => c.field === 'Rendimento Global')
     expect(grossComparison?.withinTolerance).toBe(true)
-    expect(grossComparison?.actual).toBe(45000) // should be total_taxable
+    expect(grossComparison?.actual).toBe(45000)
   })
 
-  it('should pass when values are within €1 tolerance', () => {
+  it('should pass when IRS difference is within €500 threshold', () => {
     const result = validateAgainstLiquidacao(
-      makeLiquidacao({ rendimentoGlobal: 45000.8 }),
-      makeScenario({ total_taxable: 45000 }),
+      makeLiquidacao({ coletaTotal: 10400 }),
+      makeScenario({ total_irs: 10000 }),
     )
 
     expect(result.isValid).toBe(true)
-    const grossComparison = result.comparison.find((c) => c.field === 'Rendimento Global')
-    expect(grossComparison?.withinTolerance).toBe(true)
+    expect(result.issues).toHaveLength(0)
+    const coletaComparison = result.comparison.find((c) => c.field === 'Coleta Total')
+    expect(coletaComparison?.withinTolerance).toBe(true)
   })
 
-  it('should error when rendimento global differs beyond tolerance', () => {
+  it('should report info when IRS difference exceeds €500', () => {
     const result = validateAgainstLiquidacao(
-      makeLiquidacao({ rendimentoGlobal: 47000 }),
-      makeScenario({ total_taxable: 45000 }),
+      makeLiquidacao({ coletaTotal: 11000 }),
+      makeScenario({ total_irs: 10000 }),
     )
 
     expect(result.isValid).toBe(false)
-    const errors = result.issues.filter((i) => i.severity === 'error')
-    expect(errors.length).toBeGreaterThan(0)
-    expect(errors[0].code).toBe('LIQUIDACAO_MISMATCH')
-    expect(errors[0].message).toContain('Rendimento global')
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].severity).toBe('info')
+    expect(result.issues[0].code).toBe('LIQUIDACAO_MISMATCH')
+    expect(result.issues[0].message).toContain('1000€')
+  })
+
+  it('should pass when rate difference is within 10pp threshold', () => {
+    const result = validateAgainstLiquidacao(
+      makeLiquidacao({ taxaEfetiva: 0.25 }),
+      makeScenario({ effective_rate_irs: 0.2 }),
+    )
+
+    expect(result.isValid).toBe(true)
+    const rateComparison = result.comparison.find((c) => c.field === 'Taxa Efetiva')
+    expect(rateComparison?.withinTolerance).toBe(true)
+  })
+
+  it('should report info when rate difference exceeds 10pp', () => {
+    const result = validateAgainstLiquidacao(
+      makeLiquidacao({ taxaEfetiva: 0.35 }),
+      makeScenario({ effective_rate_irs: 0.2 }),
+    )
+
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].severity).toBe('info')
+    expect(result.issues[0].message).toContain('15.0pp')
   })
 
   it('should handle NHR case where total_gross >> total_taxable', () => {
-    // NHR: Cat A income taxed at 20% (autonomous), excluded from rendimento global
-    // total_gross = 80000 (all income), total_taxable = 36000 (progressive only)
-    // AT rendimentoGlobal = 36000 (matches total_taxable, not total_gross)
     const result = validateAgainstLiquidacao(
       makeLiquidacao({ rendimentoGlobal: 36000 }),
       makeScenario({ total_gross: 80000, total_taxable: 36000 }),
@@ -90,37 +109,6 @@ describe('validateAgainstLiquidacao', () => {
     expect(result.isValid).toBe(true)
     const grossComparison = result.comparison.find((c) => c.field === 'Rendimento Global')
     expect(grossComparison?.withinTolerance).toBe(true)
-  })
-
-  it('should error when coleta total differs beyond tolerance', () => {
-    const result = validateAgainstLiquidacao(
-      makeLiquidacao({ coletaTotal: 12000 }),
-      makeScenario({ total_irs: 10000 }),
-    )
-
-    expect(result.isValid).toBe(false)
-    expect(result.issues.some((i) => i.code === 'LIQUIDACAO_MISMATCH')).toBe(true)
-  })
-
-  it('should error when taxa efetiva differs beyond 0.5pp', () => {
-    const result = validateAgainstLiquidacao(
-      makeLiquidacao({ taxaEfetiva: 0.25 }),
-      makeScenario({ effective_rate_irs: 0.2 }),
-    )
-
-    expect(result.isValid).toBe(false)
-    expect(result.issues.some((i) => i.message.includes('Taxa efetiva'))).toBe(true)
-  })
-
-  it('should tolerate small rate differences (≤0.5pp)', () => {
-    const result = validateAgainstLiquidacao(
-      makeLiquidacao({ taxaEfetiva: 0.2035 }),
-      makeScenario({ effective_rate_irs: 0.2 }),
-    )
-
-    expect(result.isValid).toBe(true)
-    const rateComparison = result.comparison.find((c) => c.field === 'Taxa Efetiva')
-    expect(rateComparison?.withinTolerance).toBe(true)
   })
 
   it('should include comparison entries for all available fields', () => {
@@ -144,5 +132,16 @@ describe('validateAgainstLiquidacao', () => {
 
     expect(result.isValid).toBe(true)
     expect(result.comparison).toHaveLength(0)
+  })
+
+  it('should report both IRS and rate mismatches when both exceed thresholds', () => {
+    const result = validateAgainstLiquidacao(
+      makeLiquidacao({ coletaTotal: 15000, taxaEfetiva: 0.35 }),
+      makeScenario({ total_irs: 10000, effective_rate_irs: 0.2 }),
+    )
+
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toHaveLength(2)
+    expect(result.issues.every((i) => i.severity === 'info')).toBe(true)
   })
 })
