@@ -1,16 +1,20 @@
 import { stripe, RECOMMENDATIONS_PRICE_ID } from '@/lib/stripe'
 import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
 
+function siteUrl(): string {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  return 'http://localhost:3000'
+}
+
 const ALLOWED_ORIGINS = new Set(
-  [process.env.NEXT_PUBLIC_SITE_URL, 'http://localhost:3000', 'http://localhost:8080'].filter(
-    Boolean,
-  ),
+  [siteUrl(), 'http://localhost:3000', 'http://localhost:8080'].filter(Boolean),
 )
 
 function safeOrigin(request: Request): string {
   const origin = request.headers.get('origin') ?? ''
   if (ALLOWED_ORIGINS.has(origin)) return origin
-  return process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  return siteUrl()
 }
 
 export async function POST(request: Request) {
