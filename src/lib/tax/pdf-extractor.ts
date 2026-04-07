@@ -847,11 +847,13 @@ export function validateAgainstLiquidacao(
   const TOLERANCE = 1.0 // €1 tolerance for rounding
 
   if (liquidacao.rendimentoGlobal != null) {
-    const diff = Math.abs(liquidacao.rendimentoGlobal - scenarioResult.total_gross)
+    // AT's rendimento global = taxable income (after specific deductions, NHR exclusions)
+    // Compare against total_taxable, not total_gross
+    const diff = Math.abs(liquidacao.rendimentoGlobal - scenarioResult.total_taxable)
     comparison.push({
       field: 'Rendimento Global',
       expected: liquidacao.rendimentoGlobal,
-      actual: scenarioResult.total_gross,
+      actual: scenarioResult.total_taxable,
       difference: diff,
       withinTolerance: diff <= TOLERANCE,
     })
@@ -859,7 +861,7 @@ export function validateAgainstLiquidacao(
       issues.push({
         severity: 'error',
         code: 'LIQUIDACAO_MISMATCH',
-        message: `Rendimento global calculado (${scenarioResult.total_gross.toFixed(2)}€) difere do oficial (${liquidacao.rendimentoGlobal.toFixed(2)}€) em ${diff.toFixed(2)}€.`,
+        message: `Rendimento global calculado (${scenarioResult.total_taxable.toFixed(2)}€) difere do oficial (${liquidacao.rendimentoGlobal.toFixed(2)}€) em ${diff.toFixed(2)}€.`,
       })
     }
   }

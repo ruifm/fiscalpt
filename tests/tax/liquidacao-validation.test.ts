@@ -25,7 +25,7 @@ function makeLiquidacao(overrides: Partial<LiquidacaoParsed> = {}): LiquidacaoPa
   return {
     nif: '123456789',
     year: 2024,
-    rendimentoGlobal: 50000,
+    rendimentoGlobal: 45000, // matches total_taxable, NOT total_gross
     coletaTotal: 10000,
     taxaEfetiva: 0.2,
     ...overrides,
@@ -40,10 +40,24 @@ describe('validateAgainstLiquidacao', () => {
     expect(result.issues.filter((i) => i.severity === 'error')).toHaveLength(0)
   })
 
+  it('should compare rendimento global against total_taxable, not total_gross', () => {
+    // AT's rendimento global = taxable income (after specific deductions, NHR exclusions)
+    // NOT gross income. The comparison should use total_taxable.
+    const result = validateAgainstLiquidacao(
+      makeLiquidacao({ rendimentoGlobal: 45000 }),
+      makeScenario({ total_gross: 50000, total_taxable: 45000 }),
+    )
+
+    expect(result.isValid).toBe(true)
+    const grossComparison = result.comparison.find((c) => c.field === 'Rendimento Global')
+    expect(grossComparison?.withinTolerance).toBe(true)
+    expect(grossComparison?.actual).toBe(45000) // should be total_taxable
+  })
+
   it('should pass when values are within €1 tolerance', () => {
     const result = validateAgainstLiquidacao(
-      makeLiquidacao({ rendimentoGlobal: 50000.8 }),
-      makeScenario({ total_gross: 50000 }),
+      makeLiquidacao({ rendimentoGlobal: 45000.8 }),
+      makeScenario({ total_taxable: 45000 }),
     )
 
     expect(result.isValid).toBe(true)
@@ -53,8 +67,8 @@ describe('validateAgainstLiquidacao', () => {
 
   it('should error when rendimento global differs beyond tolerance', () => {
     const result = validateAgainstLiquidacao(
-      makeLiquidacao({ rendimentoGlobal: 52000 }),
-      makeScenario({ total_gross: 50000 }),
+      makeLiquidacao({ rendimentoGlobal: 47000 }),
+      makeScenario({ total_taxable: 45000 }),
     )
 
     expect(result.isValid).toBe(false)
@@ -62,6 +76,20 @@ describe('validateAgainstLiquidacao', () => {
     expect(errors.length).toBeGreaterThan(0)
     expect(errors[0].code).toBe('LIQUIDACAO_MISMATCH')
     expect(errors[0].message).toContain('Rendimento global')
+  })
+
+  it('should handle NHR case where total_gross >> total_taxable', () => {
+    // NHR: Cat A income taxed at 20% (autonomous), excluded from rendimento global
+    // total_gross = 80000 (all income), total_taxable = 36000 (progressive only)
+    // AT rendimentoGlobal = 36000 (matches total_taxable, not total_gross)
+    const result = validateAgainstLiquidacao(
+      makeLiquidacao({ rendimentoGlobal: 36000 }),
+      makeScenario({ total_gross: 80000, total_taxable: 36000 }),
+    )
+
+    expect(result.isValid).toBe(true)
+    const grossComparison = result.comparison.find((c) => c.field === 'Rendimento Global')
+    expect(grossComparison?.withinTolerance).toBe(true)
   })
 
   it('should error when coleta total differs beyond tolerance', () => {
