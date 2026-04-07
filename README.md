@@ -1,5 +1,13 @@
 # FiscalPT
 
+[![CI](https://github.com/ruifm/fiscalpt/actions/workflows/ci.yml/badge.svg)](https://github.com/ruifm/fiscalpt/actions/workflows/ci.yml)
+[![Lighthouse](https://img.shields.io/badge/lighthouse-passing-brightgreen?logo=lighthouse)](https://github.com/ruifm/fiscalpt/actions/workflows/ci.yml)
+[![codecov](https://img.shields.io/badge/coverage-%E2%89%A594%25-brightgreen?logo=vitest&logoColor=white)](https://github.com/ruifm/fiscalpt)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue?logo=gnu)](LICENSE)
+[![Website](https://img.shields.io/website?url=https%3A%2F%2Ffiscalpt.com&label=fiscalpt.com)](https://fiscalpt.com)
+
 **Plataforma de otimização fiscal para contribuintes portugueses.**
 
 [fiscalpt.com](https://fiscalpt.com) · [Guias](https://fiscalpt.com/guia/como-funciona-irs) · [Blog](https://fiscalpt.com/blog)
@@ -31,6 +39,8 @@ filing scenario.
   (fallback), with automatic data extraction.
 - **1060+ automated tests** — property-based fuzz testing, AT liquidação
   cross-validation, comprehensive edge case coverage.
+- **Privacy-first** — all processing happens in the browser. Zero servers,
+  zero data collection.
 
 ### Tax Years Supported
 
