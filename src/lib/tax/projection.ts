@@ -53,11 +53,16 @@ export function buildProjectedHousehold(
         incomes: (adjusted ?? member.incomes).map((income) => {
           const { withholding: _, ss_paid: _ss, ...rest } = income
 
-          // Increment cat_b_activity_year, drop if > 2
+          // Advance cat_b_activity_year for projection:
+          // 0 = "3rd year or more" → stays beyond new-activity period (undefined)
+          // 1 = "1st year" → becomes 2nd year
+          // 2 = "2nd year" → becomes 3rd+ (undefined, no reduction)
           let activityYear = rest.cat_b_activity_year
-          if (activityYear !== undefined) {
-            activityYear = activityYear + 1
-            if (activityYear > 2) activityYear = undefined
+          if (activityYear === 1) {
+            activityYear = 2
+          } else {
+            // 0 (already past new-activity) or 2 (will be past) → no reduction
+            activityYear = undefined
           }
 
           return { ...rest, cat_b_activity_year: activityYear }

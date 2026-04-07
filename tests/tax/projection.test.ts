@@ -118,15 +118,22 @@ describe('buildProjectedHousehold', () => {
     expect(projected.members[0].special_regimes).not.toContain('irs_jovem')
   })
 
-  it('increments cat_b_activity_year by 1', () => {
+  it('increments cat_b_activity_year from 1st to 2nd year', () => {
     const h = makeHousehold()
     const projected = buildProjectedHousehold(h)
     expect(projected.members[1].incomes[0].cat_b_activity_year).toBe(2)
   })
 
-  it('drops cat_b_activity_year when it would exceed 2', () => {
+  it('drops cat_b_activity_year when 2nd year advances past new-activity period', () => {
     const h = makeHousehold()
     h.members[1].incomes[0].cat_b_activity_year = 2
+    const projected = buildProjectedHousehold(h)
+    expect(projected.members[1].incomes[0].cat_b_activity_year).toBeUndefined()
+  })
+
+  it('drops cat_b_activity_year=0 (3rd+ year) — no new-activity reduction in projection', () => {
+    const h = makeHousehold()
+    h.members[1].incomes[0].cat_b_activity_year = 0
     const projected = buildProjectedHousehold(h)
     expect(projected.members[1].incomes[0].cat_b_activity_year).toBeUndefined()
   })
