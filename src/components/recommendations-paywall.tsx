@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import {
   Lock,
@@ -62,10 +62,10 @@ export function RecommendationsPaywall({
   chatSlot,
 }: RecommendationsPaywallProps) {
   // Only show recommendations for amendable + projected years
-  const amendableYears = new Set(getAmendableYears())
-  const actionableResults = results.filter(
-    (r) => amendableYears.has(r.year) || r.household.projected,
-  )
+  const actionableResults = useMemo(() => {
+    const amendableYears = new Set(getAmendableYears())
+    return results.filter((r) => amendableYears.has(r.year) || r.household.projected)
+  }, [results])
   const [showCheckout, setShowCheckout] = useState(false)
   const [recommendations, setRecommendations] = useState<ActionableReport[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -124,7 +124,7 @@ export function RecommendationsPaywall({
         setLoading(false)
       }
     },
-    [results, onUnlock],
+    [actionableResults, onUnlock],
   )
 
   const validateDiscount = useCallback(async () => {

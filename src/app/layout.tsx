@@ -124,8 +124,8 @@ gtag('config', 'AW-18070272762');`}
         <ThemeProvider>
           <LocaleWrapper>{children}</LocaleWrapper>
         </ThemeProvider>
-        <Analytics />
-        <SpeedInsights />
+        {process.env.VERCEL && <Analytics />}
+        {process.env.VERCEL && <SpeedInsights />}
       </body>
     </html>
   )
