@@ -131,12 +131,9 @@ export default function AnalyzePage() {
       setFurthestStep(STEPS.indexOf(step as Step))
 
       // Restore original uploaded households so questionnaire shows all questions
-      try {
-        const raw = sessionStorage.getItem(`fiscalpt-uploaded-${sessionId}`)
-        if (raw) {
-          uploadedHouseholdsRef.current = JSON.parse(raw) as Household[]
-        }
-      } catch {}
+      if (saved.uploadedHouseholds?.length) {
+        uploadedHouseholdsRef.current = saved.uploadedHouseholds
+      }
     }
 
     // Set URL hash so user can bookmark
@@ -178,6 +175,8 @@ export default function AnalyzePage() {
       saveSessionState(sessionId, {
         step: s,
         households: hs,
+        uploadedHouseholds:
+          uploadedHouseholdsRef.current.length > 0 ? uploadedHouseholdsRef.current : undefined,
         results: rs,
         issues: i,
         liquidacao: l,
@@ -190,9 +189,6 @@ export default function AnalyzePage() {
     trackEvent('upload_complete', { householdCount: hs.length })
     setHouseholds(hs)
     uploadedHouseholdsRef.current = hs
-    try {
-      sessionStorage.setItem(`fiscalpt-uploaded-${sessionId}`, JSON.stringify(hs))
-    } catch {}
     setIssues(i)
     setResults([])
     const newLiq = liq ?? liquidacao
@@ -222,14 +218,12 @@ export default function AnalyzePage() {
       if (idx === 0) return h
       const propagated = propagateSharedData(h, hh)
       // Log propagation details for debugging
-      console.info(
-        `[FiscalPT] Propagation year ${hh.year}:`,
-        hh.members.map(
-          (m, mi) =>
-            `target[${mi}]=${m.name}(nif=${m.nif ?? '?'}, regimes=[${m.special_regimes}], nhr_confirmed=${m.nhr_confirmed}) → ` +
-            `result regimes=[${propagated.members[mi]?.special_regimes}], nhr_confirmed=${propagated.members[mi]?.nhr_confirmed}`,
-        ),
-      )
+      console.info('[FiscalPT] Propagation year:', hh.year, {
+        members: hh.members.map((m, mi) => ({
+          target: `${m.name}(nif=${m.nif ?? '?'}, regimes=[${m.special_regimes}], nhr_confirmed=${m.nhr_confirmed})`,
+          result: `regimes=[${propagated.members[mi]?.special_regimes}], nhr_confirmed=${propagated.members[mi]?.nhr_confirmed}`,
+        })),
+      })
       return propagated
     })
     if (projectedHousehold) allHouseholds.push(projectedHousehold)
@@ -288,31 +282,33 @@ export default function AnalyzePage() {
 
       // Diagnostic: log per-year member and scenario data (all years including projected)
       for (const r of allResults) {
-        const members = r.household.members.map(
-          (m) =>
-            `${m.name}(nif=${m.nif ?? '?'}, nhr=${m.special_regimes.includes('nhr')}, ` +
-            `nhr_confirmed=${m.nhr_confirmed ?? false}, nhr_start=${m.nhr_start_year ?? '?'}, ` +
-            `regimes=[${m.special_regimes.join(',')}], ` +
-            `irs_jovem_year=${m.irs_jovem_year ?? '?'}, first_work=${m.irs_jovem_first_work_year ?? '?'})`,
-        )
-        const burdens = r.scenarios.map(
-          (s) => `${s.filing_status}=${s.total_tax_burden.toFixed(2)}`,
-        )
-        const personRates = r.scenarios[0]?.persons.map(
-          (p) =>
-            `${p.name}: gross=${p.gross_income}, taxable=${p.taxable_income}, ` +
-            `rate=${(p.effective_rate_irs * 100).toFixed(2)}%, ` +
-            `irs_jovem_exempt=${p.irs_jovem_exemption.toFixed(2)}, ` +
-            `nhr_tax=${p.nhr_tax.toFixed(2)}, irs_after=${p.irs_after_deductions.toFixed(2)}`,
-        )
-        console.info(
-          `[FiscalPT] Year ${r.year} (${r.household.projected ? 'projected' : 'real'}):`,
-          `\n  members: ${members.join('; ')}`,
-          `\n  filing: ${r.household.filing_status}`,
-          `\n  scenarios: [${burdens.join(', ')}]`,
-          `\n  person rates: [${personRates?.join('; ') ?? 'n/a'}]`,
-          `\n  optimizations: ${r.optimizations.length}`,
-        )
+        console.info('[FiscalPT] Year:', r.year, r.household.projected ? '(projected)' : '(real)', {
+          members: r.household.members.map((m) => ({
+            name: m.name,
+            nif: m.nif ?? '?',
+            nhr: m.special_regimes.includes('nhr'),
+            nhr_confirmed: m.nhr_confirmed ?? false,
+            nhr_start: m.nhr_start_year ?? '?',
+            regimes: m.special_regimes,
+            irs_jovem_year: m.irs_jovem_year ?? '?',
+            first_work: m.irs_jovem_first_work_year ?? '?',
+          })),
+          filing: r.household.filing_status,
+          scenarios: r.scenarios.map((s) => ({
+            filing: s.filing_status,
+            burden: s.total_tax_burden.toFixed(2),
+          })),
+          personRates: r.scenarios[0]?.persons.map((p) => ({
+            name: p.name,
+            gross: p.gross_income,
+            taxable: p.taxable_income,
+            rate: (p.effective_rate_irs * 100).toFixed(2) + '%',
+            irs_jovem_exempt: p.irs_jovem_exemption.toFixed(2),
+            nhr_tax: p.nhr_tax.toFixed(2),
+            irs_after: p.irs_after_deductions.toFixed(2),
+          })),
+          optimizations: r.optimizations.length,
+        })
       }
 
       setHouseholds(enrichedHouseholds)
@@ -362,7 +358,6 @@ export default function AnalyzePage() {
     clearSessionState(sessionId)
     // Clear cached questionnaire data
     try {
-      sessionStorage.removeItem(`fiscalpt-uploaded-${sessionId}`)
       for (const key of Object.keys(sessionStorage)) {
         if (key.startsWith('fiscalpt-answers-') || key.startsWith('fiscalpt-projection-')) {
           sessionStorage.removeItem(key)

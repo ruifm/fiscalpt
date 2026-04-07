@@ -11,6 +11,8 @@ type Step = 'upload' | 'questionnaire' | 'review' | 'results'
 export interface PersistedState {
   step: Step
   households: Household[]
+  /** Original uploaded households before questionnaire answers are applied. */
+  uploadedHouseholds?: Household[]
   results: AnalysisResult[]
   issues: ValidationIssue[]
   liquidacao: LiquidacaoParsed | null
@@ -51,6 +53,11 @@ export function saveSessionState(
   if (state.step === 'upload' || state.households.length === 0) return
 
   try {
+    // lgtm[js/clear-text-storage-of-sensitive-data]
+    // CodeQL suppression: household data (income, deductions) is the user's own
+    // data stored in their own browser via localStorage/sessionStorage. It never
+    // leaves the client. The app requires client-side persistence to maintain
+    // analysis state across page reloads. No server, no transmission.
     storage.setItem(key, JSON.stringify(state))
   } catch {
     // Quota exceeded or other storage error — silently ignore
@@ -77,6 +84,7 @@ function parsePersistedState(raw: string): PersistedState | null {
     return {
       step: parsed.step,
       households,
+      uploadedHouseholds: parsed.uploadedHouseholds,
       results,
       issues: parsed.issues ?? [],
       liquidacao: parsed.liquidacao ?? null,

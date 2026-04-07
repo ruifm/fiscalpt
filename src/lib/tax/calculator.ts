@@ -902,8 +902,9 @@ export function analyzeHousehold(household: Household): AnalysisResult {
     const validationErrors = validateHousehold(household).filter((e) => e.severity === 'error')
     if (validationErrors.length > 0) {
       console.warn(
-        `[FiscalPT] Validation issues for year ${household.year}:`,
-        validationErrors.map((e) => `${e.field}: ${e.message}`),
+        '[FiscalPT] Validation issues for year:',
+        household.year,
+        validationErrors.map((e) => ({ field: e.field, message: e.message })),
       )
     }
   }
