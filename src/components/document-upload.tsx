@@ -1439,11 +1439,14 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
         }
 
         if (liquidacaoResult.taxaEfetiva) {
+          const nif = liquidacaoResult.nif ?? ''
+          const nifSuffix = nif.length >= 3 ? nif.slice(-3) : nif
           allIssues.push({
             severity: 'warning',
             code: 'LIQUIDACAO_INFO',
             message: t('upload.liquidacaoInfoMessage', {
               year: String(liquidacaoResult.year || ''),
+              nifSuffix,
               rate: (liquidacaoResult.taxaEfetiva * 100).toFixed(2),
             }),
           })
