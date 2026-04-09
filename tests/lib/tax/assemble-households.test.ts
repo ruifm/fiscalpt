@@ -1144,4 +1144,579 @@ describe('assembleHouseholds', () => {
       }
     })
   })
+
+  // ─── Uncovered Branch Tests ─────────────────────────────────
+
+  describe('nullish coalescing fallbacks in declaration assembly', () => {
+    it('falls back to parsedXml.raw NIFs when file nif/nifConjuge are undefined (L160-161)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Alice' }), makePerson({ name: 'Bob' })],
+        filing_status: 'married_joint',
+      })
+      const parsedXml = makeParsedXml(h, '111222333', '444555666')
+      const declFile: AssemblyFile = {
+        fileName: 'decl.xml',
+        status: 'done',
+        // nif and nifConjuge intentionally omitted
+        year: 2024,
+        parsedXml,
+      }
+      const sections: AssemblySectionFiles = {
+        declaration: [declFile],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.households).toHaveLength(1)
+        expect(result.households[0].members).toHaveLength(2)
+      }
+    })
+  })
+
+  describe('comprovativo and deduction year mismatch', () => {
+    it('skips pasted deductions when parsed year does not match household year (L273)', () => {
+      const h = makeHousehold({ year: 2024 })
+      const nif = '111222333'
+      const slot: DeductionSlot = {
+        key: `tp-${nif}`,
+        nif,
+        year: 2023,
+        role: 'taxpayer',
+        hasLiquidacao: false,
+      }
+      const pastedDeductions = new Map<string, { text: string; result: DeductionsParseResult }>([
+        [
+          `tp-${nif}`,
+          {
+            text: 'pasted',
+            result: {
+              ok: true,
+              data: {
+                nif,
+                name: 'Test Person',
+                year: 2023, // Mismatched with household year 2024
+                expenses: [
+                  { category: 'health' as const, expenseAmount: 500, deductionAmount: 75 },
+                ],
+              },
+            },
+          },
+        ],
+      ])
+      const sections: AssemblySectionFiles = {
+        declaration: [makeDeclFile(h, nif)],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds({
+        sectionFiles: sections,
+        pastedDeductions,
+        deductionSlots: [slot],
+      })
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        // Year mismatch → deductions not applied
+        expect(result.households[0].members[0].deductions).toHaveLength(0)
+      }
+    })
+
+    it('uses empty string for nif when file nif is undefined in comprovativo path (L169)', () => {
+      const comprovativo: ComprovativoParsed = {
+        nif: '111222333',
+        year: 2024,
+        filingStatus: 'single',
+        anexoA: [
+          {
+            titular: 'A',
+            rendimentoBruto: 25000,
+            retencoesIRS: 4000,
+            contribuicoesSS: 2750,
+          },
+        ],
+        issues: [],
+      }
+      const sections: AssemblySectionFiles = {
+        declaration: [
+          {
+            fileName: 'comp.pdf',
+            status: 'done',
+            // nif intentionally omitted
+            year: 2024,
+            parsedComprovativo: comprovativo,
+          },
+        ],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.households).toHaveLength(1)
+        expect(result.issues.some((i) => i.code === 'PDF_FALLBACK')).toBe(true)
+      }
+    })
+  })
+
+  describe('previous years nullish fallbacks', () => {
+    it('falls back to parsedXml year when file year is undefined (L233)', () => {
+      const primary = makeHousehold({ year: 2024 })
+      const prev = makeHousehold({ year: 2023 })
+      const sections: AssemblySectionFiles = {
+        declaration: [makeDeclFile(primary)],
+        liquidacao: [],
+        previousYears: [
+          {
+            fileName: 'prev.xml',
+            status: 'done',
+            nif: '111222333',
+            // year intentionally omitted — falls back to parsedXml.household.year
+            parsedXml: makeParsedXml(prev, '111222333'),
+          },
+        ],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.households).toHaveLength(2)
+        expect(result.households.map((h) => h.year)).toContain(2023)
+      }
+    })
+
+    it('falls back to parsedXml NIFs when file nif is undefined in previous years (L246)', () => {
+      const primary = makeHousehold({ year: 2024 })
+      const prev = makeHousehold({ year: 2023 })
+      const sections: AssemblySectionFiles = {
+        declaration: [makeDeclFile(primary)],
+        liquidacao: [],
+        previousYears: [
+          {
+            fileName: 'prev.xml',
+            status: 'done',
+            // nif intentionally omitted
+            year: 2023,
+            parsedXml: makeParsedXml(prev, '999888777'),
+          },
+        ],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.households).toHaveLength(2)
+      }
+    })
+  })
+
+  describe('deduction slot not found', () => {
+    it('skips pasted deductions when slot key has no matching slot (L276)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Alice' })],
+      })
+      const pastedDeductions = new Map<string, { text: string; result: DeductionsParseResult }>([
+        [
+          'nonexistent-slot-key',
+          {
+            text: 'pasted',
+            result: {
+              ok: true,
+              data: {
+                nif: '111222333',
+                name: 'Alice',
+                year: 2024,
+                expenses: [
+                  { category: 'health' as const, expenseAmount: 500, deductionAmount: 75 },
+                ],
+              },
+            },
+          },
+        ],
+      ])
+
+      const sections: AssemblySectionFiles = {
+        declaration: [makeDeclFile(h, '111222333')],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds({
+        sectionFiles: sections,
+        pastedDeductions,
+        // Empty slots — no match for 'nonexistent-slot-key'
+        deductionSlots: [],
+      })
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        // Deductions should not have been merged
+        expect(result.households[0].members[0].deductions).toHaveLength(0)
+      }
+    })
+  })
+
+  describe('liquidação deduction fallback edge cases', () => {
+    it('skips fallback when liquidação year does not match household year (L329)', () => {
+      const h = makeHousehold({ year: 2024 })
+      const liq = {
+        year: 2023, // Mismatched year
+        nif: '123456789',
+        deducoesGerais: 250,
+      } as LiquidacaoParsed
+      const sections: AssemblySectionFiles = {
+        declaration: [makeDeclFile(h)],
+        liquidacao: [
+          {
+            fileName: 'liq.pdf',
+            status: 'done',
+            // No year on AssemblyFile — bypasses validateLiquidacaoFiles year check
+            parsedLiquidacao: liq,
+          },
+        ],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        // Liq year 2023 !== household year 2024 → no deduction fallback
+        expect(result.households[0].members[0].deductions).toHaveLength(0)
+      }
+    })
+
+    it('skips liqByNif when liquidação has no nif (L332)', () => {
+      const h = makeHousehold({ year: 2024 })
+      const liq: LiquidacaoParsed = {
+        year: 2024,
+        // nif intentionally omitted
+        deducoesGerais: 250,
+        issues: [],
+      } as LiquidacaoParsed
+      const sections: AssemblySectionFiles = {
+        declaration: [makeDeclFile(h)],
+        liquidacao: [
+          {
+            fileName: 'liq.pdf',
+            status: 'done',
+            parsedLiquidacao: liq,
+          },
+        ],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        // Should still derive deductions via single-liquidação fallback (L344)
+        const member = result.households[0].members[0]
+        expect(member.deductions.find((d) => d.category === 'general')).toBeDefined()
+      }
+    })
+
+    it('returns member unchanged when multiple liquidações and no NIF match (L343-344)', () => {
+      const nifA = '123456789'
+      const nifB = '987654321'
+      const hA = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Alice' }), makePerson({ name: 'Bob' })],
+        filing_status: 'married_joint',
+      })
+      const hB = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Bob' })],
+        filing_status: 'married_joint',
+      })
+      const liq1 = {
+        year: 2024,
+        nif: '999000111', // Doesn't match either declaration nif
+        deducoesGerais: 250,
+      } as LiquidacaoParsed
+      const liq2 = {
+        year: 2024,
+        nif: '999000222', // Also doesn't match
+        deducoesSaude: 300,
+      } as LiquidacaoParsed
+
+      const sections: AssemblySectionFiles = {
+        declaration: [
+          makeDeclFile(hA, nifA, nifB),
+          { ...makeDeclFile(hB, nifB, nifA), fileName: 'decl-b.xml' },
+        ],
+        liquidacao: [
+          { fileName: 'liq1.pdf', status: 'done', parsedLiquidacao: liq1 },
+          { fileName: 'liq2.pdf', status: 'done', parsedLiquidacao: liq2 },
+        ],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        // No NIF match + multiple liquidações → no fallback → no deductions
+        for (const member of result.households[0].members) {
+          expect(member.deductions).toHaveLength(0)
+        }
+      }
+    })
+
+    it('uses nifConjuge for second member in liquidação fallback (L339)', () => {
+      const nifA = '111222333'
+      const nifB = '444555666'
+      const hA = makeHousehold({
+        year: 2024,
+        filing_status: 'married_joint',
+        members: [makePerson({ name: 'Alice' }), makePerson({ name: 'Bob' })],
+      })
+      const hB = makeHousehold({
+        year: 2024,
+        filing_status: 'married_joint',
+        members: [makePerson({ name: 'Bob' })],
+      })
+      const liqB = {
+        year: 2024,
+        nif: nifB,
+        deducoesGerais: 350,
+      } as LiquidacaoParsed
+
+      const sections: AssemblySectionFiles = {
+        declaration: [
+          makeDeclFile(hA, nifA, nifB),
+          { ...makeDeclFile(hB, nifB, nifA), fileName: 'decl-b.xml' },
+        ],
+        liquidacao: [{ fileName: 'liq.pdf', status: 'done', parsedLiquidacao: liqB }],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const bob = result.households[0].members[1]
+        // nifB matched via declFile.nifConjuge → deductions derived from liqB
+        expect(bob.deductions.find((d) => d.category === 'general')).toBeDefined()
+      }
+    })
+  })
+
+  describe('taxpayer deduction NIF fallback matching', () => {
+    it('matches member by NIF when name does not match (L281-293)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Alice Real Name' })],
+      })
+      const nif = '111222333'
+      const declFile = makeDeclFile(h, nif)
+      const slot: DeductionSlot = {
+        key: `tp-${nif}`,
+        nif,
+        year: 2024,
+        role: 'taxpayer',
+        hasLiquidacao: false,
+      }
+      const pastedDeductions = new Map<string, { text: string; result: DeductionsParseResult }>([
+        [
+          `tp-${nif}`,
+          {
+            text: 'pasted',
+            result: {
+              ok: true,
+              data: {
+                nif,
+                name: 'Different Name From AT', // Name does NOT match member
+                year: 2024,
+                expenses: [
+                  { category: 'health' as const, expenseAmount: 800, deductionAmount: 120 },
+                ],
+              },
+            },
+          },
+        ],
+      ])
+
+      const sections: AssemblySectionFiles = {
+        declaration: [declFile],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds({
+        sectionFiles: sections,
+        pastedDeductions,
+        deductionSlots: [slot],
+      })
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        // Should still match via NIF fallback (isSubjectA path)
+        const alice = result.households[0].members[0]
+        expect(alice.deductions.some((d) => d.category === 'health' && d.amount === 800)).toBe(true)
+      }
+    })
+
+    it('skips zero-amount expenses in taxpayer pasted deductions (L300)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Alice' })],
+      })
+      const nif = '111222333'
+      const declFile = makeDeclFile(h, nif)
+      const slot: DeductionSlot = {
+        key: `tp-${nif}`,
+        nif,
+        year: 2024,
+        role: 'taxpayer',
+        hasLiquidacao: false,
+      }
+      const pastedDeductions = new Map<string, { text: string; result: DeductionsParseResult }>([
+        [
+          `tp-${nif}`,
+          {
+            text: 'pasted',
+            result: {
+              ok: true,
+              data: {
+                nif,
+                name: 'Alice',
+                year: 2024,
+                expenses: [
+                  { category: 'health' as const, expenseAmount: 0, deductionAmount: 0 },
+                  { category: 'education' as const, expenseAmount: 400, deductionAmount: 120 },
+                ],
+              },
+            },
+          },
+        ],
+      ])
+
+      const sections: AssemblySectionFiles = {
+        declaration: [declFile],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds({
+        sectionFiles: sections,
+        pastedDeductions,
+        deductionSlots: [slot],
+      })
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const alice = result.households[0].members[0]
+        // Only education (400) added; health (0) skipped via L300 check
+        expect(alice.deductions).toHaveLength(1)
+        expect(alice.deductions[0].category).toBe('education')
+        expect(alice.deductions[0].amount).toBe(400)
+      }
+    })
+
+    it('does not match member when no declaration file has matching NIF (L285)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Alice' })],
+      })
+      const declFile = makeDeclFile(h, '111222333')
+      const slot: DeductionSlot = {
+        key: 'tp-999999999',
+        nif: '999999999',
+        year: 2024,
+        role: 'taxpayer',
+        hasLiquidacao: false,
+      }
+      const pastedDeductions = new Map<string, { text: string; result: DeductionsParseResult }>([
+        [
+          'tp-999999999',
+          {
+            text: 'pasted',
+            result: {
+              ok: true,
+              data: {
+                nif: '999999999', // No declaration file has this NIF
+                name: 'Unknown Person',
+                year: 2024,
+                expenses: [
+                  { category: 'health' as const, expenseAmount: 500, deductionAmount: 75 },
+                ],
+              },
+            },
+          },
+        ],
+      ])
+
+      const sections: AssemblySectionFiles = {
+        declaration: [declFile],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds({
+        sectionFiles: sections,
+        pastedDeductions,
+        deductionSlots: [slot],
+      })
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        // No member matched → deductions not applied
+        expect(result.households[0].members[0].deductions).toHaveLength(0)
+      }
+    })
+  })
+
+  describe('dependent deduction zero-amount filtering', () => {
+    it('skips zero-amount expenses in dependent deductions (L312)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Alice' })],
+      })
+      const slot: DeductionSlot = {
+        key: 'dep-child',
+        nif: '000111222',
+        year: 2024,
+        role: 'dependent',
+        hasLiquidacao: false,
+      }
+      const pastedDeductions = new Map<string, { text: string; result: DeductionsParseResult }>([
+        [
+          'dep-child',
+          {
+            text: 'pasted',
+            result: {
+              ok: true,
+              data: {
+                nif: '000111222',
+                name: 'Child',
+                year: 2024,
+                expenses: [
+                  { category: 'health' as const, expenseAmount: 0, deductionAmount: 0 },
+                  { category: 'education' as const, expenseAmount: 200, deductionAmount: 60 },
+                ],
+              },
+            },
+          },
+        ],
+      ])
+
+      const sections: AssemblySectionFiles = {
+        declaration: [makeDeclFile(h, '111222333')],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds({
+        sectionFiles: sections,
+        pastedDeductions,
+        deductionSlots: [slot],
+      })
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const alice = result.households[0].members[0]
+        // Only education (200) should be added, health (0) should be skipped
+        expect(alice.deductions).toHaveLength(1)
+        expect(alice.deductions[0].category).toBe('education')
+        expect(alice.deductions[0].amount).toBe(200)
+      }
+    })
+  })
 })
