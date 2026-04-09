@@ -410,16 +410,17 @@ async function fillStrictQuestionnaire(
  * TabsContent panel rather than the full container.
  */
 async function getVisibleYearText(page: Page, year: number, multiYear: boolean): Promise<string> {
+  const results = page.locator('[data-testid="results-container"]')
   if (multiYear) {
     // Click the year tab (exact match to avoid "2026" matching "202")
-    const tabTrigger = page
+    const tabTrigger = results
       .locator('[data-slot="tabs-trigger"]')
       .filter({ hasText: new RegExp('^\\s*' + year + '\\b') })
     await tabTrigger.first().click()
     await page.waitForTimeout(300)
 
     // Read the active (non-hidden) TabsContent panel
-    const panels = page.locator('[data-slot="tabs-content"]')
+    const panels = results.locator('[data-slot="tabs-content"]')
     const count = await panels.count()
     for (let i = 0; i < count; i++) {
       const panel = panels.nth(i)
@@ -429,16 +430,10 @@ async function getVisibleYearText(page: Page, year: number, multiYear: boolean):
       }
     }
     // Fallback
-    return (await page.locator('[data-testid="results-container"]').innerText()).replace(
-      /\u00a0/g,
-      ' ',
-    )
+    return (await results.innerText()).replace(/\u00a0/g, ' ')
   }
 
-  return (await page.locator('[data-testid="results-container"]').innerText()).replace(
-    /\u00a0/g,
-    ' ',
-  )
+  return (await results.innerText()).replace(/\u00a0/g, ' ')
 }
 
 /**

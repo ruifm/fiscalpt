@@ -38,13 +38,13 @@ test.describe('Upload → Results flow', () => {
     await waitForStep(page, 'results')
 
     // Verify results content
-    await expect(page.locator('[data-testid="results-container"]')).toBeVisible({ timeout: 30_000 })
+    const resultsContainer = page.locator('[data-testid="results-container"]')
+    await expect(resultsContainer).toBeVisible({ timeout: 30_000 })
 
     // Should show year 2024
-    await expect(page.getByText('2024')).toBeVisible()
+    await expect(resultsContainer.getByText('2024')).toBeVisible()
 
     // Should show scenario comparison (joint vs separate)
-    const resultsContainer = page.locator('[data-testid="results-container"]')
     await expect(resultsContainer).toContainText(/€/)
   })
 
@@ -132,9 +132,9 @@ test.describe('Edge cases', () => {
     // Should be back on upload step
     await waitForStep(page, 'upload')
 
-    // After going back, the upload step shows the "documents loaded" summary
-    // (households are preserved), with a "Continuar" button to re-advance
-    await expect(page.getByText(/documentos carregados/i)).toBeVisible()
+    // After going back, the upload step shows the full upload component
+    // with previously uploaded documents and navigation buttons
+    await expect(page.locator('[data-testid="upload-slot"]')).toHaveCount(2, { timeout: 10_000 })
     await expect(page.locator('[data-testid="continue-to-questionnaire"]')).toBeVisible()
   })
 
