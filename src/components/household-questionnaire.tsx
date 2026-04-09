@@ -3,7 +3,7 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, Undo2, Redo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Household } from '@/lib/tax/types'
@@ -195,13 +195,6 @@ export function HouseholdQuestionnaire({
                 <h3 className="font-semibold">{group.meta.title}</h3>
                 <p className="text-xs text-muted-foreground">{group.meta.description}</p>
               </div>
-              <Badge variant="outline" className="ml-auto">
-                {
-                  group.questions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== '')
-                    .length
-                }
-                /{group.questions.length}
-              </Badge>
             </div>
           </div>
           <CardContent className="pt-0 space-y-4">

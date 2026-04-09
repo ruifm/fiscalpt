@@ -520,6 +520,8 @@ const en: DictShape<PtDict> = {
     title: 'Analysis Results',
     dataWarningTitle: 'Some data may be incomplete',
     totalSavings: 'Total potential savings: {amount}',
+    proactiveSavingsFootnote:
+      'The optimized projection assumes all recommendations are fully implemented.',
     projected: 'Projected',
     projectedNote: 'Estimate based on the most recent known tax rules',
     historical: 'historical',

@@ -52,6 +52,7 @@ export function TaxResults({
   }))
   const sorted = [...views].sort((a, b) => a.result.year - b.result.year)
   const totalSavings = sorted.reduce((sum, { view }) => sum + view.totalSavings, 0)
+  const hasProactiveSavings = sorted.some(({ view }) => view.proactiveSavings > 0)
   const optimizationCount = results.reduce((sum, r) => sum + r.optimizations.length, 0)
   const hasMultipleYears = sorted.length > 1
 
@@ -96,6 +97,11 @@ export function TaxResults({
             <Sparkles className="inline h-4 w-4 mr-1" aria-hidden="true" />
             {t('results.totalSavings', { amount: '' })}
             <AnimatedEuro value={totalSavings} />
+          </p>
+        )}
+        {hasProactiveSavings && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            * {t('results.proactiveSavingsFootnote')}
           </p>
         )}
       </div>

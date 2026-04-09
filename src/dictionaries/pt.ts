@@ -523,6 +523,8 @@ const pt = {
     title: 'Resultado da Análise',
     dataWarningTitle: 'Alguns dados podem estar incompletos',
     totalSavings: 'Poupança potencial total: {amount}',
+    proactiveSavingsFootnote:
+      'A projeção otimizada assume que todas as recomendações são seguidas na totalidade.',
     projected: 'Projetado',
     projectedNote: 'Estimativa baseada nas regras fiscais mais recentes conhecidas',
     historical: 'histórico',
