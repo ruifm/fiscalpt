@@ -4,7 +4,13 @@ import {
   parseComprovativoPdfText,
   comprativoParsedToHousehold,
   detectDocumentType,
+  validateAgainstLiquidacao,
 } from '@/lib/tax/pdf-extractor'
+import type {
+  LiquidacaoParsed,
+  ComprovativoParsed,
+} from '@/lib/tax/pdf-extractor'
+import type { ScenarioResult } from '@/lib/tax/types'
 
 // ─── Real PDF text samples (extracted via pdfjs-dist) ────────
 
@@ -1024,5 +1030,500 @@ describe('Document type detection — content fallback', () => {
 
   it('returns unknown when no patterns match', () => {
     expect(detectDocumentType('random.pdf', 'some random content')).toBe('unknown')
+  })
+})
+
+// ─── validateAgainstLiquidacao ───────────────────────────────
+
+describe('validateAgainstLiquidacao', () => {
+  const baseScenario: ScenarioResult = {
+    label: 'test',
+    filing_status: 'single',
+    persons: [],
+    total_gross: 50000,
+    total_taxable: 45000,
+    total_irs: 10000,
+    total_ss: 5000,
+    total_deductions: 600,
+    total_tax_burden: 15600,
+    total_net: 34400,
+    effective_rate_irs: 0.2,
+    effective_rate_total: 0.312,
+  }
+
+  it('returns valid when all fields match within tolerance', () => {
+    const liquidacao: LiquidacaoParsed = {
+      rendimentoGlobal: 45050,
+      coletaTotal: 10100,
+      taxaEfetiva: 0.205,
+    }
+    const result = validateAgainstLiquidacao(liquidacao, baseScenario)
+
+    expect(result.isValid).toBe(true)
+    expect(result.issues).toHaveLength(0)
+    expect(result.comparison).toHaveLength(3)
+    expect(result.comparison[0].field).toBe('Rendimento Global')
+    expect(result.comparison[0].withinTolerance).toBe(true)
+    expect(result.comparison[1].field).toBe('Coleta Total')
+    expect(result.comparison[1].withinTolerance).toBe(true)
+    expect(result.comparison[2].field).toBe('Taxa Efetiva')
+    expect(result.comparison[2].withinTolerance).toBe(true)
+  })
+
+  it('reports issues when differences exceed thresholds', () => {
+    const liquidacao: LiquidacaoParsed = {
+      rendimentoGlobal: 45000,
+      coletaTotal: 15000,
+      taxaEfetiva: 0.5,
+    }
+    const result = validateAgainstLiquidacao(liquidacao, baseScenario)
+
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toHaveLength(2)
+    expect(result.issues[0].code).toBe('LIQUIDACAO_MISMATCH')
+    expect(result.issues[0].message).toContain('IRS')
+    expect(result.issues[1].code).toBe('LIQUIDACAO_MISMATCH')
+    expect(result.issues[1].message).toContain('taxa efetiva')
+    expect(result.comparison[1].withinTolerance).toBe(false)
+    expect(result.comparison[2].withinTolerance).toBe(false)
+  })
+
+  it('returns empty comparison when all fields are undefined', () => {
+    const liquidacao: LiquidacaoParsed = {}
+    const result = validateAgainstLiquidacao(liquidacao, baseScenario)
+
+    expect(result.isValid).toBe(true)
+    expect(result.issues).toHaveLength(0)
+    expect(result.comparison).toHaveLength(0)
+  })
+
+  it('compares only the fields that are present', () => {
+    const liquidacao: LiquidacaoParsed = {
+      coletaTotal: 10200,
+    }
+    const result = validateAgainstLiquidacao(liquidacao, baseScenario)
+
+    expect(result.isValid).toBe(true)
+    expect(result.comparison).toHaveLength(1)
+    expect(result.comparison[0].field).toBe('Coleta Total')
+  })
+})
+
+// ─── comprativoParsedToHousehold edge cases ──────────────────
+
+describe('comprativoParsedToHousehold edge cases', () => {
+  it('handles Anexo A entry with missing optional fields', () => {
+    const parsed: ComprovativoParsed = {
+      nif: '111222333',
+      year: 2024,
+      filingStatus: 'single',
+      anexoA: [
+        {
+          titular: 'A',
+          rendimentoBruto: 30000,
+          // retencoesIRS, contribuicoesSS, quotizacoesSindicais all undefined
+        },
+      ],
+      issues: [],
+    }
+    const { household } = comprativoParsedToHousehold(parsed)
+    const income = household.members![0].incomes[0]
+    expect(income.withholding).toBe(0)
+    expect(income.ss_paid).toBe(0)
+    expect(income.union_dues).toBeUndefined()
+  })
+
+  it('deduplicates IRS Jovem in special_regimes', () => {
+    const parsed: ComprovativoParsed = {
+      nif: '111222333',
+      year: 2024,
+      filingStatus: 'single',
+      anexoA: [
+        { titular: 'A', rendimentoBruto: 20000, irsJovem: true, irsJovemAno: 1 },
+        { titular: 'A', rendimentoBruto: 15000, irsJovem: true, irsJovemAno: 2 },
+      ],
+      issues: [],
+    }
+    const { household } = comprativoParsedToHousehold(parsed)
+    const member = household.members![0]
+    expect(member.special_regimes.filter((r) => r === 'irs_jovem')).toHaveLength(1)
+    expect(member.irs_jovem_year).toBe(2)
+  })
+
+  it('handles irsJovem without irsJovemAno', () => {
+    const parsed: ComprovativoParsed = {
+      nif: '111222333',
+      year: 2024,
+      filingStatus: 'single',
+      anexoA: [{ titular: 'A', rendimentoBruto: 20000, irsJovem: true }],
+      issues: [],
+    }
+    const { household } = comprativoParsedToHousehold(parsed)
+    const member = household.members![0]
+    expect(member.special_regimes).toContain('irs_jovem')
+    expect(member.irs_jovem_year).toBeUndefined()
+  })
+
+  it('skips Anexo J entries with zero gross', () => {
+    const parsed: ComprovativoParsed = {
+      nif: '111222333',
+      year: 2024,
+      filingStatus: 'single',
+      anexoJ: [{ titular: 'A', rendimentoBruto: 0 }],
+      issues: [],
+    }
+    const { household } = comprativoParsedToHousehold(parsed)
+    expect(household.members![0].incomes).toHaveLength(0)
+  })
+
+  it('handles Anexo J entry with missing retencaoFonte and impostoEstrangeiro', () => {
+    const parsed: ComprovativoParsed = {
+      nif: '111222333',
+      year: 2024,
+      filingStatus: 'single',
+      anexoJ: [{ titular: 'A', rendimentoBruto: 25000 }],
+      issues: [],
+    }
+    const { household } = comprativoParsedToHousehold(parsed)
+    const income = household.members![0].incomes[0]
+    expect(income.category).toBe('A')
+    expect(income.gross).toBe(25000)
+    expect(income.withholding).toBe(0)
+    expect(income.foreign_tax_paid).toBe(0)
+  })
+
+  it('skips NHR when nhrStatus is false', () => {
+    const parsed: ComprovativoParsed = {
+      nif: '111222333',
+      year: 2024,
+      filingStatus: 'single',
+      anexoL: [{ titular: 'A', nhrStatus: false }],
+      issues: [],
+    }
+    const { household } = comprativoParsedToHousehold(parsed)
+    expect(household.members![0].special_regimes).not.toContain('nhr')
+  })
+
+  it('skips Anexo B entries with zero gross', () => {
+    const parsed: ComprovativoParsed = {
+      nif: '111222333',
+      year: 2024,
+      filingStatus: 'single',
+      anexoB: [{ titular: 'A', somaRendimentos: 0 }],
+      issues: [],
+    }
+    const { household } = comprativoParsedToHousehold(parsed)
+    expect(household.members![0].incomes).toHaveLength(0)
+  })
+
+  it('defaults filingStatus to single when undefined', () => {
+    const parsed: ComprovativoParsed = {
+      nif: '111222333',
+      year: 2024,
+      issues: [],
+    }
+    const { household } = comprativoParsedToHousehold(parsed)
+    expect(household.filing_status).toBe('single')
+  })
+})
+
+// ─── Comprovativo Anexo edge cases ───────────────────────────
+
+describe('parseComprovativoPdfText Anexo edge cases', () => {
+  const FOOTER = 'Comprovativo Mod.3 IRS: 111222333 / 2024 / ABC'
+
+  it('generates PARSE_FAILED when supported anexo count > 0 but no data extracted', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo A Anexo B Anexo C Anexo D Anexo E Anexo F Anexo G Anexo G1 Anexo H Anexo I Anexo J Anexo L Outros Anexo SS 1 0 0 0 0 0 0 0 0 0 0 0 0 0 PRAZOS ${FOOTER}`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoCounts).toBeDefined()
+    expect(result.anexoCounts!['A']).toBe(1)
+    expect(result.issues.some((i) => i.code === 'PARSE_FAILED' && i.message.includes('Anexo A'))).toBe(
+      true,
+    )
+  })
+
+  it('generates UNSUPPORTED_ANEXO for Anexo E, F, G, H', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo A Anexo B Anexo C Anexo D Anexo E Anexo F Anexo G Anexo G1 Anexo H Anexo I Anexo J Anexo L Outros Anexo SS 0 0 0 0 1 1 1 0 1 0 0 0 0 0 PRAZOS ${FOOTER}`
+    const result = parseComprovativoPdfText(text)
+    const unsupported = result.issues.filter((i) => i.code === 'UNSUPPORTED_ANEXO')
+    expect(unsupported).toHaveLength(4)
+    expect(unsupported.map((i) => i.message)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Anexo E'),
+        expect.stringContaining('Anexo F'),
+        expect.stringContaining('Anexo G'),
+        expect.stringContaining('Anexo H'),
+      ]),
+    )
+  })
+
+  it('exercises Anexo A fallback extraction (no tailMatch)', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo A CATEGORIAS A 111222333 222333444 35.000,00 5.000,00 3.000,00 ${FOOTER}`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoA).toBeDefined()
+    expect(result.anexoA!.length).toBe(1)
+    const entry = result.anexoA![0]
+    expect(entry.rendimentoBruto).toBe(35000)
+    expect(entry.retencoesIRS).toBe(5000)
+    expect(entry.contribuicoesSS).toBe(3000)
+  })
+
+  it('handles Anexo A fallback when titular NIF not found on page', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo A CATEGORIAS A 999888777 35.000,00 ${FOOTER}`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoA).toBeDefined()
+    expect(result.anexoA![0].titular).toBe('A')
+    expect(result.anexoA![0].rendimentoBruto).toBe(35000)
+  })
+
+  it('handles Anexo A fallback with insufficient numbers', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo A CATEGORIAS A 111222333 ${FOOTER}`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoA).toBeDefined()
+    expect(result.anexoA![0].rendimentoBruto).toBeUndefined()
+  })
+
+  it('parses Anexo J page without "Comprovativo" footer text', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo J RENDIMENTOS OBTIDOS NO ESTRANGEIRO 111222333 111222333 620 401 25.000,00 1.500,00 0,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoJ).toBeDefined()
+    expect(result.anexoJ!.length).toBe(1)
+    expect(result.anexoJ![0].rendimentoBruto).toBe(25000)
+  })
+
+  it('parses Anexo J page with no NIF matches', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo J RENDIMENTOS OBTIDOS NO ESTRANGEIRO 25.000,00 1.500,00 0,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoJ).toBeDefined()
+    expect(result.anexoJ![0].titular).toBe('A')
+    expect(result.anexoJ![0].rendimentoBruto).toBe(25000)
+  })
+
+  it('parses Anexo J page with no code match', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo J RENDIMENTOS OBTIDOS NO ESTRANGEIRO 111222333 25.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoJ).toBeDefined()
+    expect(result.anexoJ![0].countryCode).toBeUndefined()
+  })
+
+  it('parses Anexo J page with only 1 number', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo J RENDIMENTOS OBTIDOS NO ESTRANGEIRO 111222333 111222333 620 401 25.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoJ![0].rendimentoBruto).toBe(25000)
+    expect(result.anexoJ![0].impostoEstrangeiro).toBeUndefined()
+  })
+
+  it('parses Anexo L page without "Comprovativo" footer', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo L HABITUAL 111222333 111222333 X 999888777 101 1234.5 50.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoL).toBeDefined()
+    expect(result.anexoL!.length).toBe(1)
+    expect(result.anexoL![0].rendimento).toBe(50000)
+  })
+
+  it('parses Anexo L page with no NIF matches', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo L HABITUAL 50.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoL).toBeDefined()
+    expect(result.anexoL![0].titular).toBe('A')
+  })
+
+  it('parses Anexo L page without employer, code, or foreign match', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo L HABITUAL 111222333 50.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoL).toBeDefined()
+    const entry = result.anexoL![0]
+    expect(entry.nifEmployer).toBeUndefined()
+    expect(entry.incomeCode).toBeUndefined()
+    expect(entry.foreignCountry).toBeUndefined()
+    expect(entry.rendimento).toBe(50000)
+  })
+
+  it('parses Anexo L page with no numbers', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo L HABITUAL 111222333`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoL).toBeDefined()
+    expect(result.anexoL![0].rendimento).toBeUndefined()
+  })
+
+  it('parses Anexo SS page with no NISS match', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+ANEXO SS 111222333 30.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoSS).toBeDefined()
+    expect(result.anexoSS![0].niss).toBeUndefined()
+    expect(result.anexoSS![0].somaRendimentos).toBe(30000)
+  })
+
+  it('parses Anexo SS page with no NIF match', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+ANEXO SS 30.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoSS).toBeDefined()
+    expect(result.anexoSS![0].titular).toBe('A')
+    expect(result.anexoSS![0].nif).toBeUndefined()
+  })
+
+  it('parses Anexo SS page with no amounts', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+ANEXO SS 111222333`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoSS).toBeDefined()
+    expect(result.anexoSS![0].somaRendimentos).toBeUndefined()
+  })
+
+  it('parses Anexo B primary path with complete block', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B RENDIMENTOS CATEGORIA B NIF do titular
+111222333 art.º 151 atividades 1332 X 60.148,51 60.148,51 0,00 0,00 Prestações de serviços 60.148,51 Retenções na fonte 5.000,00 Comprovativo Mod.3`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB!.length).toBe(1)
+    const entry = result.anexoB![0]
+    expect(entry.nif).toBe('111222333')
+    expect(entry.titular).toBe('A')
+    expect(entry.activityCode).toBe('1332')
+    expect(entry.somaRendimentos).toBeGreaterThan(0)
+    expect(entry.prestacaoServicos).toBe(60148.51)
+    expect(entry.retencoesFonte).toBe(5000)
+  })
+
+  it('parses Anexo B primary path with no NIF match', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B RENDIMENTOS CATEGORIA B NIF do titular
+999888777 art.º 151 atividades 1332 X 60.148,51 60.148,51 Comprovativo Mod.3`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB![0].nif).toBe('999888777')
+    expect(result.anexoB![0].titular).toBe('B')
+  })
+
+  it('parses Anexo B primary path with no activity match', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B RENDIMENTOS CATEGORIA B NIF do titular
+111222333 X 60.148,51 Comprovativo Mod.3`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB![0].activityCode).toBeUndefined()
+  })
+
+  it('parses Anexo B primary path with fewer than 2 numbers', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B RENDIMENTOS CATEGORIA B NIF do titular
+111222333 art.º 151 atividades 1332 Comprovativo Mod.3`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB![0].somaRendimentos).toBeUndefined()
+  })
+
+  it('parses Anexo B primary path without prestação or retenção match', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B RENDIMENTOS CATEGORIA B NIF do titular
+111222333 art.º 151 atividades 1332 X 60.148,51 60.148,51 Comprovativo Mod.3`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB![0].prestacaoServicos).toBeUndefined()
+    expect(result.anexoB![0].retencoesFonte).toBeUndefined()
+  })
+
+  it('generates PARSE_FAILED for multiple supported anexos with count but no data', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo A Anexo B Anexo C Anexo D Anexo E Anexo F Anexo G Anexo G1 Anexo H Anexo I Anexo J Anexo L Outros Anexo SS 1 1 0 0 0 0 0 0 0 0 1 1 0 1 PRAZOS ${FOOTER}`
+    const result = parseComprovativoPdfText(text)
+    const parseFailed = result.issues.filter((i) => i.code === 'PARSE_FAILED')
+    // All 5 supported anexos declared but none extracted
+    expect(parseFailed.length).toBe(5)
+  })
+
+  it('parses comprovativo text without page separator', () => {
+    const text = `111222333 X Casado X X 222333444 Comprovativo Mod.3 IRS: 111222333 / 2024 / ABC`
+    const result = parseComprovativoPdfText(text)
+    expect(result.nif).toBe('111222333')
+    expect(result.year).toBe(2024)
+  })
+
+  it('parses Anexo B via fallback path when primary regex misses', () => {
+    // No "Comprovativo Mod.3" after "CATEGORIA B" => primary regex fails, fallback triggers
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B stuff CATEGORIA B 111222333 1332 X 50.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB!.length).toBe(1)
+    expect(result.anexoB![0].titular).toBe('A')
+    expect(result.anexoB![0].somaRendimentos).toBe(50000)
+  })
+
+  it('parses Anexo B fallback with no NIF matches', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B CATEGORIA B 50.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB![0].titular).toBe('A')
+    expect(result.anexoB![0].nif).toBeUndefined()
+  })
+
+  it('parses Anexo B fallback with unknown NIF', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B CATEGORIA B 999000111 1332 X 50.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB![0].nif).toBeUndefined()
+    expect(result.anexoB![0].titular).toBe('A')
+  })
+
+  it('parses Anexo B fallback with no activity code', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B CATEGORIA B 111222333 50.000,00`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB![0].activityCode).toBeUndefined()
+  })
+
+  it('parses Anexo B fallback with no amounts', () => {
+    const text = `111222333 X ${FOOTER}
+---PAGE---
+Anexo B CATEGORIA B 111222333`
+    const result = parseComprovativoPdfText(text)
+    expect(result.anexoB).toBeDefined()
+    expect(result.anexoB![0].somaRendimentos).toBeUndefined()
   })
 })
