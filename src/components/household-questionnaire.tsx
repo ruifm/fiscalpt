@@ -135,6 +135,17 @@ export function HouseholdQuestionnaire({
         </CardContent>
       </Card>
 
+      {/* Top navigation — lets users skip/continue without scrolling */}
+      <div className="flex items-center justify-end gap-3">
+        <Button variant="ghost" onClick={handleSubmit} className="text-muted-foreground">
+          {t('common.skip')}
+        </Button>
+        <Button onClick={handleSubmit} className="gap-1.5">
+          {t('common.continue')}
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </div>
+
       {/* Undo / Redo */}
       <div className="flex items-center gap-1">
         <TooltipProvider>
