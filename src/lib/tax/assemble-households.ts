@@ -151,6 +151,7 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
     issues: ValidationIssue[]
   }> = []
 
+  // Prefer XML declarations; fall back to PDF comprovativos only if no XML exists
   for (const uf of sectionFiles.declaration) {
     if (uf.status !== 'done') continue
 
@@ -161,22 +162,30 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
         nifConjuge: uf.nifConjuge ?? uf.parsedXml.raw.subjectB_nif,
         issues: uf.parsedXml.issues,
       })
-    } else if (uf.parsedComprovativo && parsedDeclarations.length === 0) {
-      const converted = comprativoParsedToHousehold(uf.parsedComprovativo)
-      if (converted.household.members && converted.household.members.length > 0) {
-        parsedDeclarations.push({
-          household: converted.household as Household,
-          nif: uf.nif ?? '',
-          nifConjuge: uf.nifConjuge,
-          issues: [
-            ...converted.issues,
-            {
-              severity: 'warning',
-              code: 'PDF_FALLBACK',
-              message: 'Data extracted from PDF comprovativo — XML provides higher fidelity.',
-            },
-          ],
-        })
+    }
+  }
+
+  if (parsedDeclarations.length === 0) {
+    for (const uf of sectionFiles.declaration) {
+      if (uf.status !== 'done') continue
+
+      if (uf.parsedComprovativo) {
+        const converted = comprativoParsedToHousehold(uf.parsedComprovativo)
+        if (converted.household.members && converted.household.members.length > 0) {
+          parsedDeclarations.push({
+            household: converted.household as Household,
+            nif: uf.nif ?? '',
+            nifConjuge: uf.nifConjuge,
+            issues: [
+              ...converted.issues,
+              {
+                severity: 'warning',
+                code: 'PDF_FALLBACK',
+                message: 'Data extracted from PDF comprovativo — XML provides higher fidelity.',
+              },
+            ],
+          })
+        }
       }
     }
   }
@@ -227,10 +236,15 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
     }>
   >()
 
+  // Prefer XML; fall back to comprovativos for years with no XML
+  const prevYearXmlYears = new Set<number>()
+
   for (const uf of sectionFiles.previousYears) {
     if (uf.status !== 'done' || !uf.parsedXml) continue
 
     const year = uf.year ?? uf.parsedXml.household.year
+    prevYearXmlYears.add(year)
+
     if (declarationYear && year === declarationYear) {
       allIssues.push({
         severity: 'warning',
@@ -246,6 +260,34 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
       nif: uf.nif ?? uf.parsedXml.raw.subjectA_nif,
       nifConjuge: uf.nifConjuge ?? uf.parsedXml.raw.subjectB_nif,
       issues: uf.parsedXml.issues,
+    })
+  }
+
+  // PDF comprovativo fallback for previous years without XML
+  for (const uf of sectionFiles.previousYears) {
+    if (uf.status !== 'done' || !uf.parsedComprovativo) continue
+    const year = uf.year ?? uf.parsedComprovativo.year
+    if (year == null) continue // skip if year unknown
+    if (prevYearXmlYears.has(year)) continue // XML already parsed for this year
+
+    if (declarationYear && year === declarationYear) continue // skip overlap
+
+    const converted = comprativoParsedToHousehold(uf.parsedComprovativo)
+    if (!converted.household.members || converted.household.members.length === 0) continue
+
+    if (!previousYearsParsed.has(year)) previousYearsParsed.set(year, [])
+    previousYearsParsed.get(year)!.push({
+      household: converted.household as Household,
+      nif: uf.nif ?? '',
+      nifConjuge: uf.nifConjuge,
+      issues: [
+        ...converted.issues,
+        {
+          severity: 'warning',
+          code: 'PDF_FALLBACK',
+          message: 'Data extracted from PDF comprovativo — XML provides higher fidelity.',
+        },
+      ],
     })
   }
 
