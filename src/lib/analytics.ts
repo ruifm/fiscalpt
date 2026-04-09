@@ -4,6 +4,7 @@ export type AnalyticsEventName =
   | 'upload_complete'
   | 'questionnaire_start'
   | 'questionnaire_complete'
+  | 'questionnaire_skip'
   | 'results_viewed'
   | 'pdf_exported'
   | 'locale_changed'

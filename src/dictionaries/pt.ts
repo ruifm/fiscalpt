@@ -283,6 +283,8 @@ const pt = {
     calcErrorPrefix: 'Erro no cálculo: {message}',
     reportMismatch: 'Reportar diferença',
     reportSent: 'Reportado ✓',
+    skipToResults: 'Analisar agora',
+    skipToResultsDesc: 'Usar valores predefinidos conservadores',
   },
 
   upload: {

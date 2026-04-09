@@ -281,6 +281,8 @@ const en: DictShape<PtDict> = {
     calcErrorPrefix: 'Calculation error: {message}',
     reportMismatch: 'Report discrepancy',
     reportSent: 'Reported ✓',
+    skipToResults: 'Analyze now',
+    skipToResultsDesc: 'Use conservative default values',
   },
 
   upload: {

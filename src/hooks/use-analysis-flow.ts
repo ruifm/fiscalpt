@@ -14,6 +14,7 @@ import {
 } from '@/lib/session-persistence'
 import { propagateSharedData } from '@/lib/tax/propagate-shared-data'
 import { estimateProjectedRetentions } from '@/lib/tax/projection'
+import { applyDefaults } from '@/lib/tax/missing-inputs'
 import { trackEvent } from '@/lib/analytics'
 
 // ─── Types ────────────────────────────────────────────────────
@@ -458,6 +459,19 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
     [computeAndShowResults],
   )
 
+  const handleSkipQuestionnaire = useCallback(() => {
+    trackEvent('questionnaire_skip')
+    const currentHouseholds = stateRef.current.households
+    const primary = currentHouseholds[0]
+    if (!primary) return
+    const withDefaults = applyDefaults(primary)
+    const allHouseholds = currentHouseholds.map((hh, idx) => {
+      if (idx === 0) return withDefaults
+      return propagateSharedData(withDefaults, hh)
+    })
+    computeAndShowResults(allHouseholds)
+  }, [computeAndShowResults])
+
   const handleClearAll = useCallback(() => {
     clearingRef.current = true
     clearSessionState(sessionId)
@@ -498,6 +512,7 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
     projectionYear,
     handleExtracted,
     handleQuestionnaireComplete,
+    handleSkipQuestionnaire,
     handleClearAll,
     goToStep,
     advanceStep,

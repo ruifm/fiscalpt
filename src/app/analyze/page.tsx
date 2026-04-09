@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Mail,
+  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DocumentUpload } from '@/components/document-upload'
@@ -66,6 +67,7 @@ export default function AnalyzePage() {
     projectionYear,
     handleExtracted,
     handleQuestionnaireComplete,
+    handleSkipQuestionnaire,
     handleClearAll,
     goToStep,
     advanceStep,
@@ -333,6 +335,15 @@ export default function AnalyzePage() {
                         {t('analyze.loadNewDocs')}
                       </Button>
                       <Button
+                        variant="outline"
+                        onClick={handleSkipQuestionnaire}
+                        className="w-full sm:w-auto gap-1.5"
+                        data-testid="skip-to-results"
+                      >
+                        <Zap className="h-4 w-4" aria-hidden="true" />
+                        {t('analyze.skipToResults')}
+                      </Button>
+                      <Button
                         onClick={() => advanceStep('questionnaire')}
                         className="w-full sm:w-auto gap-1.5"
                         data-testid="continue-to-questionnaire"
@@ -341,6 +352,9 @@ export default function AnalyzePage() {
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </Button>
                     </div>
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                      {t('analyze.skipToResultsDesc')}
+                    </p>
                   </div>
                 ) : (
                   <DocumentUpload onExtracted={handleExtracted} />
