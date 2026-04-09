@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import type OpenAI from 'openai'
 
 // ─── Provider configuration ──────────────────────────────────
 
@@ -7,6 +7,16 @@ export type LlmProvider = 'github' | 'openai' | 'anthropic'
 interface ProviderConfig {
   client: OpenAI
   model: string
+}
+
+let _OpenAI: typeof import('openai').default | undefined
+
+async function getOpenAI(): Promise<typeof import('openai').default> {
+  if (!_OpenAI) {
+    const mod = await import('openai')
+    _OpenAI = mod.default
+  }
+  return _OpenAI
 }
 
 const MODELS: Record<LlmProvider, string> = {
@@ -24,13 +34,14 @@ function detectProvider(): LlmProvider {
   )
 }
 
-function buildConfig(provider?: LlmProvider): ProviderConfig {
+async function buildConfig(provider?: LlmProvider): Promise<ProviderConfig> {
   const p = provider ?? detectProvider()
+  const OpenAICtor = await getOpenAI()
 
   switch (p) {
     case 'github':
       return {
-        client: new OpenAI({
+        client: new OpenAICtor({
           baseURL: 'https://models.inference.ai.azure.com',
           apiKey: process.env.GITHUB_TOKEN!,
         }),
@@ -38,14 +49,14 @@ function buildConfig(provider?: LlmProvider): ProviderConfig {
       }
     case 'openai':
       return {
-        client: new OpenAI({
+        client: new OpenAICtor({
           apiKey: process.env.OPENAI_API_KEY!,
         }),
         model: process.env.LLM_MODEL ?? MODELS.openai,
       }
     case 'anthropic':
       return {
-        client: new OpenAI({
+        client: new OpenAICtor({
           baseURL: 'https://api.anthropic.com/v1/',
           apiKey: process.env.ANTHROPIC_API_KEY!,
         }),
@@ -77,7 +88,7 @@ export async function* streamChat(
   messages: ChatMessage[],
   options: ChatOptions = {},
 ): AsyncGenerator<string> {
-  const { client, model } = buildConfig(options.provider)
+  const { client, model } = await buildConfig(options.provider)
 
   const stream = await client.chat.completions.create({
     model,
@@ -97,7 +108,7 @@ export async function* streamChat(
  * Non-streaming chat completion. Returns the full response text.
  */
 export async function chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
-  const { client, model } = buildConfig(options.provider)
+  const { client, model } = await buildConfig(options.provider)
 
   const response = await client.chat.completions.create({
     model,

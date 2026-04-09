@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { stripe } from '@/lib/stripe'
 import { parseBody } from '@/lib/api-validation'
+import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
 import type Stripe from 'stripe'
 
 const schema = z.object({
@@ -11,6 +12,11 @@ const schema = z.object({
 })
 
 export async function POST(request: Request) {
+  if (
+    isRateLimited(rateLimitKey(request, 'discount-validate'), { maxRequests: 10, windowMs: 60_000 })
+  )
+    return Response.json({ error: 'Too many requests' }, { status: 429 })
+
   const parsed = await parseBody(request, schema)
   if (!parsed.ok) return parsed.response
 
