@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { assembleHouseholds, type AssemblyInput } from '@/lib/tax/assemble-households'
 import type { ComprovativoParsed } from '@/lib/tax/pdf-extractor'
+import type { Household } from '@/lib/tax/types'
 
 function makeComprovativo(overrides: Partial<ComprovativoParsed> = {}): ComprovativoParsed {
   return {
@@ -296,5 +297,124 @@ describe('assembleHouseholds — PDF comprovativo support', () => {
     expect(result.households.length).toBe(1)
     expect(result.households[0].year).toBe(2024)
     expect(result.households[0].members[0].incomes[0].gross).toBe(30000)
+  })
+})
+
+describe('assembleHouseholds — default deductions', () => {
+  it('injects general €250 deduction for members with no deductions', () => {
+    const comp = makeComprovativo({ filingStatus: 'single' })
+    const result = assembleHouseholds(
+      makeInput({
+        declaration: [
+          {
+            fileName: 'test.pdf',
+            status: 'done',
+            nif: '111111111',
+            year: 2024,
+            parsedComprovativo: comp,
+          },
+        ],
+      }),
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const member = result.households[0].members[0]
+    const generalDed = member.deductions.find((d) => d.category === 'general')
+    expect(generalDed).toBeDefined()
+    expect(generalDed!.amount).toBe(250)
+  })
+
+  it('does not override existing general deduction', () => {
+    const household: Household = {
+      year: 2024,
+      filing_status: 'single',
+      members: [
+        {
+          name: 'Test',
+          incomes: [{ category: 'A', gross: 30000 }],
+          deductions: [{ category: 'general', amount: 500 }],
+          special_regimes: [],
+        },
+      ],
+      dependents: [],
+    }
+    const result = assembleHouseholds(
+      makeInput({
+        declaration: [
+          {
+            fileName: 'test.pdf',
+            status: 'done',
+            nif: '111111111',
+            year: 2024,
+            parsedXml: {
+              household,
+              raw: { subjectA_nif: '111111111', subjectB_nif: '' },
+              issues: [],
+            } as never,
+          },
+        ],
+      }),
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const member = result.households[0].members[0]
+    const generalDeds = member.deductions.filter((d) => d.category === 'general')
+    expect(generalDeds).toHaveLength(1)
+    expect(generalDeds[0].amount).toBe(500)
+  })
+
+  it('applies default deductions to previous-year households', () => {
+    const prevHousehold: Household = {
+      year: 2023,
+      filing_status: 'single',
+      members: [
+        {
+          name: 'Test',
+          incomes: [{ category: 'A', gross: 25000 }],
+          deductions: [],
+          special_regimes: [],
+        },
+      ],
+      dependents: [],
+    }
+    const result = assembleHouseholds(
+      makeInput({
+        declaration: [
+          {
+            fileName: 'decl.pdf',
+            status: 'done',
+            nif: '111111111',
+            year: 2024,
+            parsedComprovativo: makeComprovativo({ year: 2024, filingStatus: 'single' }),
+          },
+        ],
+        previousYears: [
+          {
+            fileName: 'prev.xml',
+            status: 'done',
+            nif: '111111111',
+            year: 2023,
+            parsedXml: {
+              household: prevHousehold,
+              raw: { subjectA_nif: '111111111', subjectB_nif: '' },
+              issues: [],
+            } as never,
+          },
+        ],
+      }),
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const prevYearHousehold = result.households.find((h) => h.year === 2023)!
+    const member = prevYearHousehold.members[0]
+    const generalDed = member.deductions.find((d) => d.category === 'general')
+    expect(generalDed).toBeDefined()
+    expect(generalDed!.amount).toBe(250)
   })
 })

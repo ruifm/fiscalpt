@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   assembleHouseholds,
   LIQUIDACAO_DEDUCTION_MAP,
+  DEFAULT_GENERAL_DEDUCTION_AMOUNT,
   type AssemblyFile,
   type AssemblySectionFiles,
   type AssemblyInput,
@@ -80,6 +81,12 @@ function baseInput(sectionFiles: AssemblySectionFiles = emptySections()): Assemb
     pastedDeductions: new Map(),
     deductionSlots: [],
   }
+}
+
+function expectOnlyDefaultDeduction(deductions: { category: string; amount: number }[]) {
+  expect(deductions).toHaveLength(1)
+  expect(deductions[0].category).toBe('general')
+  expect(deductions[0].amount).toBe(DEFAULT_GENERAL_DEDUCTION_AMOUNT)
 }
 
 // ─── Error Cases ─────────────────────────────────────────────
@@ -557,7 +564,7 @@ describe('assembleHouseholds', () => {
 
       expect(result.ok).toBe(true)
       if (result.ok) {
-        expect(result.households[0].members[0].deductions).toHaveLength(0)
+        expectOnlyDefaultDeduction(result.households[0].members[0].deductions)
       }
     })
 
@@ -589,7 +596,7 @@ describe('assembleHouseholds', () => {
 
       expect(result.ok).toBe(true)
       if (result.ok) {
-        expect(result.households[0].members[0].deductions).toHaveLength(0)
+        expectOnlyDefaultDeduction(result.households[0].members[0].deductions)
       }
     })
 
@@ -917,7 +924,7 @@ describe('assembleHouseholds', () => {
 
       expect(result.ok).toBe(true)
       if (result.ok) {
-        expect(result.households[0].members[0].deductions).toHaveLength(0)
+        expectOnlyDefaultDeduction(result.households[0].members[0].deductions)
       }
     })
   })
@@ -1221,7 +1228,7 @@ describe('assembleHouseholds', () => {
       expect(result.ok).toBe(true)
       if (result.ok) {
         // Year mismatch → deductions not applied
-        expect(result.households[0].members[0].deductions).toHaveLength(0)
+        expectOnlyDefaultDeduction(result.households[0].members[0].deductions)
       }
     })
 
@@ -1355,7 +1362,7 @@ describe('assembleHouseholds', () => {
       expect(result.ok).toBe(true)
       if (result.ok) {
         // Deductions should not have been merged
-        expect(result.households[0].members[0].deductions).toHaveLength(0)
+        expectOnlyDefaultDeduction(result.households[0].members[0].deductions)
       }
     })
   })
@@ -1385,7 +1392,7 @@ describe('assembleHouseholds', () => {
       expect(result.ok).toBe(true)
       if (result.ok) {
         // Liq year 2023 !== household year 2024 → no deduction fallback
-        expect(result.households[0].members[0].deductions).toHaveLength(0)
+        expectOnlyDefaultDeduction(result.households[0].members[0].deductions)
       }
     })
 
@@ -1459,7 +1466,7 @@ describe('assembleHouseholds', () => {
       if (result.ok) {
         // No NIF match + multiple liquidações → no fallback → no deductions
         for (const member of result.households[0].members) {
-          expect(member.deductions).toHaveLength(0)
+          expectOnlyDefaultDeduction(member.deductions)
         }
       }
     })
@@ -1605,10 +1612,12 @@ describe('assembleHouseholds', () => {
       expect(result.ok).toBe(true)
       if (result.ok) {
         const alice = result.households[0].members[0]
-        // Only education (400) added; health (0) skipped via L300 check
-        expect(alice.deductions).toHaveLength(1)
-        expect(alice.deductions[0].category).toBe('education')
-        expect(alice.deductions[0].amount).toBe(400)
+        // Only education (400) added; health (0) skipped via L300 check; default general also added
+        expect(alice.deductions).toHaveLength(2)
+        expect(alice.deductions.find((d) => d.category === 'education')?.amount).toBe(400)
+        expect(alice.deductions.find((d) => d.category === 'general')?.amount).toBe(
+          DEFAULT_GENERAL_DEDUCTION_AMOUNT,
+        )
       }
     })
 
@@ -1659,7 +1668,7 @@ describe('assembleHouseholds', () => {
       expect(result.ok).toBe(true)
       if (result.ok) {
         // No member matched → deductions not applied
-        expect(result.households[0].members[0].deductions).toHaveLength(0)
+        expectOnlyDefaultDeduction(result.households[0].members[0].deductions)
       }
     })
   })
@@ -1712,10 +1721,12 @@ describe('assembleHouseholds', () => {
       expect(result.ok).toBe(true)
       if (result.ok) {
         const alice = result.households[0].members[0]
-        // Only education (200) should be added, health (0) should be skipped
-        expect(alice.deductions).toHaveLength(1)
-        expect(alice.deductions[0].category).toBe('education')
-        expect(alice.deductions[0].amount).toBe(200)
+        // Only education (200) should be added, health (0) should be skipped; default general also added
+        expect(alice.deductions).toHaveLength(2)
+        expect(alice.deductions.find((d) => d.category === 'education')?.amount).toBe(200)
+        expect(alice.deductions.find((d) => d.category === 'general')?.amount).toBe(
+          DEFAULT_GENERAL_DEDUCTION_AMOUNT,
+        )
       }
     })
   })

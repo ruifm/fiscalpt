@@ -62,6 +62,10 @@ export type AssemblyResult =
 
 // ─── Constants ──────────────────────────────────────────────
 
+/** Default general deduction expense for taxpayers without liquidação or pasted data.
+ *  €250 is the cap at 35% rate → €250 × 35% = €87.50 deduction. Conservative default. */
+export const DEFAULT_GENERAL_DEDUCTION_AMOUNT = 250
+
 export const LIQUIDACAO_DEDUCTION_MAP: {
   field: keyof LiquidacaoParsed
   category: DeductionCategory
@@ -410,12 +414,17 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
         }),
       }
     }
+
+    // Apply default general deduction for taxpayers with no deduction data
+    household = applyDefaultDeductions(household)
   }
 
   // ── Build final result ──────────────────────────────────
 
   if (household) {
-    const allHouseholds = [household, ...previousHouseholds].sort((a, b) => b.year - a.year)
+    const allHouseholds = [household, ...previousHouseholds.map(applyDefaultDeductions)].sort(
+      (a, b) => b.year - a.year,
+    )
     return {
       ok: true,
       households: allHouseholds,
@@ -425,7 +434,9 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
   }
 
   if (previousHouseholds.length > 0) {
-    const allHouseholds = previousHouseholds.sort((a, b) => b.year - a.year)
+    const allHouseholds = previousHouseholds
+      .map(applyDefaultDeductions)
+      .sort((a, b) => b.year - a.year)
     return {
       ok: true,
       households: allHouseholds,
@@ -435,4 +446,23 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
   }
 
   return { ok: false, code: 'EXTRACTION_FAILED' }
+}
+
+/**
+ * For each taxpayer member without any 'general' deduction,
+ * inject a conservative default (€250 — the per-person general cap).
+ */
+function applyDefaultDeductions(h: Household): Household {
+  const members = h.members.map((m) => {
+    const hasGeneral = m.deductions.some((d) => d.category === 'general')
+    if (hasGeneral) return m
+    return {
+      ...m,
+      deductions: [
+        ...m.deductions,
+        { category: 'general' as const, amount: DEFAULT_GENERAL_DEDUCTION_AMOUNT },
+      ],
+    }
+  })
+  return { ...h, members }
 }

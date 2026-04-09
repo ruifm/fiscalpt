@@ -26,7 +26,6 @@ import {
 } from '@/lib/tax/pdf-extractor'
 import {
   computeDeductionSlots,
-  getMandatoryUnfilledSlots,
   maxPreviousYearsFiles,
   getAmendableYears,
   getAllSupportedYears,
@@ -145,10 +144,6 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
     return computeDeductionSlots(declarations, liquidacaoFiles)
   }, [sectionFiles])
 
-  const deductionsMandatory =
-    deductionSlots.length > 0 &&
-    deductionSlots.some((s) => s.role === 'taxpayer' && !s.hasLiquidacao)
-
   // Autoscroll to next action after all files finish processing (only if no errors)
   const prevProcessing = useRef(false)
   const anyFileError = (Object.values(sectionFiles) as UploadedFile[][]).some((files) =>
@@ -159,14 +154,10 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
     prevProcessing.current = anyFileProcessing
     if (wasProcessing && !anyFileProcessing && hasDeclaration && !anyFileError) {
       setTimeout(() => {
-        if (deductionsSectionRef.current && deductionsMandatory) {
-          deductionsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        } else if (advanceButtonRef.current) {
-          advanceButtonRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
+        advanceButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }, 200)
     }
-  }, [anyFileProcessing, hasDeclaration, deductionsMandatory, anyFileError])
+  }, [anyFileProcessing, hasDeclaration, anyFileError])
 
   const handleDeductionPaste = useCallback(
     (slotKey: string, expectedNif: string, expectedYear: number, text: string) => {
@@ -454,18 +445,6 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
   }
 
   function processFiles() {
-    // Mandatory deduction slot check (UI concern — not in assembly)
-    const pastedKeys = new Set(
-      [...pastedDeductions.entries()].filter(([_, v]) => v.result.ok).map(([k]) => k),
-    )
-    const unfilledMandatory = getMandatoryUnfilledSlots(deductionSlots, pastedKeys)
-    if (unfilledMandatory.length > 0) {
-      setDeductionsPasteOpen(true)
-      const nifs = unfilledMandatory.map((s) => `NIF ${s.nif} (${s.year})`).join(', ')
-      setValidationError(t('upload.deductionExpensesRequired', { names: nifs }))
-      return
-    }
-
     setProcessing(true)
     setValidationError(null)
 
@@ -501,14 +480,6 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
     }
   }
 
-  // Auto-expand deductions section when mandatory
-  useEffect(() => {
-    if (deductionsMandatory && !deductionsPasteOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- derived state sync
-      setDeductionsPasteOpen(true)
-    }
-  }, [deductionsMandatory]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const deductionsSection = deductionSlots.length > 0 && (
     <div ref={deductionsSectionRef}>
       <Card>
@@ -527,11 +498,7 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
           <span className="font-heading text-base font-medium">
             {t('upload.deductionExpenses')}
           </span>
-          {deductionsMandatory ? (
-            <Badge>{t('upload.required')}</Badge>
-          ) : (
-            <Badge variant="outline">{t('upload.optional')}</Badge>
-          )}
+          <Badge variant="outline">{t('upload.optional')}</Badge>
           {[...pastedDeductions.values()].filter((v) => v.result.ok).length > 0 && (
             <Badge variant="secondary" className="ml-auto">
               {[...pastedDeductions.values()].filter((v) => v.result.ok).length}/
@@ -653,9 +620,6 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
         </CardContent>
       </Card>
 
-      {/* Mandatory deductions rendered before optional sections */}
-      {deductionsMandatory && deductionsSection}
-
       {/* Demonstração de Liquidação (optional, collapsible) */}
       {hasDeclaration && (
         <Card>
@@ -765,7 +729,7 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
       </Card>
 
       {/* Optional deductions rendered after optional sections */}
-      {!deductionsMandatory && deductionsSection}
+      {deductionsSection}
 
       {validationError && (
         <div
