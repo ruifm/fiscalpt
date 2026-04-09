@@ -161,11 +161,96 @@ test.describe('Landing page — dual CTAs', () => {
   })
 })
 
-test.describe('Mode toggle — Analyze page', () => {
-  test('analyze page has link to simulation', async ({ page }) => {
+test.describe('Simulação Rápida — localStorage persistence', () => {
+  test('form state survives page refresh', async ({ page }) => {
+    await page.goto('/simulacao')
+
+    // Fill form
+    await fillBirthYear(page, 'Contribuinte', '1990')
+    await fillGrossCatA(page, 'Contribuinte', '30000')
+
+    // Refresh
+    await page.reload()
+
+    // Form state should be restored
+    const birthInput = page.locator('input[id="birth-year-Contribuinte"]')
+    await expect(birthInput).toHaveValue('1990')
+    const incomeInput = page.locator('input[id="gross-a-Contribuinte"]')
+    await expect(incomeInput).toHaveValue('30000')
+  })
+
+  test('results survive page refresh', async ({ page }) => {
+    await page.goto('/simulacao')
+
+    await fillBirthYear(page, 'Contribuinte', '1990')
+    await fillGrossCatA(page, 'Contribuinte', '30000')
+    await clickCalculate(page)
+    await waitForResults(page)
+
+    // Refresh
+    await page.reload()
+
+    // Results should still be visible
+    await expect(page.locator('[data-testid="results-container"]')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('[data-testid="results-container"]')).toContainText(/€/)
+  })
+
+  test('back clears results but keeps form', async ({ page }) => {
+    await page.goto('/simulacao')
+
+    await fillBirthYear(page, 'Contribuinte', '1990')
+    await fillGrossCatA(page, 'Contribuinte', '30000')
+    await clickCalculate(page)
+    await waitForResults(page)
+
+    // Click "Voltar" (back) button — use data-testid area for results navigation
+    const resultsContainer = page.locator('[data-testid="results-container"]')
+    await resultsContainer.getByRole('button', { name: /^voltar$/i }).first().click()
+
+    // Form should be visible with data preserved
+    await expect(page.locator('[data-testid="simulation-form"]')).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('input[id="birth-year-Contribuinte"]')).toHaveValue('1990')
+    await expect(page.locator('input[id="gross-a-Contribuinte"]')).toHaveValue('30000')
+
+    // Results should not be visible
+    await expect(page.locator('[data-testid="results-container"]')).not.toBeVisible()
+  })
+
+  test('reset clears both form and results', async ({ page }) => {
+    await page.goto('/simulacao')
+
+    await fillBirthYear(page, 'Contribuinte', '1990')
+    await fillGrossCatA(page, 'Contribuinte', '30000')
+    await clickCalculate(page)
+    await waitForResults(page)
+
+    // Click "Nova análise" (reset) button — inside results area
+    const resultsContainer = page.locator('[data-testid="results-container"]')
+    await resultsContainer
+      .getByRole('button', { name: /nova análise|new analysis/i })
+      .first()
+      .click()
+
+    // Form should be visible with empty values
+    await expect(page.locator('[data-testid="simulation-form"]')).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('input[id="birth-year-Contribuinte"]')).toHaveValue('')
+    await expect(page.locator('input[id="gross-a-Contribuinte"]')).toHaveValue('')
+  })
+})
+
+test.describe('/analyze — UX callouts', () => {
+  test('"no documents?" callout visible when no files uploaded', async ({ page }) => {
     await page.goto('/analyze')
 
-    const simLink = page.locator('a[href="/simulacao"]').first()
-    await expect(simLink).toBeVisible()
+    await expect(page.locator('[data-testid="no-documents-callout"]')).toBeVisible()
+    await expect(page.locator('[data-testid="no-documents-callout"]')).toContainText(
+      /simulação rápida/i,
+    )
+  })
+
+  test('draft XML tip visible on upload stage', async ({ page }) => {
+    await page.goto('/analyze')
+
+    await expect(page.getByText(/rascunho/i)).toBeVisible()
   })
 })
