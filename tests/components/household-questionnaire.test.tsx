@@ -196,14 +196,14 @@ describe('HouseholdQuestionnaire', () => {
     expect(continueBtn).toBeDefined()
   })
 
-  it('shows skip warning when skipping with unanswered important questions', async () => {
+  it('skip proceeds directly when all questions are optional', async () => {
     render(
       <HouseholdQuestionnaire household={makeHousehold()} onComplete={onComplete} onBack={onBack} />,
     )
     const skipBtn = screen.getByTestId('questionnaire-skip')
     await userEvent.click(skipBtn)
-    // makeHousehold() has missing birth_year (critical) so warning must appear
-    expect(screen.getByRole('alert')).toBeDefined()
+    // All questions are optional, so skip should call onComplete directly
+    expect(onComplete).toHaveBeenCalled()
   })
 
   it('persists answers to sessionStorage after interaction', async () => {

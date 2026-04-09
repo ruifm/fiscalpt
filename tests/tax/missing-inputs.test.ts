@@ -3,9 +3,11 @@ import {
   identifyMissingInputs,
   groupBySection,
   applyAnswers,
+  applyDefaults,
   hasMandatoryQuestions,
   countUnansweredCritical,
   validateAnswer,
+  DEFAULT_OFFSETS,
   type MissingInputQuestion,
 } from '@/lib/tax/missing-inputs'
 import type { Household, Person, Income } from '@/lib/tax/types'
@@ -48,7 +50,9 @@ describe('identifyMissingInputs', () => {
       const q = qs.find((q) => q.id === 'member.0.birth_year')
       expect(q).toBeDefined()
       expect(q!.section).toBe('taxpayer_info')
-      expect(q!.priority).toBe('important')
+      expect(q!.priority).toBe('optional')
+      expect(q!.currentValue).toBe(2025 - 40)
+      expect(q!.isDefault).toBe(true)
     })
 
     it('does not ask when birth year is present', () => {
@@ -59,13 +63,13 @@ describe('identifyMissingInputs', () => {
       expect(qs.find((q) => q.id === 'member.0.birth_year')).toBeUndefined()
     })
 
-    it('marks birth year as critical when IRS Jovem is active', () => {
+    it('marks birth year as optional even when IRS Jovem is active', () => {
       const h = makeHousehold({
         members: [makePerson({ special_regimes: ['irs_jovem'] })],
       })
       const qs = identifyMissingInputs(h)
       const q = qs.find((q) => q.id === 'member.0.birth_year')
-      expect(q!.priority).toBe('critical')
+      expect(q!.priority).toBe('optional')
     })
 
     it('asks for both members in married household', () => {
@@ -88,7 +92,8 @@ describe('identifyMissingInputs', () => {
       const q = qs.find((q) => q.id === 'dependent.0.birth_year')
       expect(q).toBeDefined()
       expect(q!.isPlaceholder).toBe(true)
-      expect(q!.currentValue).toBe(2020)
+      expect(q!.currentValue).toBe(2015) // year - 10 default for placeholders
+      expect(q!.isDefault).toBe(true)
     })
 
     it('asks when birth year is 0 (unknown from XML parser)', () => {
@@ -99,7 +104,8 @@ describe('identifyMissingInputs', () => {
       const q = qs.find((q) => q.id === 'dependent.0.birth_year')
       expect(q).toBeDefined()
       expect(q!.isPlaceholder).toBe(true)
-      expect(q!.currentValue).toBe(0)
+      expect(q!.currentValue).toBe(2015) // year - 10 default for placeholders
+      expect(q!.isDefault).toBe(true)
     })
 
     it('asks when birth year is negative', () => {
@@ -227,7 +233,8 @@ describe('identifyMissingInputs', () => {
       const qs = identifyMissingInputs(h)
       const q = qs.find((q) => q.id === 'member.0.cat_b_start_year')
       expect(q).toBeDefined()
-      expect(q!.priority).toBe('critical')
+      expect(q!.priority).toBe('optional')
+      expect(q!.isDefault).toBe(true)
       expect(q!.type).toBe('number')
     })
 
@@ -389,7 +396,7 @@ describe('identifyMissingInputs', () => {
       const q = qs.find((q) => q.id === 'member.0.first_work_year')
       expect(q).toBeDefined()
       expect(q!.section).toBe('irs_jovem')
-      expect(q!.priority).toBe('critical')
+      expect(q!.priority).toBe('optional')
     })
 
     it('skips first_work_year when irs_jovem_first_work_year already set', () => {
@@ -425,7 +432,7 @@ describe('identifyMissingInputs', () => {
       const qs = identifyMissingInputs(h)
       const q = qs.find((q) => q.id === 'member.0.nhr_start_year')
       expect(q).toBeDefined()
-      expect(q!.priority).toBe('critical')
+      expect(q!.priority).toBe('optional')
       expect(q!.section).toBe('nhr')
     })
 
@@ -437,14 +444,14 @@ describe('identifyMissingInputs', () => {
       expect(qs.find((q) => q.id === 'member.0.nhr_start_year')).toBeUndefined()
     })
 
-    it('asks start year with lower priority when nhr_confirmed (Anexo L present)', () => {
+    it('asks start year with optional priority when nhr_confirmed (Anexo L present)', () => {
       const h = makeHousehold({
         members: [makePerson({ special_regimes: ['nhr'], nhr_confirmed: true })],
       })
       const qs = identifyMissingInputs(h)
       const q = qs.find((q) => q.id === 'member.0.nhr_start_year')
       expect(q).toBeDefined()
-      expect(q!.priority).toBe('important') // lower than critical since confirmed for this year
+      expect(q!.priority).toBe('optional')
     })
 
     it('does not ask when nhr_confirmed and start year already set', () => {
@@ -751,7 +758,7 @@ describe('applyAnswers', () => {
       dependents: [{ name: 'Child', birth_year: 2015, disability_degree: 60 }],
     })
     const result = applyAnswers(h, { 'dependent.0.disability': false })
-    expect(result.dependents[0].disability_degree).toBeUndefined()
+    expect(result.dependents[0].disability_degree).toBe(0)
   })
 
   it('applies ascendant birth year', () => {
@@ -1155,7 +1162,7 @@ describe('question validators', () => {
     })
 
     it('rejects invalid years', () => {
-      expect(getCatBStartYearQuestion().validate!(2026)).not.toBeNull()
+      expect(getCatBStartYearQuestion().validate!(2030)).not.toBeNull()
       expect(getCatBStartYearQuestion().validate!(1989)).not.toBeNull()
     })
   })
@@ -1988,6 +1995,384 @@ describe('question validators', () => {
         'member.0.irs_jovem_is_phd': false,
       })
       expect(updated.members[0].irs_jovem_is_phd).toBe(false)
+    })
+  })
+
+  // ─── applyDefaults ──────────────────────────────────────────
+
+  describe('applyDefaults', () => {
+    it('fills taxpayer birth_year with year - 40', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [makePerson({ name: 'Rui' })],
+      })
+      const result = applyDefaults(h)
+      expect(result.members[0].birth_year).toBe(1985)
+    })
+
+    it('does not overwrite existing taxpayer birth_year', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [makePerson({ name: 'Rui', birth_year: 1990 })],
+      })
+      const result = applyDefaults(h)
+      expect(result.members[0].birth_year).toBe(1990)
+    })
+
+    it('fills dependent placeholder birth_year with year - 10', () => {
+      const h = makeHousehold({
+        year: 2025,
+        dependents: [{ name: 'Child', birth_year: 2020 }],
+      })
+      const result = applyDefaults(h)
+      expect(result.dependents[0].birth_year).toBe(2015)
+    })
+
+    it('preserves valid dependent birth_year', () => {
+      const h = makeHousehold({
+        year: 2024,
+        dependents: [{ name: 'Child', birth_year: 2012 }],
+      })
+      const result = applyDefaults(h)
+      expect(result.dependents[0].birth_year).toBe(2012)
+    })
+
+    it('fills cat_b_start_year with year - 10', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            incomes: [makeIncome({ category: 'B', gross: 30000 })],
+          }),
+        ],
+      })
+      const result = applyDefaults(h)
+      expect(result.members[0].cat_b_start_year).toBe(2015)
+    })
+
+    it('does not overwrite existing cat_b_start_year', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            cat_b_start_year: 2020,
+            incomes: [makeIncome({ category: 'B', gross: 30000 })],
+          }),
+        ],
+      })
+      const result = applyDefaults(h)
+      expect(result.members[0].cat_b_start_year).toBe(2020)
+    })
+
+    it('fills nhr_start_year with year - 10 for NHR member', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [makePerson({ special_regimes: ['nhr'] })],
+      })
+      const result = applyDefaults(h)
+      expect(result.members[0].nhr_start_year).toBe(2015)
+    })
+
+    it('does not set nhr_start_year for non-NHR member', () => {
+      const h = makeHousehold({
+        members: [makePerson()],
+      })
+      const result = applyDefaults(h)
+      expect(result.members[0].nhr_start_year).toBeUndefined()
+    })
+
+    it('fills disability_degree with 0 when undefined', () => {
+      const h = makeHousehold({
+        dependents: [{ name: 'Child', birth_year: 2015 }],
+      })
+      const result = applyDefaults(h)
+      expect(result.dependents[0].disability_degree).toBe(0)
+    })
+
+    it('preserves existing disability_degree', () => {
+      const h = makeHousehold({
+        dependents: [{ name: 'Child', birth_year: 2015, disability_degree: 80 }],
+      })
+      const result = applyDefaults(h)
+      expect(result.dependents[0].disability_degree).toBe(80)
+    })
+
+    it('sets rental_contract_duration to 0 for Cat F income', () => {
+      const h = makeHousehold({
+        members: [
+          makePerson({
+            incomes: [makeIncome({ category: 'F', gross: 12000 })],
+          }),
+        ],
+      })
+      const result = applyDefaults(h)
+      expect(result.members[0].incomes[0].rental_contract_duration).toBe(0)
+    })
+
+    it('fills ascendant birth_year with year - 75', () => {
+      const h = makeHousehold({
+        year: 2025,
+        ascendants: [{ name: 'Grandmother' }],
+      })
+      const result = applyDefaults(h)
+      expect(result.ascendants![0].birth_year).toBe(1950)
+    })
+
+    it('does not mutate the original household', () => {
+      const h = makeHousehold({
+        members: [makePerson({ name: 'Rui' })],
+      })
+      const originalBirthYear = h.members[0].birth_year
+      applyDefaults(h)
+      expect(h.members[0].birth_year).toBe(originalBirthYear)
+    })
+
+    it('handles multiple members and dependents', () => {
+      const h = makeHousehold({
+        year: 2024,
+        filing_status: 'married_joint',
+        members: [
+          makePerson({ name: 'Rui' }),
+          makePerson({
+            name: 'Ana',
+            birth_year: 1992,
+            incomes: [makeIncome({ category: 'B', gross: 20000 })],
+          }),
+        ],
+        dependents: [
+          { name: 'Child1', birth_year: 2019 },
+          { name: 'Child2', birth_year: 2010 },
+        ],
+      })
+      const result = applyDefaults(h)
+      expect(result.members[0].birth_year).toBe(1984)
+      expect(result.members[1].birth_year).toBe(1992) // preserved
+      expect(result.members[1].cat_b_start_year).toBe(2014)
+      expect(result.dependents[0].birth_year).toBe(2014) // placeholder → year-10
+      expect(result.dependents[1].birth_year).toBe(2010) // valid, preserved
+    })
+  })
+
+  // ─── DEFAULT_OFFSETS ────────────────────────────────────────
+
+  describe('DEFAULT_OFFSETS', () => {
+    it('has expected offset values', () => {
+      expect(DEFAULT_OFFSETS.taxpayerBirthYear).toBe(40)
+      expect(DEFAULT_OFFSETS.dependentBirthYear).toBe(10)
+      expect(DEFAULT_OFFSETS.ascendantBirthYear).toBe(75)
+      expect(DEFAULT_OFFSETS.catBStartYear).toBe(10)
+      expect(DEFAULT_OFFSETS.nhrStartYear).toBe(10)
+      expect(DEFAULT_OFFSETS.irsJovemFirstWorkYear).toBe(15)
+      expect(DEFAULT_OFFSETS.irsJovemDegreeYear).toBe(10)
+    })
+  })
+
+  // ─── isDefault / currentValue assertions ────────────────────
+
+  describe('isDefault and currentValue on questions', () => {
+    it('marks taxpayer birth_year as default when missing', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson()],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.birth_year')
+      expect(q!.isDefault).toBe(true)
+      expect(q!.currentValue).toBe(1984)
+    })
+
+    it('marks taxpayer birth_year as non-default when already set', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ birth_year: 1990 })],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.birth_year')
+      expect(q).toBeUndefined() // not asked when already set
+    })
+
+    it('marks cat_b_start_year as default when missing', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            incomes: [makeIncome({ category: 'B', gross: 10000 })],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.cat_b_start_year')
+      expect(q!.isDefault).toBe(true)
+      expect(q!.currentValue).toBe('2014')
+    })
+
+    it('marks cat_b_start_year as non-default when set', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            cat_b_start_year: 2020,
+            incomes: [makeIncome({ category: 'B', gross: 10000 })],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.cat_b_start_year')
+      expect(q!.isDefault).toBe(false)
+      expect(q!.currentValue).toBe('2020')
+    })
+
+    it('marks dependent disability as default', () => {
+      const h = makeHousehold({
+        dependents: [{ name: 'Child', birth_year: 2015 }],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'dependent.0.disability')
+      expect(q!.isDefault).toBe(true)
+      expect(q!.currentValue).toBe(false)
+    })
+
+    it('marks NHR start_year as default when missing', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ special_regimes: ['nhr'] })],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.nhr_start_year')
+      expect(q!.isDefault).toBe(true)
+      expect(q!.currentValue).toBe(2014)
+    })
+
+    it('marks englobamento as default', () => {
+      const h = makeHousehold({
+        members: [
+          makePerson({
+            incomes: [makeIncome({ category: 'E', gross: 5000 })],
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.income.0.englobamento')
+      expect(q).toBeDefined()
+      expect(q!.isDefault).toBe(true)
+      expect(q!.currentValue).toBe(false)
+    })
+  })
+
+  // ─── Round-trip tests ───────────────────────────────────────
+
+  describe('round-trip: identify → default → apply → re-identify', () => {
+    it('does not re-ask questions after applying defaults for single taxpayer', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+          }),
+        ],
+        dependents: [{ name: 'Child', birth_year: 2020 }],
+      })
+
+      const qs1 = identifyMissingInputs(h)
+      expect(qs1.length).toBeGreaterThan(0)
+
+      const answers: Record<string, string | number | boolean> = {}
+      for (const q of qs1) {
+        if (q.currentValue !== undefined) {
+          answers[q.id] = q.currentValue
+        }
+      }
+
+      const h2 = applyAnswers(h, answers)
+      const qs2 = identifyMissingInputs(h2)
+      // Some questions are always generated for review (birth_year, cat_b_start_year)
+      // After applying defaults, they should have isDefault: false (real value set)
+      const alwaysAsked = new Set(['birth_year', 'cat_b_start_year'])
+      const nonReview = qs2.filter((q) => {
+        const parts = q.id.split('.')
+        const field = parts[parts.length - 1]
+        return !alwaysAsked.has(field) || q.isDefault
+      })
+      expect(nonReview.length).toBe(0)
+      // All remaining questions must be non-default (values were applied)
+      for (const q of qs2) {
+        expect(q.isDefault).toBe(false)
+      }
+    })
+
+    it('does not re-ask questions after applying defaults for married household with Cat B', () => {
+      const h = makeHousehold({
+        year: 2025,
+        filing_status: 'married_joint',
+        members: [
+          makePerson({
+            name: 'Rui',
+            incomes: [makeIncome({ category: 'B', gross: 50000 })],
+          }),
+          makePerson({
+            name: 'Ana',
+            incomes: [makeIncome({ category: 'A', gross: 30000 })],
+          }),
+        ],
+        dependents: [{ name: 'Filho', birth_year: 2020 }],
+      })
+
+      const qs1 = identifyMissingInputs(h)
+      expect(qs1.length).toBeGreaterThan(0)
+
+      const answers: Record<string, string | number | boolean> = {}
+      for (const q of qs1) {
+        if (q.currentValue !== undefined) {
+          answers[q.id] = q.currentValue
+        }
+      }
+
+      const h2 = applyAnswers(h, answers)
+      const qs2 = identifyMissingInputs(h2)
+      // Dependent birth_year and cat_b_start_year questions are always
+      // generated for review (even when values are set)
+      const alwaysAsked = new Set(['birth_year', 'cat_b_start_year'])
+      const nonReview = qs2.filter((q) => {
+        const parts = q.id.split('.')
+        const field = parts[parts.length - 1]
+        return !alwaysAsked.has(field) || q.isDefault
+      })
+      expect(nonReview.length).toBe(0)
+      for (const q of qs2) {
+        expect(q.isDefault).toBe(false)
+      }
+    })
+
+    it('does not re-ask questions after applyDefaults', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            incomes: [
+              makeIncome({ category: 'A', gross: 25000 }),
+              makeIncome({ category: 'B', gross: 10000 }),
+            ],
+          }),
+        ],
+        dependents: [
+          { name: 'Child1', birth_year: 2020 },
+          { name: 'Child2', birth_year: 0 },
+        ],
+      })
+
+      const qs1 = identifyMissingInputs(h)
+      expect(qs1.length).toBeGreaterThan(0)
+
+      const h2 = applyDefaults(h)
+      const qs2 = identifyMissingInputs(h2)
+      // Some questions are always generated for review (birth_year, cat_b_start_year)
+      const alwaysAsked = new Set(['birth_year', 'cat_b_start_year'])
+      const nonReview = qs2.filter((q) => {
+        const parts = q.id.split('.')
+        const field = parts[parts.length - 1]
+        return !alwaysAsked.has(field) || q.isDefault
+      })
+      expect(nonReview.length).toBe(0)
     })
   })
 })

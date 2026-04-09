@@ -32,6 +32,8 @@ export interface MissingInputQuestion {
   currentValue?: number | string | boolean
   /** Whether this is a placeholder value that should be confirmed */
   isPlaceholder?: boolean
+  /** Whether this is a conservative default (not user-provided) */
+  isDefault?: boolean
   /** Priority: critical inputs block accurate calculation */
   priority: 'critical' | 'important' | 'optional'
   /** Path to update in the household object */
@@ -87,6 +89,30 @@ export const SECTION_LABELS: Record<QuestionSection, { title: string; descriptio
   },
 }
 
+// ─── Conservative Defaults ───────────────────────────────────
+
+/**
+ * Conservative default offsets (subtracted from tax year).
+ * Each defaults to the least beneficial interpretation so the user
+ * must opt-in to benefits by correcting the values.
+ */
+export const DEFAULT_OFFSETS = {
+  /** Age 40: too old for IRS Jovem (≤35) */
+  taxpayerBirthYear: 40,
+  /** Age 10: standard €600 dependent deduction */
+  dependentBirthYear: 10,
+  /** Age 75 */
+  ascendantBirthYear: 75,
+  /** 3rd+ year of activity: no new-activity reduction */
+  catBStartYear: 10,
+  /** Year 11: NHR expired */
+  nhrStartYear: 10,
+  /** Year 16: no benefit (max 10 years) */
+  irsJovemFirstWorkYear: 15,
+  /** >5 years since degree: no pre-2025 benefit */
+  irsJovemDegreeYear: 10,
+} as const
+
 // ─── Main Function ───────────────────────────────────────────
 
 /**
@@ -116,6 +142,7 @@ export function identifyMissingInputs(
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
     if (!member.birth_year) {
+      const defaultValue = year - DEFAULT_OFFSETS.taxpayerBirthYear
       questions.push({
         id: `member.${i}.birth_year`,
         section: 'taxpayer_info',
@@ -123,7 +150,9 @@ export function identifyMissingInputs(
         reason:
           'Necessário para limites de dedução PPR, elegibilidade IRS Jovem (≤35 anos) e deduções por deficiência.',
         type: 'year',
-        priority: hasSpecialRegime(member, 'irs_jovem') ? 'critical' : 'important',
+        priority: 'optional',
+        currentValue: defaultValue,
+        isDefault: true,
         path: `members.${i}.birth_year`,
         validate: validateBirthYear,
       })
@@ -136,15 +165,17 @@ export function identifyMissingInputs(
   for (let i = 0; i < household.dependents.length; i++) {
     const dep = household.dependents[i]
     const isPlaceholder = isPlaceholderBirthYear(dep.birth_year, year)
+    const defaultValue = isPlaceholder ? year - DEFAULT_OFFSETS.dependentBirthYear : dep.birth_year
     questions.push({
       id: `dependent.${i}.birth_year`,
       section: 'dependents',
       label: `Ano de nascimento de ${dep.name}`,
       reason: 'A dedução depende da idade: €900 (< 3 anos), €726 (3-6 anos), €600 (> 6 anos).',
       type: 'year',
-      currentValue: dep.birth_year,
+      currentValue: defaultValue,
       isPlaceholder,
-      priority: isPlaceholder ? 'important' : 'optional',
+      isDefault: isPlaceholder,
+      priority: 'optional',
       path: `dependents.${i}.birth_year`,
       validate: validateBirthYear,
     })
@@ -161,6 +192,8 @@ export function identifyMissingInputs(
         reason: 'Incapacidade ≥ 60% atribui dedução adicional de 2,5 × IAS (Art. 87).',
         type: 'boolean',
         priority: 'optional',
+        currentValue: false,
+        isDefault: true,
         path: `dependents.${i}.has_disability`,
       })
     }
@@ -175,6 +208,8 @@ export function identifyMissingInputs(
     const disabilityUnknown = asc.disability_degree === undefined
     const highDisability = (asc.disability_degree ?? 0) >= 90
     if (disabilityUnknown || highDisability) {
+      const hasValue = asc.birth_year !== undefined && asc.birth_year > 0
+      const defaultValue = hasValue ? asc.birth_year : year - DEFAULT_OFFSETS.ascendantBirthYear
       questions.push({
         id: `ascendant.${i}.birth_year`,
         section: 'ascendants',
@@ -183,6 +218,8 @@ export function identifyMissingInputs(
           'Incapacidade ≥ 90% atribui dedução de acompanhamento (4 × IAS). Necessário verificar idade.',
         type: 'year',
         priority: 'optional',
+        currentValue: defaultValue,
+        isDefault: !hasValue,
         path: `ascendants.${i}.birth_year`,
       })
     }
@@ -215,6 +252,7 @@ export function identifyMissingInputs(
       }
     }
 
+    const defaultCatBStart = year - DEFAULT_OFFSETS.catBStartYear
     questions.push({
       id: `member.${i}.cat_b_start_year`,
       section: 'cat_b_details',
@@ -222,14 +260,13 @@ export function identifyMissingInputs(
       reason:
         'Art. 31 nº 10: 1.º ano → apenas 50% do rendimento é tributável; 2.º ano → 75%. A partir do 3.º ano: sem redução.',
       type: 'number',
-      priority: alreadySet ? 'optional' : 'critical',
-      currentValue: alreadySet ? String(member.cat_b_start_year) : undefined,
+      priority: 'optional',
+      currentValue: alreadySet ? String(member.cat_b_start_year) : String(defaultCatBStart),
+      isDefault: !alreadySet,
       path: `members.${i}.cat_b_start_year`,
       validate: (v: string | number | boolean): string | null => {
         const n = toNumber(v)
-        return n >= 1990 && n <= household.year
-          ? null
-          : `Ano deve ser entre 1990 e ${household.year}`
+        return n >= 1990 && n <= currentYear ? null : `Ano deve ser entre 1990 e ${currentYear}`
       },
     })
   }
@@ -256,9 +293,10 @@ export function identifyMissingInputs(
           { value: '10', label: '10-19 anos (14%)' },
           { value: '20', label: '≥ 20 anos (10%)' },
         ],
-        priority: hasRentalDuration ? 'optional' : 'important',
+        priority: 'optional',
         path: `members.${i}.incomes.${j}.rental_contract_duration`,
-        currentValue: hasRentalDuration ? String(income.rental_contract_duration) : undefined,
+        currentValue: hasRentalDuration ? String(income.rental_contract_duration) : '0',
+        isDefault: !hasRentalDuration,
         validate: (v: string | number | boolean): string | null => {
           const n = toNumber(v)
           return n >= 0 ? null : 'Valor inválido'
@@ -286,6 +324,7 @@ export function identifyMissingInputs(
 
     if (!member.nhr_start_year) {
       const nhrConfirmedAny = member.nhr_confirmed || otherMembers.some((m) => m.nhr_confirmed)
+      const defaultValue = year - DEFAULT_OFFSETS.nhrStartYear
       questions.push({
         id: `member.${i}.nhr_start_year`,
         section: 'nhr',
@@ -294,7 +333,9 @@ export function identifyMissingInputs(
           ? 'RNH confirmado via Anexo L. O ano de inscrição permite calcular a janela de 10 anos para outros anos fiscais.'
           : 'O regime RNH tem duração de 10 anos. Necessário para verificar se ainda está ativo. Novas inscrições a partir de 2024 foram revogadas (Lei 45-A/2024).',
         type: 'year',
-        priority: nhrConfirmedAny ? 'important' : 'critical',
+        priority: 'optional',
+        currentValue: defaultValue,
+        isDefault: true,
         path: `members.${i}.nhr_start_year`,
         validate: (value: string | number | boolean): string | null => {
           const n = toNumber(value)
@@ -324,6 +365,8 @@ export function identifyMissingInputs(
           'Se a taxa marginal for inferior a 28%, o englobamento pode reduzir o imposto. Escolha "Sim" para incluir estes rendimentos na tributação progressiva.',
         type: 'boolean',
         priority: 'optional',
+        currentValue: false,
+        isDefault: true,
         path: `members.${i}.incomes.${j}.englobamento`,
       })
     }
@@ -385,6 +428,7 @@ export function identifyMissingInputs(
 
     if (hasPost2025) {
       // New regime: no degree required, just first year of work in Portugal
+      const defaultFirstWork = year - DEFAULT_OFFSETS.irsJovemFirstWorkYear
       questions.push({
         id: `member.${i}.first_work_year`,
         section: 'irs_jovem',
@@ -394,8 +438,9 @@ export function identifyMissingInputs(
           : 'A partir de 2025, o IRS Jovem aplica-se aos primeiros 10 anos de trabalho ' +
             '(sem exigência de grau académico). Se elegível, pode isentar 25%-50% do rendimento.',
         type: 'year',
-        currentValue: member.irs_jovem_first_work_year,
-        priority: hasUnconfirmedIrsJovem ? 'critical' : 'important',
+        currentValue: member.irs_jovem_first_work_year ?? defaultFirstWork,
+        isDefault: !member.irs_jovem_first_work_year,
+        priority: 'optional',
         path: `members.${i}.first_work_year`,
         validate: (value: string | number | boolean): string | null => {
           const n = toNumber(value)
@@ -406,6 +451,7 @@ export function identifyMissingInputs(
 
     if (hasPre2025) {
       // Pre-2025: requires degree completion
+      const defaultDegreeYear = year - DEFAULT_OFFSETS.irsJovemDegreeYear
       questions.push({
         id: `member.${i}.degree_year`,
         section: 'irs_jovem',
@@ -415,8 +461,9 @@ export function identifyMissingInputs(
           : 'Até 2024, o IRS Jovem (Art. 12-F) aplica-se nos 5 anos após conclusão do ' +
             'ensino superior. Se elegível, pode isentar 25%-100% do rendimento.',
         type: 'year',
-        currentValue: member.irs_jovem_degree_year,
-        priority: hasUnconfirmedIrsJovem ? 'critical' : 'important',
+        currentValue: member.irs_jovem_degree_year ?? defaultDegreeYear,
+        isDefault: !member.irs_jovem_degree_year,
+        priority: 'optional',
         path: `members.${i}.degree_year`,
         validate: (value: string | number | boolean): string | null => {
           const n = toNumber(value)
@@ -441,8 +488,9 @@ export function identifyMissingInputs(
               `${member.name} tem entre 27 e 30 anos num ano anterior a 2025. ` +
               'Com doutoramento, o limite de idade do IRS Jovem sobe de 26 para 30 anos.',
             type: 'boolean',
-            currentValue: undefined,
-            priority: 'important',
+            currentValue: false,
+            isDefault: true,
+            priority: 'optional',
             path: `members.${i}.irs_jovem_is_phd`,
           })
         }
@@ -600,7 +648,7 @@ export function applyAnswers(
       // A more detailed follow-up could ask for the actual degree
       const idx = parseInt(parts[1])
       if (h.dependents[idx]) {
-        h.dependents[idx].disability_degree = value === true || value === 'true' ? 60 : undefined
+        h.dependents[idx].disability_degree = value === true || value === 'true' ? 60 : 0
       }
     } else if (parts[0] === 'ascendant' && parts[2] === 'birth_year') {
       const idx = parseInt(parts[1])
@@ -632,6 +680,58 @@ function toNumber(value: string | number | boolean): number {
   if (typeof value === 'number') return sanitizeNumber(value)
   if (typeof value === 'boolean') return value ? 1 : 0
   return sanitizeNumber(parseInt(value))
+}
+
+/**
+ * Apply conservative default values to all undefined household fields.
+ * This lets the tax engine run without any user input (all defaults are
+ * conservative — they disable benefits, not enable them).
+ *
+ * IRS Jovem fields are intentionally NOT defaulted here:
+ * - `irs_jovem_year` left undefined = no benefit (conservative)
+ * - IRS Jovem eligibility gating happens in the engine via birth_year check
+ */
+export function applyDefaults(household: Household): Household {
+  const h = structuredClone(household)
+  const { year } = h
+
+  for (const member of h.members) {
+    if (!member.birth_year) member.birth_year = year - DEFAULT_OFFSETS.taxpayerBirthYear
+
+    const hasCatB = member.incomes.some((inc) => inc.category === 'B')
+    if (hasCatB && !member.cat_b_start_year) {
+      member.cat_b_start_year = year - DEFAULT_OFFSETS.catBStartYear
+    }
+
+    const hasNhr = member.nhr_confirmed || member.special_regimes?.includes('nhr')
+    if (hasNhr && !member.nhr_start_year) {
+      member.nhr_start_year = year - DEFAULT_OFFSETS.nhrStartYear
+    }
+
+    for (const income of member.incomes) {
+      if (income.category === 'F' && income.rental_contract_duration === undefined) {
+        income.rental_contract_duration = 0
+      }
+      if (['E', 'F', 'G'].includes(income.category) && income.englobamento === undefined) {
+        income.englobamento = false
+      }
+    }
+  }
+
+  for (const dep of h.dependents) {
+    if (!dep.birth_year || isPlaceholderBirthYear(dep.birth_year, year)) {
+      dep.birth_year = year - DEFAULT_OFFSETS.dependentBirthYear
+    }
+    if (dep.disability_degree === undefined) dep.disability_degree = 0
+  }
+
+  for (const asc of h.ascendants ?? []) {
+    if (!asc.birth_year || asc.birth_year <= 0) {
+      asc.birth_year = year - DEFAULT_OFFSETS.ascendantBirthYear
+    }
+  }
+
+  return h
 }
 
 /** Returns true if there are any critical or important questions. */
