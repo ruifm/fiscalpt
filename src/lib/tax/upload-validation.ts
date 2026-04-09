@@ -443,6 +443,9 @@ function mergePersonData(placeholder: Person, source: Person): Person {
     special_regimes:
       source.special_regimes.length > 0 ? source.special_regimes : placeholder.special_regimes,
     irs_jovem_year: source.irs_jovem_year ?? placeholder.irs_jovem_year,
+    irs_jovem_first_work_year:
+      source.irs_jovem_first_work_year ?? placeholder.irs_jovem_first_work_year,
+    irs_jovem_degree_year: source.irs_jovem_degree_year ?? placeholder.irs_jovem_degree_year,
     nhr_start_year: source.nhr_start_year ?? placeholder.nhr_start_year,
     nhr_confirmed: source.nhr_confirmed ?? placeholder.nhr_confirmed,
     disability_degree: source.disability_degree ?? placeholder.disability_degree,

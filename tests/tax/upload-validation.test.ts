@@ -776,6 +776,31 @@ describe('mergeSpouseHouseholds', () => {
     expect(result!.household.members[1].irs_jovem_year).toBe(3)
   })
 
+  it('preserves irs_jovem stable anchors from spouse source', () => {
+    const result = mergeSpouseHouseholds([
+      makeDecl({
+        nif: '111',
+        nifConjuge: '222',
+        household: makeHousehold(2024, [makePerson('A'), makePerson('Titular B (222)')]),
+      }),
+      makeDecl({
+        nif: '222',
+        nifConjuge: '111',
+        household: makeHousehold(2024, [
+          makePerson('B', {
+            special_regimes: ['irs_jovem'],
+            irs_jovem_year: 3,
+            irs_jovem_first_work_year: 2021,
+            irs_jovem_degree_year: 2020,
+          }),
+        ]),
+      }),
+    ])
+
+    expect(result!.household.members[1].irs_jovem_first_work_year).toBe(2021)
+    expect(result!.household.members[1].irs_jovem_degree_year).toBe(2020)
+  })
+
   it('combines issues from both declarations', () => {
     const result = mergeSpouseHouseholds([
       makeDecl({

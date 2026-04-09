@@ -218,11 +218,12 @@ function computeTaxableIncome(person: Person, taxYear: number): TaxableIncomeRes
     person.special_regimes.includes('nhr') &&
     isNhrActive(person.nhr_start_year, taxYear, person.nhr_confirmed)
 
-  // Derive benefit year from stable first_work_year when available
+  // Derive benefit year from stable anchors (regime-aware)
   const effectiveBenefitYear = deriveIrsJovemBenefitYear(
     person.irs_jovem_year,
     person.irs_jovem_first_work_year,
     taxYear,
+    person.irs_jovem_degree_year,
   )
   const hasIrsJovem =
     person.special_regimes.includes('irs_jovem') &&
@@ -779,6 +780,7 @@ function generateIrsJovemOptimizations(household: Household): {
       person.irs_jovem_year,
       person.irs_jovem_first_work_year,
       household.year,
+      person.irs_jovem_degree_year,
     )
     if (
       !person.special_regimes.includes('irs_jovem') ||

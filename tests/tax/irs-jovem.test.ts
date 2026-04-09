@@ -333,26 +333,42 @@ describe('IRS Jovem — edge cases', () => {
 })
 
 describe('deriveIrsJovemBenefitYear', () => {
-  it('derives benefit year from firstWorkYear and taxYear', () => {
+  it('uses firstWorkYear for post-2025', () => {
     expect(deriveIrsJovemBenefitYear(undefined, 2020, 2025)).toBe(6)
     expect(deriveIrsJovemBenefitYear(undefined, 2025, 2025)).toBe(1)
     expect(deriveIrsJovemBenefitYear(undefined, 2016, 2025)).toBe(10)
   })
 
-  it('uses explicit irsJovemYear when firstWorkYear is not set', () => {
+  it('uses degreeYear for pre-2025', () => {
+    // benefitYear = taxYear - degreeYear → 2024 - 2020 = 4
+    expect(deriveIrsJovemBenefitYear(undefined, undefined, 2024, 2020)).toBe(4)
+    expect(deriveIrsJovemBenefitYear(undefined, undefined, 2023, 2020)).toBe(3)
+  })
+
+  it('prefers degreeYear over firstWorkYear for pre-2025', () => {
+    // degree 2018, first work 2022. For 2024: should use degree → 2024 - 2018 = 6
+    expect(deriveIrsJovemBenefitYear(undefined, 2022, 2024, 2018)).toBe(6)
+  })
+
+  it('prefers firstWorkYear over degreeYear for post-2025', () => {
+    // degree 2018, first work 2022. For 2025: should use first_work → 2025 - 2022 + 1 = 4
+    expect(deriveIrsJovemBenefitYear(undefined, 2022, 2025, 2018)).toBe(4)
+  })
+
+  it('uses explicit irsJovemYear when no stable anchor matches', () => {
     expect(deriveIrsJovemBenefitYear(3, undefined, 2025)).toBe(3)
   })
 
-  it('prefers firstWorkYear over explicit irsJovemYear', () => {
-    // firstWorkYear=2020, taxYear=2025 → year 6, ignore explicit 3
-    expect(deriveIrsJovemBenefitYear(3, 2020, 2025)).toBe(6)
-  })
-
-  it('returns undefined when neither is set', () => {
+  it('returns undefined when nothing is set', () => {
     expect(deriveIrsJovemBenefitYear(undefined, undefined, 2025)).toBeUndefined()
   })
 
   it('returns undefined when firstWorkYear is after taxYear', () => {
     expect(deriveIrsJovemBenefitYear(undefined, 2026, 2025)).toBeUndefined()
+  })
+
+  it('falls back to firstWorkYear for pre-2025 when no degreeYear', () => {
+    // No degree info but has firstWorkYear — use firstWorkYear as fallback
+    expect(deriveIrsJovemBenefitYear(undefined, 2022, 2024)).toBe(3)
   })
 })

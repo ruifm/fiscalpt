@@ -169,14 +169,25 @@ export function isEligibleForIrsJovem(benefitYear: number | undefined, taxYear?:
 
 /**
  * Derive the IRS Jovem benefit year from stable inputs.
- * Uses irs_jovem_first_work_year if available, falls back to irs_jovem_year.
- * Formula: benefitYear = taxYear - firstWorkYear + 1
+ * Pre-2025: uses degree_year (benefitYear = taxYear - degreeYear)
+ * Post-2025: uses first_work_year (benefitYear = taxYear - firstWorkYear + 1)
+ * Falls back to the explicit irs_jovem_year if no stable anchor matches.
  */
 export function deriveIrsJovemBenefitYear(
   irsJovemYear: number | undefined,
   irsJovemFirstWorkYear: number | undefined,
   taxYear: number,
+  irsJovemDegreeYear?: number,
 ): number | undefined {
+  if (taxYear < 2025 && irsJovemDegreeYear !== undefined) {
+    const derived = taxYear - irsJovemDegreeYear
+    return derived >= 1 ? derived : undefined
+  }
+  if (taxYear >= 2025 && irsJovemFirstWorkYear !== undefined) {
+    const derived = taxYear - irsJovemFirstWorkYear + 1
+    return derived >= 1 ? derived : undefined
+  }
+  // Fallback: use whichever stable anchor is available
   if (irsJovemFirstWorkYear !== undefined) {
     const derived = taxYear - irsJovemFirstWorkYear + 1
     return derived >= 1 ? derived : undefined
