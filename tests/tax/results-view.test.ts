@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type {
   AnalysisResult,
+  FilingStatus,
   Household,
   Optimization,
   PersonTaxDetail,
@@ -63,7 +64,7 @@ function makeResult(
   overrides: {
     projected?: boolean
     optimizations?: Optimization[]
-    optimized_burdens?: { filing_status: string; total_tax_burden: number }[]
+    optimized_burdens?: { filing_status: FilingStatus; total_tax_burden: number }[]
   } = {},
 ): AnalysisResult {
   return {
