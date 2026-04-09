@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const E2E_PORT = 3939
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -10,9 +12,10 @@ export default defineConfig({
   timeout: 60_000,
 
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${E2E_PORT}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    storageState: { cookies: [], origins: [] },
   },
 
   projects: [
@@ -23,9 +26,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: process.env.CI ? 'npm run start' : 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,
+    command: process.env.CI ? `npx next start -p ${E2E_PORT}` : `npx next dev -p ${E2E_PORT}`,
+    url: `http://localhost:${E2E_PORT}`,
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
 })
