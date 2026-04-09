@@ -125,6 +125,8 @@ export interface Household {
   dependents: Dependent[]
   ascendants?: Ascendant[]
   projected?: boolean
+  /** True when spouse declaration was not uploaded — joint filing cannot be recommended */
+  spouse_data_incomplete?: boolean
 }
 
 // ─── Tax Bracket Definition ───────────────────────────────────

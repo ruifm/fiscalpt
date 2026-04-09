@@ -1179,7 +1179,103 @@ describe('assembleHouseholds', () => {
       expect(result.ok).toBe(true)
       if (result.ok) {
         expect(result.households).toHaveLength(1)
-        expect(result.households[0].members).toHaveLength(2)
+        // Single declaration with nifConjuge → spouse stripped, only 1 member
+        expect(result.households[0].members).toHaveLength(1)
+        expect(result.households[0].members[0].name).toBe('Alice')
+        expect(result.households[0].spouse_data_incomplete).toBe(true)
+      }
+    })
+  })
+
+  // ─── Incomplete Spouse Data ────────────────────────────────
+
+  describe('incomplete spouse data (single declaration for married household)', () => {
+    it('strips the placeholder spouse member and marks spouse_data_incomplete', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Rui',
+            incomes: [{ category: 'A', gross: 40000 }],
+          }),
+          makePerson({ name: 'Titular B (NIF 987654321)' }),
+        ],
+        filing_status: 'married_separate',
+      })
+      const parsedXml = makeParsedXml(h, '123456789', '987654321')
+      const declFile: AssemblyFile = {
+        fileName: 'decl.xml',
+        status: 'done',
+        nif: '123456789',
+        nifConjuge: '987654321',
+        year: 2025,
+        parsedXml,
+      }
+      const sections: AssemblySectionFiles = {
+        declaration: [declFile],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const hh = result.households[0]
+        expect(hh.spouse_data_incomplete).toBe(true)
+        expect(hh.members).toHaveLength(1)
+        expect(hh.members[0].name).toBe('Rui')
+      }
+    })
+
+    it('does not strip spouse when both declarations are provided', () => {
+      const h1 = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Rui',
+            incomes: [{ category: 'A', gross: 40000 }],
+          }),
+        ],
+        filing_status: 'married_joint',
+      })
+      const h2 = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Micha',
+            incomes: [{ category: 'A', gross: 35000 }],
+          }),
+        ],
+        filing_status: 'married_joint',
+      })
+      const decl1: AssemblyFile = {
+        fileName: 'rui.xml',
+        status: 'done',
+        nif: '123456789',
+        nifConjuge: '987654321',
+        year: 2025,
+        parsedXml: makeParsedXml(h1, '123456789', '987654321'),
+      }
+      const decl2: AssemblyFile = {
+        fileName: 'micha.xml',
+        status: 'done',
+        nif: '987654321',
+        nifConjuge: '123456789',
+        year: 2025,
+        parsedXml: makeParsedXml(h2, '987654321', '123456789'),
+      }
+      const sections: AssemblySectionFiles = {
+        declaration: [decl1, decl2],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const hh = result.households[0]
+        expect(hh.spouse_data_incomplete).toBeUndefined()
+        expect(hh.members).toHaveLength(2)
       }
     })
   })

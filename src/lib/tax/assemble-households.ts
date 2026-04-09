@@ -205,6 +205,14 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
     household = first.household
     declarationYear = first.household.year
     allIssues.push(...first.issues)
+
+    // When only one declaration uploaded for a married household,
+    // strip the empty spouse placeholder — we can't compute joint filing
+    // or show aggregate results without real spouse data.
+    if (first.nifConjuge && household.members.length >= 2) {
+      household.spouse_data_incomplete = true
+      household.members = [household.members[0]]
+    }
   }
 
   // ── Assemble liquidação ─────────────────────────────────
@@ -302,7 +310,12 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
       previousHouseholds.push(m.household)
       allIssues.push(...m.issues)
     } else if (yearDecls.length > 0) {
-      previousHouseholds.push(yearDecls[0].household)
+      const prevHousehold = yearDecls[0].household
+      if (yearDecls[0].nifConjuge && prevHousehold.members.length >= 2) {
+        prevHousehold.spouse_data_incomplete = true
+        prevHousehold.members = [prevHousehold.members[0]]
+      }
+      previousHouseholds.push(prevHousehold)
       allIssues.push(...yearDecls[0].issues)
     }
   }
