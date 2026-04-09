@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('@/lib/i18n', () => ({
@@ -79,6 +79,9 @@ describe('HouseholdQuestionnaire', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sessionStorage.clear()
+    // jsdom doesn't implement scrollIntoView — mock it to prevent unhandled errors
+    // from the hook's auto-focus setTimeout firing after test teardown
+    Element.prototype.scrollIntoView = vi.fn()
   })
 
   it('renders the title and progress', () => {
@@ -199,27 +202,31 @@ describe('HouseholdQuestionnaire', () => {
     )
     const skipBtn = screen.getByTestId('questionnaire-skip')
     await userEvent.click(skipBtn)
-    // Should show a warning about skipping
-    const warning = screen.queryByRole('alert')
-    // The warning appears when there are unanswered critical or important questions
-    if (warning) {
-      expect(warning).toBeDefined()
-    }
+    // makeHousehold() has missing birth_year (critical) so warning must appear
+    expect(screen.getByRole('alert')).toBeDefined()
   })
 
-  it('persists answers to sessionStorage', async () => {
+  it('persists answers to sessionStorage after interaction', async () => {
     const household = makeHousehold()
-    render(
+    const { unmount } = render(
       <HouseholdQuestionnaire household={household} onComplete={onComplete} onBack={onBack} />,
     )
-    // After any interaction that sets an answer, sessionStorage should be updated
-    // Check that the storage key is based on the year
     const key = `fiscalpt-answers-${household.year}`
-    // Initial answers from pre-filled values may already be in storage
-    const stored = sessionStorage.getItem(key)
-    if (stored) {
-      expect(JSON.parse(stored)).toBeDefined()
+
+    // Type into the first available input to trigger an answer change
+    const inputs = screen.queryAllByRole('spinbutton')
+    if (inputs.length > 0) {
+      await userEvent.type(inputs[0], '1990')
+      // Wait for the useEffect that persists to sessionStorage
+      await waitFor(() => {
+        expect(sessionStorage.getItem(key)).not.toBeNull()
+      })
+      expect(JSON.parse(sessionStorage.getItem(key)!)).toEqual(expect.objectContaining({}))
+    } else {
+      // If no inputs are visible (all sections collapsed), verify storage key format
+      expect(key).toBe('fiscalpt-answers-2024')
     }
+    unmount()
   })
 
   it('renders section headers with icons', () => {
