@@ -1558,6 +1558,794 @@ describe('XML Parser — Modelo 3 IRS', () => {
     })
   })
 
+  // ─── Branch Coverage Tests ─────────────────────────────
+
+  describe('Rosto — optional fields missing', () => {
+    it('handles missing Q05SPB (no SP B disability section)', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>SOLO</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+          <Quadro05><Q05B01>N</Q05B01></Quadro05>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.household.members).toHaveLength(1)
+      expect(result.household.members[0].disability_degree).toBeUndefined()
+    })
+
+    it('handles SP B disability = S but no degree (defaults to 60)', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>PERSON A</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro05>
+            <Q05B01>N</Q05B01>
+            <Q05SPB><Q05B02>S</Q05B02></Q05SPB>
+          </Quadro05>
+          <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
+          <Quadro08><Q08B01>2</Q08B01></Quadro08>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.household.members).toHaveLength(2)
+      // SP B has disability S but no degree → defaults to 60
+      expect(result.household.members[1].disability_degree).toBe(60)
+    })
+
+    it('handles SP B disability = N → 0', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>PERSON A</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro05>
+            <Q05B01>N</Q05B01>
+            <Q05SPB><Q05B02>N</Q05B02></Q05SPB>
+          </Quadro05>
+          <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
+          <Quadro08><Q08B01>2</Q08B01></Quadro08>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.household.members[1].disability_degree).toBeUndefined()
+    })
+
+    it('handles no dependents, no shared custody, no godchildren, no ascendants', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>SOLO</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+          <Quadro05><Q05B01>N</Q05B01></Quadro05>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.household.dependents).toHaveLength(0)
+      expect(result.raw.ascendants).toHaveLength(0)
+    })
+
+    it('handles dependent line with no NIF (filtered out)', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+          <Quadro06>
+            <Rostoq06BT01>
+              <Rostoq06BT01-Linha numero="1"><GrauDeficiencia>75</GrauDeficiencia></Rostoq06BT01-Linha>
+            </Rostoq06BT01>
+          </Quadro06>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.household.dependents).toHaveLength(0)
+    })
+
+    it('handles shared custody dependent with expense share and other parent NIF', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+          <Quadro06>
+            <Rostoq06BT02>
+              <Rostoq06BT02-Linha numero="1">
+                <NIF>555666777</NIF>
+                <GrauDeficiencia>80</GrauDeficiencia>
+                <PartilhaDespesas>60</PartilhaDespesas>
+                <NIFOutroSP>888999000</NIFOutroSP>
+              </Rostoq06BT02-Linha>
+            </Rostoq06BT02>
+          </Quadro06>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.household.dependents).toHaveLength(1)
+      expect(result.household.dependents[0].shared_custody).toBe(true)
+      expect(result.household.dependents[0].disability_degree).toBe(80)
+    })
+
+    it('handles godchild (BT03) dependents', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+          <Quadro06>
+            <Rostoq06BT03>
+              <Rostoq06BT03-Linha numero="1"><NIF>999000111</NIF></Rostoq06BT03-Linha>
+            </Rostoq06BT03>
+          </Quadro06>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.household.dependents).toHaveLength(1)
+      expect(result.household.dependents[0].name).toContain('afilhado civil')
+    })
+
+    it('handles ascendant with no NIF (filtered out)', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+          <Quadro07>
+            <Rostoq07AT01>
+              <Rostoq07AT01-Linha numero="1">
+                <Rendimento>5000</Rendimento>
+              </Rostoq07AT01-Linha>
+            </Rostoq07AT01>
+          </Quadro07>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.raw.ascendants).toHaveLength(0)
+    })
+
+    it('parses ascendant with alternate Rendimentos tag', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+          <Quadro07>
+            <Rostoq07AT01>
+              <Rostoq07AT01-Linha numero="1">
+                <NIF>222333444</NIF>
+                <Rendimentos>7500</Rendimentos>
+                <GrauDeficiencia>90</GrauDeficiencia>
+              </Rostoq07AT01-Linha>
+            </Rostoq07AT01>
+          </Quadro07>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.raw.ascendants).toHaveLength(1)
+      expect(result.raw.ascendants[0].income).toBe(7500)
+      expect(result.raw.ascendants[0].disabilityDegree).toBe(90)
+    })
+  })
+
+  describe('Anexo B — unknown regime code', () => {
+    it('produces warning for unknown regime code', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoB>
+          <Quadro01><AnexoBq01B01>5</AnexoBq01B01></Quadro01>
+          <Quadro03><AnexoBq03C01>111222333</AnexoBq03C01></Quadro03>
+          <Quadro04><AnexoBq04C403>10000</AnexoBq04C403></Quadro04>
+        </AnexoB>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.issues.some((i) => i.code === 'UNKNOWN_REGIME')).toBe(true)
+      expect(result.issues.find((i) => i.code === 'UNKNOWN_REGIME')!.message).toContain('5')
+    })
+
+    it('does not warn when regime code is 0 or missing', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoB>
+          <Quadro03><AnexoBq03C01>111222333</AnexoBq03C01></Quadro03>
+          <Quadro04><AnexoBq04C403>10000</AnexoBq04C403></Quadro04>
+        </AnexoB>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.issues.some((i) => i.code === 'UNKNOWN_REGIME')).toBe(false)
+    })
+  })
+
+  describe('Anexo B — person B assignment and activity year', () => {
+    it('assigns Anexo B to person B when NIF matches', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>PERSON A</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
+          <Quadro08><Q08B01>2</Q08B01></Quadro08>
+        </Rosto>
+        <AnexoB>
+          <Quadro01><AnexoBq01B01>1</AnexoBq01B01></Quadro01>
+          <Quadro03><AnexoBq03C01>999888777</AnexoBq03C01></Quadro03>
+          <Quadro04><AnexoBq04C403>25000</AnexoBq04C403></Quadro04>
+        </AnexoB>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      // Person A should have no Cat B income
+      expect(result.household.members[0].incomes.filter((i) => i.category === 'B')).toHaveLength(0)
+      // Person B should have Cat B income
+      expect(result.household.members[1].incomes.filter((i) => i.category === 'B')).toHaveLength(1)
+      expect(result.household.members[1].incomes[0].gross).toBe(25000)
+    })
+
+    it('leaves activityYear undefined when firstYear=true but prior income exists', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoB>
+          <Quadro01><AnexoBq01B01>1</AnexoBq01B01></Quadro01>
+          <Quadro03>
+            <AnexoBq03C01>111222333</AnexoBq03C01>
+            <AnexoBq03B10>S</AnexoBq03B10>
+          </Quadro03>
+          <Quadro04><AnexoBq04C403>15000</AnexoBq04C403></Quadro04>
+          <Quadro13><AnexoBq13C1305>12000</AnexoBq13C1305></Quadro13>
+        </AnexoB>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const catB = result.household.members[0].incomes.find((i) => i.category === 'B')
+      // firstYear=S but priorYearIncome=12000 → activityYear should be undefined
+      expect(catB!.cat_b_activity_year).toBeUndefined()
+    })
+
+    it('sets activityYear=1 when firstYear=true and no prior income', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoB>
+          <Quadro01><AnexoBq01B01>1</AnexoBq01B01></Quadro01>
+          <Quadro03>
+            <AnexoBq03C01>111222333</AnexoBq03C01>
+            <AnexoBq03B10>S</AnexoBq03B10>
+          </Quadro03>
+          <Quadro04><AnexoBq04C403>15000</AnexoBq04C403></Quadro04>
+        </AnexoB>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const catB = result.household.members[0].incomes.find((i) => i.category === 'B')
+      expect(catB!.cat_b_activity_year).toBe(1)
+    })
+
+    it('uses totalGross when no income codes present but SomaC01 > 0', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoB>
+          <Quadro01><AnexoBq01B01>2</AnexoBq01B01></Quadro01>
+          <Quadro03><AnexoBq03C01>111222333</AnexoBq03C01></Quadro03>
+          <Quadro04>
+            <AnexoBq04SomaC01>30000</AnexoBq04SomaC01>
+          </Quadro04>
+          <Quadro06><AnexoBq06C603>1500</AnexoBq06C603></Quadro06>
+        </AnexoB>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const catB = result.household.members[0].incomes.find((i) => i.category === 'B')
+      expect(catB!.gross).toBe(30000)
+      expect(catB!.cat_b_regime).toBe('organized')
+      expect(catB!.withholding).toBe(1500)
+    })
+  })
+
+  describe('Anexo E/F/G — missing optional fields', () => {
+    it('handles Anexo E line with no englobamento field (defaults false)', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoE>
+          <Quadro04>
+            <AnexoEq04AT01>
+              <AnexoEq04AT01-Linha numero="1">
+                <NIF>500100200</NIF>
+                <Rendimentos>5000</Rendimentos>
+                <Retencoes>1400</Retencoes>
+              </AnexoEq04AT01-Linha>
+            </AnexoEq04AT01>
+          </Quadro04>
+        </AnexoE>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const catE = result.household.members[0].incomes.find((i) => i.category === 'E')
+      expect(catE).toBeDefined()
+      expect(catE!.gross).toBe(5000)
+      expect(catE!.englobamento).toBe(false)
+    })
+
+    it('filters out zero-gross Anexo E lines', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoE>
+          <Quadro04>
+            <AnexoEq04AT01>
+              <AnexoEq04AT01-Linha numero="1">
+                <Rendimentos>0</Rendimentos>
+              </AnexoEq04AT01-Linha>
+              <AnexoEq04AT01-Linha numero="2">
+                <Rendimentos>3000</Rendimentos>
+                <Englobamento>S</Englobamento>
+              </AnexoEq04AT01-Linha>
+            </AnexoEq04AT01>
+          </Quadro04>
+        </AnexoE>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const catE = result.household.members[0].incomes.filter((i) => i.category === 'E')
+      expect(catE).toHaveLength(1)
+      expect(catE[0].englobamento).toBe(true)
+    })
+
+    it('handles Anexo F with alternate tag names (RendasBrutas, Despesas)', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoF>
+          <Quadro04>
+            <AnexoFq04AT01>
+              <AnexoFq04AT01-Linha numero="1">
+                <Titular>A</Titular>
+                <RendasBrutas>12000</RendasBrutas>
+                <Despesas>2000</Despesas>
+                <Retencoes>3000</Retencoes>
+                <DuracaoContrato>5</DuracaoContrato>
+              </AnexoFq04AT01-Linha>
+            </AnexoFq04AT01>
+          </Quadro04>
+        </AnexoF>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const catF = result.household.members[0].incomes.find((i) => i.category === 'F')
+      expect(catF).toBeDefined()
+      expect(catF!.gross).toBe(12000)
+      expect(catF!.expenses).toBe(2000)
+      expect(catF!.rental_contract_duration).toBe(5)
+    })
+
+    it('handles Anexo G with alternate ValorAlienacao and DataRealizacao tags', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoG>
+          <Quadro04>
+            <AnexoGq04AT01>
+              <AnexoGq04AT01-Linha numero="1">
+                <Titular>A</Titular>
+                <ValorAquisicao>100000</ValorAquisicao>
+                <ValorAlienacao>150000</ValorAlienacao>
+                <DataAquisicao>2015-01-01</DataAquisicao>
+                <DataRealizacao>2025-06-15</DataRealizacao>
+                <Retencoes>0</Retencoes>
+              </AnexoGq04AT01-Linha>
+            </AnexoGq04AT01>
+          </Quadro04>
+        </AnexoG>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const catG = result.household.members[0].incomes.find((i) => i.category === 'G')
+      expect(catG).toBeDefined()
+      expect(catG!.gross).toBe(50000)
+      expect(catG!.asset_type).toBe('real_estate')
+    })
+
+    it('skips Anexo G lines with both values zero', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoG>
+          <Quadro04>
+            <AnexoGq04AT01>
+              <AnexoGq04AT01-Linha numero="1">
+                <Titular>A</Titular>
+                <ValorAquisicao>0</ValorAquisicao>
+                <ValorRealizacao>0</ValorRealizacao>
+              </AnexoGq04AT01-Linha>
+            </AnexoGq04AT01>
+          </Quadro04>
+          <Quadro09>
+            <AnexoGq09AT01>
+              <AnexoGq09AT01-Linha numero="1">
+                <Titular>A</Titular>
+                <ValorAquisicao>0</ValorAquisicao>
+                <ValorRealizacao>0</ValorRealizacao>
+              </AnexoGq09AT01-Linha>
+            </AnexoGq09AT01>
+          </Quadro09>
+        </AnexoG>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const catG = result.household.members[0].incomes.filter((i) => i.category === 'G')
+      expect(catG).toHaveLength(0)
+    })
+  })
+
+  describe('Anexo J/H — missing optional fields', () => {
+    it('handles Anexo J line with alternate Pais tag for country code', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoJ>
+          <Quadro04>
+            <AnexoJq04AAT01>
+              <AnexoJq04AAT01-Linha numero="1">
+                <Titular>A</Titular>
+                <Pais>276</Pais>
+                <Rendimentos>20000</Rendimentos>
+                <ImpostoPago>4000</ImpostoPago>
+              </AnexoJq04AAT01-Linha>
+            </AnexoJq04AAT01>
+          </Quadro04>
+        </AnexoJ>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const foreign = result.household.members[0].incomes.find(
+        (i) => i.category === 'A' && i.country_code,
+      )
+      expect(foreign).toBeDefined()
+      expect(foreign!.country_code).toBe('276')
+      expect(foreign!.foreign_tax_paid).toBe(4000)
+    })
+
+    it('handles Anexo J line with no foreign tax paid', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoJ>
+          <Quadro04>
+            <AnexoJq04EAT01>
+              <AnexoJq04EAT01-Linha numero="1">
+                <Titular>A</Titular>
+                <CodPais>840</CodPais>
+                <Rendimentos>5000</Rendimentos>
+              </AnexoJq04EAT01-Linha>
+            </AnexoJq04EAT01>
+          </Quadro04>
+        </AnexoJ>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const foreign = result.household.members[0].incomes.find((i) => i.category === 'E')
+      expect(foreign).toBeDefined()
+      expect(foreign!.foreign_tax_paid).toBeUndefined()
+    })
+
+    it('filters out zero-gross Anexo J lines', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoJ>
+          <Quadro04>
+            <AnexoJq04FAT01>
+              <AnexoJq04FAT01-Linha numero="1">
+                <Titular>A</Titular>
+                <CodPais>826</CodPais>
+                <Rendimentos>0</Rendimentos>
+              </AnexoJq04FAT01-Linha>
+            </AnexoJq04FAT01>
+          </Quadro04>
+        </AnexoJ>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.household.members[0].incomes.filter((i) => i.category === 'F')).toHaveLength(0)
+      // No FOREIGN_INCOME warning since no lines survived filtering
+      expect(result.issues.some((i) => i.code === 'FOREIGN_INCOME')).toBe(false)
+    })
+
+    it('handles Anexo H expense corrections with tipo mapping', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+        <AnexoH>
+          <Quadro06C>
+            <AnexoHq06CAT01>
+              <AnexoHq06CAT01-Linha numero="1">
+                <Tipo>1</Tipo>
+                <Valor>500</Valor>
+              </AnexoHq06CAT01-Linha>
+              <AnexoHq06CAT01-Linha numero="2">
+                <CodDespesa>educacao</CodDespesa>
+                <Montante>300</Montante>
+              </AnexoHq06CAT01-Linha>
+              <AnexoHq06CAT01-Linha numero="3">
+                <Tipo>3</Tipo>
+                <Valor>200</Valor>
+              </AnexoHq06CAT01-Linha>
+              <AnexoHq06CAT01-Linha numero="4">
+                <Tipo>4</Tipo>
+                <Valor>150</Valor>
+              </AnexoHq06CAT01-Linha>
+              <AnexoHq06CAT01-Linha numero="5">
+                <Tipo>unknown</Tipo>
+                <Valor>100</Valor>
+              </AnexoHq06CAT01-Linha>
+            </AnexoHq06CAT01>
+          </Quadro06C>
+        </AnexoH>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const deds = result.household.members[0].deductions
+      expect(deds.find((d) => d.category === 'health')!.amount).toBe(500)
+      expect(deds.find((d) => d.category === 'education')!.amount).toBe(300)
+      expect(deds.find((d) => d.category === 'housing')!.amount).toBe(200)
+      expect(deds.find((d) => d.category === 'care_home')!.amount).toBe(150)
+      expect(deds.find((d) => d.category === 'general')!.amount).toBe(100)
+    })
+
+    it('filters out zero-amount deductions in Anexo H', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>10000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+        <AnexoH>
+          <Quadro06A>
+            <AnexoHq06AAT01>
+              <AnexoHq06AAT01-Linha numero="1">
+                <Valor>0</Valor>
+              </AnexoHq06AAT01-Linha>
+            </AnexoHq06AAT01>
+          </Quadro06A>
+          <Quadro06B>
+            <AnexoHq06BAT01>
+              <AnexoHq06BAT01-Linha numero="1">
+                <Montante>1000</Montante>
+              </AnexoHq06BAT01-Linha>
+            </AnexoHq06BAT01>
+          </Quadro06B>
+        </AnexoH>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const deds = result.household.members[0].deductions
+      // alimony with 0 should be filtered; PPR with 1000 should remain
+      expect(deds.filter((d) => d.category === 'alimony')).toHaveLength(0)
+      expect(deds.find((d) => d.category === 'ppr')!.amount).toBe(1000)
+    })
+  })
+
+  describe('NHR deduplication — Anexo L with existing Cat A', () => {
+    it('does not add duplicate income when person already has Cat A from Anexo A', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST NHR</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular>
+            <CodRendimentos>401</CodRendimentos>
+            <Rendimentos>40000</Rendimentos>
+            <Retencoes>8000</Retencoes>
+            <Contribuicoes>4400</Contribuicoes>
+            <Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+        <AnexoL>
+          <Quadro03><AnexoLq03C01>111222333</AnexoLq03C01></Quadro03>
+          <Quadro04>
+            <AnexoLq04AT01>
+              <AnexoLq04AT01-Linha numero="1">
+                <Titular>A</Titular>
+                <Rendimentos>40000</Rendimentos>
+                <Retencoes>8000</Retencoes>
+              </AnexoLq04AT01-Linha>
+            </AnexoLq04AT01>
+          </Quadro04>
+        </AnexoL>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const person = result.household.members[0]
+      // Should have only 1 Cat A income (not duplicated from Anexo L)
+      const catAIncomes = person.incomes.filter((i) => i.category === 'A')
+      expect(catAIncomes).toHaveLength(1)
+      expect(catAIncomes[0].gross).toBe(40000)
+      // But NHR should still be detected
+      expect(person.special_regimes).toContain('nhr')
+      expect(person.nhr_confirmed).toBe(true)
+    })
+
+    it('adds Anexo L income when no Anexo A income exists', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>NHR ONLY</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoL>
+          <Quadro03><AnexoLq03C01>111222333</AnexoLq03C01></Quadro03>
+          <Quadro04>
+            <AnexoLq04AT01>
+              <AnexoLq04AT01-Linha numero="1">
+                <Titular>A</Titular>
+                <Rendimentos>50000</Rendimentos>
+                <Retencoes>10000</Retencoes>
+              </AnexoLq04AT01-Linha>
+            </AnexoLq04AT01>
+          </Quadro04>
+        </AnexoL>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      const person = result.household.members[0]
+      const catAIncomes = person.incomes.filter((i) => i.category === 'A')
+      expect(catAIncomes).toHaveLength(1)
+      expect(catAIncomes[0].gross).toBe(50000)
+      expect(person.special_regimes).toContain('nhr')
+    })
+
+    it('sets NHR on person B when Anexo L NIF matches SP B', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>PERSON A</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
+          <Quadro08><Q08B01>2</Q08B01></Quadro08>
+        </Rosto>
+        <AnexoA><Quadro04><AnexoAq04AT01>
+          <AnexoAq04AT01-Linha numero="1">
+            <Titular>A</Titular><Rendimentos>30000</Rendimentos>
+            <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
+          </AnexoAq04AT01-Linha>
+        </AnexoAq04AT01></Quadro04></AnexoA>
+        <AnexoL>
+          <Quadro03><AnexoLq03C01>999888777</AnexoLq03C01></Quadro03>
+        </AnexoL>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      // Person B should have NHR, not person A
+      expect(result.household.members[1].special_regimes).toContain('nhr')
+      expect(result.household.members[0].special_regimes).not.toContain('nhr')
+    })
+  })
+
+  describe('Anexo SS — alternative income code formats', () => {
+    it('parses income codes from both C4XX and padded C4XX formats', () => {
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>TEST</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>3</Q04B01></Quadro04>
+        </Rosto>
+        <AnexoSS>
+          <Quadro03>
+            <AnexoSSq03C06>111222333</AnexoSSq03C06>
+            <AnexoSSq03C07>12345678901</AnexoSSq03C07>
+          </Quadro03>
+          <Quadro04>
+            <AnexoSSq04C1>50000</AnexoSSq04C1>
+            <AnexoSSq04C403>20000</AnexoSSq04C403>
+          </Quadro04>
+        </AnexoSS>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.raw.anexoSS).toHaveLength(1)
+      expect(result.raw.anexoSS[0].catBIncome).toBe(50000)
+      expect(result.raw.anexoSS[0].incomeByCode[403]).toBe(20000)
+    })
+  })
+
   describe('Error recovery (safeParseSection)', () => {
     it('returns fallback and pushes warning when parser throws', () => {
       const issues: ValidationIssue[] = []

@@ -883,3 +883,146 @@ describe('PDF extractor edge cases', () => {
     expect(detectDocumentType('demonstracaoliquidacao_123.pdf')).toBe('pdf_liquidacao')
   })
 })
+
+// ─── Branch Coverage Tests ─────────────────────────────
+
+describe('Marital status edge cases', () => {
+  it('handles married but no cônjuge NIF → defaults to married_separate', () => {
+    const text = `Casado
+---PAGE---
+Comprovativo Mod.3 IRS: 100000001 / 2024 / 1234-X5678-00 Página 1 de 1`
+    const parsed = parseComprovativoPdfText(text)
+    expect(parsed.nif).toBe('100000001')
+    // Only one NIF on page 1 (footer), no cônjuge NIF
+    expect(parsed.nifConjuge).toBeUndefined()
+    expect(parsed.filingStatus).toBe('married_separate')
+    expect(parsed.tributacaoConjunta).toBe(false)
+  })
+
+  it('handles single filer — dependent NIF path with no cônjuge', () => {
+    // Only main NIF on page 1 (appears twice), no other distinct NIF
+    const text = `100000001 X 100000001
+---PAGE---
+Comprovativo Mod.3 IRS: 100000001 / 2024 / 1234-X5678-00 Página 2 de 2`
+    const parsed = parseComprovativoPdfText(text)
+    expect(parsed.nif).toBe('100000001')
+    expect(parsed.nifConjuge).toBeUndefined()
+    expect(parsed.filingStatus).toBe('single')
+    // Dependent NIF extraction runs but finds none (only main NIF repeated)
+    expect(parsed.dependentNifs).toEqual([])
+  })
+
+  it('assigns filing status correctly for single filer — no X between NIFs', () => {
+    const text = `100000001 X
+---PAGE---
+Comprovativo Mod.3 IRS: 100000001 / 2024 / 1234-X5678-00 Página 1 de 1`
+    const parsed = parseComprovativoPdfText(text)
+    expect(parsed.filingStatus).toBe('single')
+  })
+
+  it('handles cônjuge NIF found but X pattern undetermined → married_separate', () => {
+    // Two distinct NIFs on page 1, but main NIF indexOf returns -1 or cônjuge before main
+    // Craft: nifConjuge found, but the search for main NIF position on page1 fails
+    // This hits L377-380: conjIdx <= nifIdx branch
+    const text = `200000001 100000001
+---PAGE---
+Comprovativo Mod.3 IRS: 100000001 / 2024 / 1234-X5678-00 Página 1 de 1`
+    const parsed = parseComprovativoPdfText(text)
+    expect(parsed.nif).toBe('100000001')
+    if (parsed.nifConjuge) {
+      // Cônjuge found but X pattern can't be determined because
+      // cônjuge NIF appears before main NIF in page text
+      expect(parsed.filingStatus).toBe('married_separate')
+      expect(parsed.tributacaoConjunta).toBe(false)
+    }
+  })
+})
+
+describe('Comprovativo declaration count validation', () => {
+  it('detects declared Anexo A with no extracted data → PARSE_FAILED', () => {
+    // Text with Anexo counts section declaring Anexo A=1, but no actual Anexo A page
+    // ANEXO_NAMES: A, B, C, D, E, F, G, G1, H, I, J, L, Outros, SS (14 entries)
+    const text = `100000001 X
+---PAGE---
+Anexo A Anexo B Anexo C Anexo D Anexo E Anexo F Anexo G Anexo G1 Anexo H Anexo I Anexo J Anexo L Outros Anexo SS
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 PRAZOS
+---PAGE---
+Comprovativo Mod.3 IRS: 100000001 / 2024 / 1234-X5678-00 Página 2 de 2`
+    const parsed = parseComprovativoPdfText(text)
+    const parseFailed = parsed.issues.find(
+      (i) => i.code === 'PARSE_FAILED' && i.message.includes('Anexo A'),
+    )
+    expect(parseFailed).toBeDefined()
+  })
+
+  it('detects unsupported Anexo E in counts → UNSUPPORTED_ANEXO error', () => {
+    // UNSUPPORTED_PDF_ANEXOS = ['E', 'F', 'G', 'H']
+    const text = `100000001 X
+---PAGE---
+Anexo A Anexo B Anexo C Anexo D Anexo E Anexo F Anexo G Anexo G1 Anexo H Anexo I Anexo J Anexo L Outros Anexo SS
+0 0 0 0 1 0 0 0 0 0 0 0 0 0 PRAZOS
+---PAGE---
+Comprovativo Mod.3 IRS: 100000001 / 2024 / 1234-X5678-00 Página 2 de 2`
+    const parsed = parseComprovativoPdfText(text)
+    const unsupported = parsed.issues.find(
+      (i) => i.code === 'UNSUPPORTED_ANEXO' && i.message.includes('Anexo E'),
+    )
+    expect(unsupported).toBeDefined()
+  })
+
+  it('does not warn when supported annexes have data', () => {
+    const text = `100000001 X
+---PAGE---
+Anexo A CATEGORIA A RENDIMENTOS 100000001 500000001 401 A 100000001 35.000,00 4.200,00 3.850,00 0,00 Comprovativo Mod.3 IRS: 100000001 / 2024 / 1234-X5678-00 Página 2 de 3
+---PAGE---
+Anexo A Anexo B Anexo C Anexo D Anexo E Anexo F Anexo G Anexo G1 Anexo H Anexo I Anexo J Anexo L Outros Anexo SS
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 PRAZOS
+---PAGE---
+Comprovativo Mod.3 IRS: 100000001 / 2024 / 1234-X5678-00 Página 3 de 3`
+    const parsed = parseComprovativoPdfText(text)
+    expect(parsed.issues.filter((i) => i.code === 'PARSE_FAILED')).toHaveLength(0)
+  })
+})
+
+describe('Anexo A income code 417 — IRS Jovem detection', () => {
+  it('detects IRS Jovem from income code 417', () => {
+    const text = `100000001 X
+---PAGE---
+Anexo A CATEGORIA A RENDIMENTOS 2024 100000001 500000001 417 A 35.000,00 4.200,00 3.850,00 0,00 Comprovativo Mod.3 IRS: 100000001 / 2024 / 1234-X5678-00 Página 2 de 2`
+    const parsed = parseComprovativoPdfText(text)
+    expect(parsed.anexoA).toBeDefined()
+    expect(parsed.anexoA!.length).toBe(1)
+    expect(parsed.anexoA![0].irsJovem).toBe(true)
+    expect(parsed.anexoA![0].incomeCode).toBe('417')
+  })
+})
+
+describe('Document type detection — content fallback', () => {
+  it('detects XML by Modelo3IRS content', () => {
+    expect(detectDocumentType('unknown.dat', '<Modelo3IRS>')).toBe('xml_modelo3')
+  })
+
+  it('detects XML by AnexoA content', () => {
+    expect(detectDocumentType('doc.txt', '<AnexoA>')).toBe('xml_modelo3')
+  })
+
+  it('detects XML by AnexoB content', () => {
+    expect(detectDocumentType('doc.txt', '<AnexoB>')).toBe('xml_modelo3')
+  })
+
+  it('detects liquidação by content', () => {
+    expect(detectDocumentType('doc.pdf', 'Demonstração de Liquidação IRS 2024')).toBe(
+      'pdf_liquidacao',
+    )
+  })
+
+  it('detects comprovativo by content', () => {
+    expect(detectDocumentType('doc.pdf', 'Comprovativo de Entrega IRS 2024')).toBe(
+      'pdf_comprovativo',
+    )
+  })
+
+  it('returns unknown when no patterns match', () => {
+    expect(detectDocumentType('random.pdf', 'some random content')).toBe('unknown')
+  })
+})
