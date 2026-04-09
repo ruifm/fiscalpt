@@ -29,11 +29,17 @@ interface IrsJovemRegime {
   maxBenefitYears: number
   rules: IrsJovemYearRule[] // indexed by benefitYear - 1
   catBEligible: boolean
+  // Pre-2025: age limit for standard (26) and PhD (30) applicants.
+  // Post-2025: single age limit (35), no PhD distinction.
+  maxAge: number
+  maxAgePhd?: number // only relevant pre-2025
 }
 
 const REGIME_2021: IrsJovemRegime = {
   maxBenefitYears: 3,
   catBEligible: false,
+  maxAge: 26,
+  maxAgePhd: 30,
   rules: [
     { rate: 0.3, capFactor: 7.5 }, // Y1
     { rate: 0.2, capFactor: 5 }, // Y2
@@ -44,6 +50,8 @@ const REGIME_2021: IrsJovemRegime = {
 const REGIME_2022_2023: IrsJovemRegime = {
   maxBenefitYears: 5,
   catBEligible: true,
+  maxAge: 26,
+  maxAgePhd: 30,
   rules: [
     { rate: 0.5, capFactor: 12.5 }, // Y1
     { rate: 0.4, capFactor: 10 }, // Y2
@@ -56,6 +64,8 @@ const REGIME_2022_2023: IrsJovemRegime = {
 const REGIME_2024: IrsJovemRegime = {
   maxBenefitYears: 5,
   catBEligible: true,
+  maxAge: 26,
+  maxAgePhd: 30,
   rules: [
     { rate: 1.0, capFactor: 40 }, // Y1
     { rate: 0.75, capFactor: 30 }, // Y2
@@ -68,6 +78,7 @@ const REGIME_2024: IrsJovemRegime = {
 const REGIME_2025: IrsJovemRegime = {
   maxBenefitYears: 10,
   catBEligible: true,
+  maxAge: 35,
   rules: [
     { rate: 1.0, capFactor: 55 }, // Y1
     { rate: 0.75, capFactor: 55 }, // Y2
@@ -153,14 +164,32 @@ export function computeIrsJovemExemption(
 
 /**
  * Check if a person is eligible for IRS Jovem in a given tax year.
+ * Age is checked annually (per AT folheto: "O pressuposto da idade tem
+ * que se verificar anualmente").
+ * Pre-2025: must be ≤26 in the tax year (≤30 if PhD).
+ * Post-2025: must be ≤35 in the tax year.
  */
-export function isEligibleForIrsJovem(benefitYear: number | undefined, taxYear?: number): boolean {
+export function isEligibleForIrsJovem(
+  benefitYear: number | undefined,
+  taxYear?: number,
+  birthYear?: number,
+  isPhd?: boolean,
+): boolean {
   if (benefitYear === undefined || benefitYear < 1) return false
 
   if (taxYear !== undefined) {
     const regime = getRegime(taxYear)
     if (!regime) return false
-    return benefitYear <= regime.maxBenefitYears
+    if (benefitYear > regime.maxBenefitYears) return false
+
+    // Annual age check: age at 31/12 of tax year
+    if (birthYear !== undefined) {
+      const age = taxYear - birthYear
+      const maxAge = isPhd && regime.maxAgePhd ? regime.maxAgePhd : regime.maxAge
+      if (age > maxAge) return false
+    }
+
+    return true
   }
 
   // Fallback: valid for any year with up to 10 benefit years
