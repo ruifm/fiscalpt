@@ -31,6 +31,7 @@ interface TaxResultsProps {
   onReset: () => void
   checkoutSessionId?: string | null
   sessionHash?: string
+  returnPath?: string
   simulationMode?: boolean
   simulationSavings?: number
   currentResult?: AnalysisResult
@@ -43,6 +44,7 @@ export function TaxResults({
   onReset,
   checkoutSessionId,
   sessionHash,
+  returnPath,
   simulationMode = false,
   simulationSavings,
   currentResult,
@@ -174,8 +176,8 @@ export function TaxResults({
         </Button>
       </div>
 
-      {/* Teaser CTA — visible only when there are savings and paywall is locked (not in simulation) */}
-      {!simulationMode && totalSavings > 0 && optimizationCount > 0 && (
+      {/* Teaser CTA — visible only when there are savings and paywall is locked */}
+      {totalSavings > 0 && optimizationCount > 0 && (
         <a
           href="#recommendations-paywall"
           className="block print:hidden"
@@ -298,23 +300,23 @@ export function TaxResults({
         />
       )}
 
-      {/* Paywall — unlockable recommendations (not in simulation) */}
-      {!simulationMode && (
-        <div id="recommendations-paywall">
-          <RecommendationsPaywall
-            results={results}
-            totalSavings={totalSavings}
-            onUnlock={setUnlockedReports}
-            checkoutSessionId={checkoutSessionId}
-            sessionHash={sessionHash}
-            chatSlot={
-              unlockedReports ? (
-                <TaxChat results={results} recommendations={unlockedReports} />
-              ) : undefined
-            }
-          />
-        </div>
-      )}
+      {/* Paywall — unlockable recommendations */}
+      <div id="recommendations-paywall">
+        <RecommendationsPaywall
+          results={results}
+          totalSavings={totalSavings}
+          onUnlock={setUnlockedReports}
+          checkoutSessionId={checkoutSessionId}
+          sessionHash={sessionHash}
+          returnPath={returnPath}
+          baselineResults={simulationMode && currentResult ? [currentResult] : undefined}
+          chatSlot={
+            unlockedReports ? (
+              <TaxChat results={results} recommendations={unlockedReports} />
+            ) : undefined
+          }
+        />
+      </div>
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 print:hidden">

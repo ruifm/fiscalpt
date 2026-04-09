@@ -50,6 +50,9 @@ interface RecommendationsPaywallProps {
   onUnlock?: (reports: ActionableReport[]) => void
   checkoutSessionId?: string | null
   sessionHash?: string
+  returnPath?: string
+  /** Override results used for recommendation generation (e.g. current baseline for simulation) */
+  baselineResults?: AnalysisResult[]
   chatSlot?: React.ReactNode
 }
 
@@ -59,13 +62,18 @@ export function RecommendationsPaywall({
   onUnlock,
   checkoutSessionId,
   sessionHash,
+  returnPath,
+  baselineResults,
   chatSlot,
 }: RecommendationsPaywallProps) {
   // Only show recommendations for amendable + projected years
+  // For recommendations: use baselineResults (current/un-optimized) when provided
+  // so the engine generates correct IRS Jovem / filing recommendations
+  const recommendationSource = baselineResults ?? results
   const actionableResults = useMemo(() => {
     const amendableYears = new Set(getAmendableYears())
-    return results.filter((r) => amendableYears.has(r.year) || r.household.projected)
-  }, [results])
+    return recommendationSource.filter((r) => amendableYears.has(r.year) || r.household.projected)
+  }, [recommendationSource])
   const [showCheckout, setShowCheckout] = useState(false)
   const [recommendations, setRecommendations] = useState<ActionableReport[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -208,6 +216,7 @@ export function RecommendationsPaywall({
                 analysisId={analysisId}
                 sessionHash={sessionHash}
                 promotionCodeId={discountStatus.result?.promotion_code_id}
+                returnPath={returnPath}
                 onComplete={handlePaymentComplete}
               />
             </CardContent>
@@ -313,6 +322,7 @@ export function RecommendationsPaywall({
               analysisId={analysisId}
               sessionHash={sessionHash}
               promotionCodeId={discountStatus.result?.promotion_code_id}
+              returnPath={returnPath}
               onComplete={handlePaymentComplete}
             />
           </CardContent>

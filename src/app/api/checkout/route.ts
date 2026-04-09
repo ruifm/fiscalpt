@@ -19,10 +19,16 @@ function safeOrigin(request: Request): string {
   return siteUrl()
 }
 
+const ALLOWED_RETURN_PATHS = new Set(['/analyze', '/simulacao'])
+
 const schema = z.object({
   analysisId: z.string().optional(),
   sessionHash: z.string().optional(),
   promotionCodeId: z.string().optional(),
+  returnPath: z
+    .string()
+    .optional()
+    .refine((v) => !v || ALLOWED_RETURN_PATHS.has(v), 'Invalid return path'),
 })
 
 export async function POST(request: Request) {
@@ -38,6 +44,9 @@ export async function POST(request: Request) {
 
     const body = parsed.data
     const hash = body.sessionHash ? `#s=${body.sessionHash}` : ''
+    const returnPath = body.returnPath ?? '/analyze'
+    const returnUrl = new URL(returnPath, origin)
+    returnUrl.searchParams.set('session_id', '{CHECKOUT_SESSION_ID}')
 
     const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
       ui_mode: 'embedded_page',
@@ -51,7 +60,7 @@ export async function POST(request: Request) {
       metadata: {
         analysis_id: body.analysisId ?? '',
       },
-      return_url: `${origin}/analyze?session_id={CHECKOUT_SESSION_ID}${hash}`,
+      return_url: `${returnUrl.toString()}${hash}`,
     }
 
     // Pre-apply validated promo code, otherwise let user enter one in Stripe UI

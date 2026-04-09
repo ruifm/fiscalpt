@@ -12,6 +12,7 @@ interface CheckoutFormProps {
   analysisId: string
   sessionHash?: string
   promotionCodeId?: string
+  returnPath?: string
   onComplete: (sessionId: string) => void
 }
 
@@ -19,6 +20,7 @@ export function CheckoutForm({
   analysisId,
   sessionHash,
   promotionCodeId,
+  returnPath,
   onComplete,
 }: CheckoutFormProps) {
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +30,7 @@ export function CheckoutForm({
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analysisId, sessionHash, promotionCodeId }),
+        body: JSON.stringify({ analysisId, sessionHash, promotionCodeId, returnPath }),
       })
 
       if (!res.ok) {
@@ -45,7 +47,7 @@ export function CheckoutForm({
       setError(msg)
       throw err
     }
-  }, [analysisId, sessionHash, promotionCodeId])
+  }, [analysisId, sessionHash, promotionCodeId, returnPath])
 
   if (!stripePromise) {
     return (
