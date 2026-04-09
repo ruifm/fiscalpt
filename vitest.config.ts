@@ -8,6 +8,7 @@ export default defineConfig({
     exclude: ['tests/e2e/**', 'node_modules/**', 'scripts/**'],
     coverage: {
       include: ['src/lib/tax/**'],
+      exclude: ['src/lib/tax/index.ts'],
       reporter: ['text', 'json-summary'],
     },
   },

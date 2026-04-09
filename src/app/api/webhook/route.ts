@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
-      console.log(
+      console.info(
         `Payment completed: session=${session.id}, analysis=${session.metadata?.analysis_id}`,
       )
       // Payment is verified — the /api/checkout/verify endpoint
