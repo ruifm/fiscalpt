@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { ArrowLeft, Sparkles, Printer, Lock, ArrowRight, AlertTriangle } from 'lucide-react'
 import { PdfExportButton } from '@/components/pdf-export-button'
 import { ShareResults } from '@/components/share-results'
@@ -17,7 +18,11 @@ import { useT } from '@/lib/i18n'
 import { RecommendationsPaywall } from '@/components/recommendations-paywall'
 import type { ActionableReport } from '@/lib/tax/actionable-recommendations'
 import { YearResults } from '@/components/results/year-results'
-import { HistoricalComparison } from '@/components/results/historical-section'
+
+const HistoricalComparison = dynamic(
+  () => import('@/components/results/historical-section').then((mod) => mod.HistoricalComparison),
+  { ssr: false },
+)
 
 interface TaxResultsProps {
   results: AnalysisResult[]
