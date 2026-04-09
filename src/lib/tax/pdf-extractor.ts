@@ -838,11 +838,10 @@ export function comprativoParsedToHousehold(parsed: ComprovativoParsed): {
 
   const dependents: Dependent[] = (parsed.dependentNifs || []).map((_nif, i) => ({
     name: `Dependente ${i + 1}`,
-    birth_year: 0, // unknown — will be asked in questionnaire
+    // PDF doesn't contain birth years — default to age 10 (standard €600
+    // deduction, no special benefits). Questionnaire lets user override.
+    birth_year: (parsed.year ?? new Date().getFullYear()) - 10,
   }))
-
-  // Birth years are unknown from PDF — missing-inputs.ts will prompt for them
-  // via the questionnaire, so no parser-time warning is needed.
 
   return {
     household: {

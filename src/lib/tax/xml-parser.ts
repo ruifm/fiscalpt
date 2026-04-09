@@ -1010,14 +1010,13 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
         : ''
     return {
       name: `Dependente ${i + 1} (${d.nif})${source}`,
-      birth_year: 0, // unknown — will be asked in questionnaire
+      // XML doesn't contain birth years — default to age 10 (standard €600
+      // deduction, no special benefits). Questionnaire lets user override.
+      birth_year: rosto.year - 10,
       shared_custody: isShared,
       disability_degree: d.disabilityDegree,
     }
   })
-
-  // Birth years are unknown from XML — missing-inputs.ts will prompt for them
-  // via the questionnaire, so no parser-time warning is needed.
 
   // ─── Ascendants ─────────────────────────────────────────
   const ascendants: Ascendant[] = rosto.ascendants.map((a, i) => ({

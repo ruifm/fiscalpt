@@ -804,11 +804,12 @@ Anexo A CATEGORIA A 111222333 30.000,00 3.600,00 3.300,00 Comprovativo Mod.3 IRS
 })
 
 describe('Strict validation — sentinel birth years', () => {
-  it('should use sentinel birth_year=0 instead of placeholder', () => {
+  it('should use reasonable default birth_year instead of 0', () => {
     const parsed = parseComprovativoPdfText(COMPROVATIVO_2024_SP_A)
     const { household } = comprativoParsedToHousehold(parsed)
     expect(household.dependents!.length).toBeGreaterThan(0)
-    expect(household.dependents![0].birth_year).toBe(0)
+    // Default: taxYear - 10 (age 10 → standard €600 deduction, no special benefits)
+    expect(household.dependents![0].birth_year).toBe(household.year! - 10)
   })
 
   it('should not emit MISSING_BIRTH_YEARS warning (questionnaire handles it)', () => {
