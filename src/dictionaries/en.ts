@@ -1,6 +1,7 @@
-import type { Dictionary } from '@/lib/i18n'
+import type { DictShape } from '@/lib/i18n'
+import type { PtDict } from './pt'
 
-const en: Dictionary = {
+const en: DictShape<PtDict> = {
   common: {
     back: 'Back',
     continue: 'Continue',

@@ -1,6 +1,6 @@
 import type { Dictionary } from '@/lib/i18n'
 
-const pt: Dictionary = {
+const pt = {
   common: {
     back: 'Voltar',
     continue: 'Continuar',
@@ -942,6 +942,7 @@ const pt: Dictionary = {
     reportSentTitle: 'Mensagem enviada',
     reportSentDescription: 'Iremos analisar a sua situação e responder por email em breve.',
   },
-}
+} as const satisfies Dictionary
 
 export default pt
+export type PtDict = typeof pt

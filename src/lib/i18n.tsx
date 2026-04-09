@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import type { PtDict } from '@/dictionaries/pt'
 
 export type Locale = 'pt' | 'en'
 
@@ -9,10 +10,25 @@ const LOCALE_STORAGE_KEY = 'fiscalpt:locale'
 type DictValue = string | { [key: string]: DictValue }
 export type Dictionary = Record<string, DictValue>
 
+// Recursively extract all dot-separated leaf paths from a nested object type
+type DotPaths<T, Prefix extends string = ''> = T extends string
+  ? Prefix
+  : T extends Record<string, unknown>
+    ? {
+        [K in keyof T & string]: DotPaths<T[K], Prefix extends '' ? K : `${Prefix}.${K}`>
+      }[keyof T & string]
+    : never
+
+// Relax a deeply-const dictionary to a mutable string-leaf shape (for en.ts validation)
+export type DictShape<T> = T extends string ? string : { [K in keyof T]: DictShape<T[K]> }
+
+// Union of all valid translation keys derived from the Portuguese dictionary
+export type TranslationKey = DotPaths<PtDict>
+
 interface LocaleContextValue {
   locale: Locale
   setLocale: (locale: Locale) => void
-  t: (key: string, params?: Record<string, string | number>) => string
+  t: (key: TranslationKey | (string & {}), params?: Record<string, string | number>) => string
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null)
@@ -63,7 +79,7 @@ export function LocaleProvider({
   }, [])
 
   const t = useCallback(
-    (key: string, params?: Record<string, string | number>): string => {
+    (key: TranslationKey | (string & {}), params?: Record<string, string | number>): string => {
       const value = resolvePath(dictionaries[locale], key)
       if (value === undefined) {
         // Fallback to Portuguese, then to the key itself
@@ -85,6 +101,9 @@ export function useLocale(): LocaleContextValue {
   return ctx
 }
 
-export function useT(): (key: string, params?: Record<string, string | number>) => string {
+export function useT(): (
+  key: TranslationKey | (string & {}),
+  params?: Record<string, string | number>,
+) => string {
   return useLocale().t
 }
