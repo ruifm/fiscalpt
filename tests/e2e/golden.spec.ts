@@ -584,6 +584,7 @@ test.describe('Golden canary: 2024 primary with liquidacao', () => {
     checkAmendableBoundary()
     await dismissOnboarding(page)
     await page.goto('/analyze')
+
     await waitForStep(page, 'upload')
 
     await uploadXml(page, 'decl-m3-irs-2024-holder-a.xml')
@@ -676,8 +677,9 @@ test.describe('Golden canary: all years PDF comprovativos (2021-2024)', () => {
 
     await clickAdvance(page)
 
-    // Questionnaire — birth years + degree year + Cat B activity year
-    // PDF comprovativos don't trigger IRS Jovem first_work_year or NHR questions
+    // Questionnaire — with assembly fix, both holders' data is now present.
+    // PDF comprovativos extract IRS Jovem from Anexo A (so no first_work_year needed)
+    // and NHR from Anexo L. Both members get degree_year (proactive IRS Jovem check).
     await fillStrictQuestionnaire(
       page,
       {
@@ -685,8 +687,9 @@ test.describe('Golden canary: all years PDF comprovativos (2021-2024)', () => {
         'member.1.birth_year': '1989',
         'dependent.0.birth_year': '2019',
         'dependent.1.birth_year': '2022',
-        'dependent.2.birth_year': '2016',
         'member.0.degree_year': '2020',
+        'member.1.degree_year': '2012',
+        'member.1.nhr_start_year': '2021',
       },
       { cat_b_activity_year: '2' },
     )
@@ -696,23 +699,33 @@ test.describe('Golden canary: all years PDF comprovativos (2021-2024)', () => {
       timeout: 30_000,
     })
 
-    // PDF comprovativos lack Cat A/E/F/G/H data — only Cat B is extracted.
-    // The system produces a single-year result (most recent year with data).
-    const text = await getVisibleYearText(page, 2024, false)
-    console.log('=== PDF_ALL_YEARS: 2024 ===')
-    console.log(text.substring(0, 3000))
-    console.log('=== END 2024 ===')
+    // Projection tab (2025) only appears if currentYear - 1 <= primaryYear,
+    // i.e. only when running in 2025. Check dynamically.
+    const availableYears = [2021, 2022, 2023, 2024]
+    const has2025 = await page
+      .locator('[data-slot="tabs-trigger"]')
+      .filter({ hasText: /2025/ })
+      .count()
+    if (has2025 > 0) availableYears.push(2025)
+
+    for (const year of availableYears) {
+      const text = await getVisibleYearText(page, year, true)
+      console.log(`=== PDF_ALL_YEARS: ${year} ===`)
+      console.log(text.substring(0, 3000))
+      console.log(`=== END ${year} ===`)
+    }
   })
 })
 
 test.describe('Golden canary: 2024 primary PDF with liquidacao', () => {
-  test('uploads 2024 comprovativo PDFs with liquidacao, captures golden values', async ({
+  test('uploads 2024 comprovativo PDFs with liquidacao, asserts golden values match XML', async ({
     page,
   }) => {
     test.setTimeout(120_000)
     checkAmendableBoundary()
     await dismissOnboarding(page)
     await page.goto('/analyze')
+
     await waitForStep(page, 'upload')
 
     // Upload 2024 comprovativos as primary
@@ -734,10 +747,11 @@ test.describe('Golden canary: 2024 primary PDF with liquidacao', () => {
     await chooser.setFiles(path.join(FIXTURES_DIR, 'liquidacao-2024-holder-a.pdf'))
     await page.waitForTimeout(3_000)
 
-    // PDF comprovativos don't extract deduction data — skip fillGoldenDeductionSlots
+    // Fill deduction slots — same amounts as XML variant for parity
+    await fillGoldenDeductionSlots(page, [2024])
     await clickAdvance(page)
 
-    // Questionnaire — PDF inputs produce fewer questions than XML
+    // Questionnaire — PDF extracts IRS Jovem from Anexo A, NHR from Anexo L
     await fillStrictQuestionnaire(
       page,
       {
@@ -745,8 +759,9 @@ test.describe('Golden canary: 2024 primary PDF with liquidacao', () => {
         'member.1.birth_year': '1989',
         'dependent.0.birth_year': '2019',
         'dependent.1.birth_year': '2022',
-        'dependent.2.birth_year': '2016',
         'member.0.degree_year': '2020',
+        'member.1.degree_year': '2012',
+        'member.1.nhr_start_year': '2021',
       },
       { cat_b_activity_year: '2' },
     )
@@ -755,10 +770,18 @@ test.describe('Golden canary: 2024 primary PDF with liquidacao', () => {
     const container = page.locator('[data-testid="results-container"]')
     await expect(container).toBeVisible({ timeout: 30_000 })
 
-    // Capture golden values (single year — no tabs)
-    const text = await getVisibleYearText(page, 2024, false)
-    console.log('=== PDF_2024_PRIMARY ===')
-    console.log(text.substring(0, 3000))
-    console.log('=== END PDF_2024_PRIMARY ===')
+    // Assert golden values — must match XML 2024-primary exactly
+    for (const golden of YEAR_2024_PRIMARY_GOLDEN) {
+      const text = await getVisibleYearText(page, golden.year, false)
+      assertGoldenYear(text, golden)
+    }
+
+    // Verify no liquidacao mismatch warnings
+    const warningBlock = container.locator('[role="status"]')
+    const warningCount = await warningBlock.count()
+    if (warningCount > 0) {
+      const warningText = await warningBlock.innerText()
+      expect(warningText, 'No liquidacao mismatch warnings').not.toMatch(/liquidac|mismatch/i)
+    }
   })
 })
