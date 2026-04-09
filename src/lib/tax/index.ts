@@ -86,4 +86,10 @@ export {
   FATURA_DEDUCTION_CAP,
 } from './types'
 export { round2, round4, sumGross } from './utils'
+export {
+  buildSimulationHousehold,
+  buildOptimizedSimulationHousehold,
+  computeSimulationResults,
+} from './simulation'
+export type { SimulationInputs, SimulationPersonInput, SimulationResults } from './simulation'
 export type * from './types'
