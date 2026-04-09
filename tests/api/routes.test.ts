@@ -52,6 +52,15 @@ beforeEach(() => {
 
 // ─── Helpers ──────────────────────────────────────────────────
 
+/** Minimal mock result that passes AnalysisResult Zod validation */
+const mockResult = {
+  year: 2024,
+  household: { year: 2024, filing_status: 'single', members: [] },
+  scenarios: [{ label: 'Separada' }],
+  recommended_scenario: 'Separada',
+  optimizations: [],
+}
+
 function jsonRequest(url: string, body: unknown, headers?: Record<string, string>): Request {
   return new Request(url, {
     method: 'POST',
@@ -599,7 +608,7 @@ describe('POST /api/recommendations', () => {
 
     const req = jsonRequest('http://localhost:3000/api/recommendations', {
       sessionId: 'cs_unpaid',
-      results: [{ year: 2024 }],
+      results: [mockResult],
     })
     const res = await POST(req)
     expect(res.status).toBe(402)
@@ -610,7 +619,7 @@ describe('POST /api/recommendations', () => {
 
     const req = jsonRequest('http://localhost:3000/api/recommendations', {
       sessionId: 'cs_invalid',
-      results: [{ year: 2024 }],
+      results: [mockResult],
     })
     const res = await POST(req)
     expect(res.status).toBe(402)
@@ -640,7 +649,7 @@ describe('POST /api/recommendations', () => {
 
     const req = jsonRequest('http://localhost:3000/api/recommendations', {
       sessionId: 'cs_test',
-      results: [{ year: 2024 }],
+      results: [mockResult],
     })
     const res = await POST(req)
     expect(res.status).toBe(429)
@@ -660,7 +669,7 @@ describe('POST /api/chat', () => {
   it('returns SSE stream for valid chat request', async () => {
     const req = jsonRequest('http://localhost:3000/api/chat', {
       messages: [{ role: 'user', content: 'How much tax do I owe?' }],
-      results: [{ year: 2024 }],
+      results: [mockResult],
       locale: 'pt',
     })
     const res = await POST(req)
@@ -693,7 +702,7 @@ describe('POST /api/chat', () => {
 
     const req = jsonRequest('http://localhost:3000/api/chat', {
       messages: [{ role: 'user', content: 'test' }],
-      results: [{ year: 2024 }],
+      results: [mockResult],
     })
     const res = await POST(req)
     expect(res.status).toBe(429)

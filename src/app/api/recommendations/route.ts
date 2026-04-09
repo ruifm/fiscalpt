@@ -4,9 +4,21 @@ import { generateActionableRecommendations } from '@/lib/tax/actionable-recommen
 import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
 import { parseBody } from '@/lib/api-validation'
 
+// Minimal shape validation for AnalysisResult — ensures data has expected structure
+// without replicating the full type system in Zod.
+const analysisResultSchema = z
+  .object({
+    year: z.number(),
+    household: z.object({ year: z.number(), filing_status: z.string(), members: z.array(z.any()) }),
+    scenarios: z.array(z.object({ label: z.string() }).passthrough()),
+    recommended_scenario: z.string(),
+    optimizations: z.array(z.object({ id: z.string() }).passthrough()),
+  })
+  .passthrough()
+
 const schema = z.object({
   sessionId: z.string().min(1),
-  results: z.array(z.object({}).passthrough()).min(1),
+  results: z.array(analysisResultSchema).min(1),
 })
 
 export async function POST(request: Request) {

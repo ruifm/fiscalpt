@@ -16,11 +16,33 @@ const messageSchema = z.object({
   content: z.string().max(MAX_MESSAGE_LENGTH),
 })
 
+// Minimal shape validation for AnalysisResult — avoids replicating the full
+// type system in Zod while ensuring the data has the expected structure.
+const analysisResultSchema = z
+  .object({
+    year: z.number(),
+    household: z.object({ year: z.number(), filing_status: z.string(), members: z.array(z.any()) }),
+    scenarios: z.array(z.object({ label: z.string() }).passthrough()),
+    recommended_scenario: z.string(),
+    optimizations: z.array(z.object({ id: z.string() }).passthrough()),
+  })
+  .passthrough()
+
+const actionableReportSchema = z
+  .object({
+    year: z.number(),
+    recommendations: z.array(
+      z.object({ id: z.string(), category: z.string(), total_savings: z.number() }).passthrough(),
+    ),
+    total_savings: z.number(),
+  })
+  .passthrough()
+
 const schema = z.object({
   messages: z.array(messageSchema).min(1),
-  results: z.array(z.object({}).passthrough()).min(1),
+  results: z.array(analysisResultSchema).min(1),
   locale: z.string().optional(),
-  recommendations: z.array(z.object({}).passthrough()).optional(),
+  recommendations: z.array(actionableReportSchema).optional(),
 })
 
 export async function POST(request: Request) {
