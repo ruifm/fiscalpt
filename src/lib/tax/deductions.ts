@@ -16,7 +16,7 @@ import { round2 } from './utils'
 
 // ─── Deduction Caps ───────────────────────────────────────────
 
-interface DeductionConfig {
+export interface DeductionConfig {
   rate: number
   cap: number
 }
@@ -39,7 +39,7 @@ const DEDUCTION_CAPS_DEFAULT: Record<string, DeductionConfig> = {
 
 // PPR age-based caps (Art. 21 nº 3 EBF)
 // Under 35: €400, 35-50: €350, Over 50: €300
-function getPprCap(birthYear?: number, taxYear: number = 2025): number {
+export function getPprCap(birthYear?: number, taxYear: number = 2025): number {
   if (!birthYear) return 400 // default to under-35 cap
   const age = taxYear - birthYear
   if (age < 35) return 400
@@ -54,7 +54,7 @@ const DEDUCTION_CAPS_BY_YEAR: Record<number, Partial<Record<string, DeductionCon
   },
 }
 
-function getDeductionConfig(
+export function getDeductionConfig(
   category: string,
   taxYear: number,
   birthYear?: number,

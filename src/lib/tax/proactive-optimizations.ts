@@ -6,39 +6,19 @@ import {
   FATURA_DEDUCTION_RATE,
   getCatBCoefficient,
 } from './types'
+import { getDeductionConfig } from './deductions'
 import { round2, formatEuro } from './utils'
 
-// ─── Constants ──────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────
 
-const GENERAL_DEDUCTION_RATE = 0.35
-const GENERAL_DEDUCTION_CAP = 250
-// Required spending to reach the €250 cap: 250 / 0.35 ≈ €714.29
-const GENERAL_REQUIRED_SPENDING = Math.ceil(GENERAL_DEDUCTION_CAP / GENERAL_DEDUCTION_RATE)
-
-const PPR_RATE = 0.2
-function getPprCap(birthYear: number | undefined, taxYear: number): number {
-  if (!birthYear) return 400
-  const age = taxYear - birthYear
-  if (age < 35) return 400
-  if (age <= 50) return 350
-  return 300
-}
-
-const HEALTH_RATE = 0.15
-const HEALTH_CAP = 1000
-const EDUCATION_RATE = 0.3
-const EDUCATION_CAP = 800
-const HOUSING_RATE = 0.15
-const HOUSING_CAP_DEFAULT = 502
-const HOUSING_CAP_2025 = 800
-
-function getHousingCap(year: number): number {
-  return year >= 2025 ? HOUSING_CAP_2025 : HOUSING_CAP_DEFAULT
+/** Look up rate and cap for a deduction category/year via canonical config. */
+function configFor(category: string, taxYear: number, birthYear?: number) {
+  return getDeductionConfig(category, taxYear, birthYear)!
 }
 
 const TRACKABLE_EXPENSE_CATEGORIES = [
-  { category: 'health', rate: HEALTH_RATE, cap: HEALTH_CAP, label: 'Saúde' },
-  { category: 'education', rate: EDUCATION_RATE, cap: EDUCATION_CAP, label: 'Educação' },
+  { category: 'health', label: 'Saúde' },
+  { category: 'education', label: 'Educação' },
 ] as const
 
 function slugify(name: string): string {
@@ -53,25 +33,27 @@ function slugify(name: string): string {
 
 function generateGeneralDeductionOpt(
   person: Person,
-  _taxYear: number,
+  taxYear: number,
   slug: string,
 ): Optimization | undefined {
+  const { rate, cap } = configFor('general', taxYear)
   const generalExpenses = person.deductions
     .filter((d) => d.category === 'general')
     .reduce((s, d) => s + d.amount, 0)
 
-  const currentDeduction = Math.min(generalExpenses * GENERAL_DEDUCTION_RATE, GENERAL_DEDUCTION_CAP)
-  if (currentDeduction >= GENERAL_DEDUCTION_CAP) return undefined
+  const currentDeduction = Math.min(generalExpenses * rate, cap)
+  if (currentDeduction >= cap) return undefined
 
-  const additionalSpending = GENERAL_REQUIRED_SPENDING - generalExpenses
+  const requiredSpending = Math.ceil(cap / rate)
+  const additionalSpending = requiredSpending - generalExpenses
   if (additionalSpending <= 0) return undefined
 
-  const savings = round2(GENERAL_DEDUCTION_CAP - currentDeduction)
+  const savings = round2(cap - currentDeduction)
 
   return {
     id: `general-deduction-${slug}`,
     title: `Maximizar dedução geral (${person.name})`,
-    description: `Gaste mais ${formatEuro(additionalSpending)} em despesas gerais (e-fatura) para obter a dedução máxima de ${formatEuro(GENERAL_DEDUCTION_CAP)}.`,
+    description: `Gaste mais ${formatEuro(additionalSpending)} em despesas gerais (e-fatura) para obter a dedução máxima de ${formatEuro(cap)}.`,
     estimated_savings: savings,
   }
 }
@@ -109,12 +91,12 @@ function generateCatBAcrescimoOpt(
 function generatePprOpt(person: Person, taxYear: number, slug: string): Optimization | undefined {
   const pprDeductions = person.deductions.filter((d) => d.category === 'ppr')
   const pprTotal = pprDeductions.reduce((s, d) => s + d.amount, 0)
-  const cap = getPprCap(person.birth_year, taxYear)
-  const currentDeduction = Math.min(pprTotal * PPR_RATE, cap)
+  const { rate, cap } = configFor('ppr', taxYear, person.birth_year)
+  const currentDeduction = Math.min(pprTotal * rate, cap)
 
   if (pprTotal === 0) {
     // No PPR at all → suggest subscribing
-    const savings = round2(cap * PPR_RATE)
+    const savings = round2(cap * rate)
     return {
       id: `ppr-${slug}`,
       title: `Subscrever PPR (${person.name})`,
@@ -126,7 +108,7 @@ function generatePprOpt(person: Person, taxYear: number, slug: string): Optimiza
   // Has PPR but under cap → suggest maximizing
   if (currentDeduction < cap) {
     const gap = round2(cap - currentDeduction)
-    const maxInvestment = Math.ceil(cap / PPR_RATE)
+    const maxInvestment = Math.ceil(cap / rate)
     const additionalInvestment = maxInvestment - pprTotal
     if (additionalInvestment <= 0) return undefined
 
@@ -170,7 +152,8 @@ function generateFaturaOpt(
 function generateExpenseGapOpts(person: Person, taxYear: number, slug: string): Optimization[] {
   const opts: Optimization[] = []
 
-  for (const { category, rate, cap, label } of TRACKABLE_EXPENSE_CATEGORIES) {
+  for (const { category, label } of TRACKABLE_EXPENSE_CATEGORIES) {
+    const { rate, cap } = configFor(category, taxYear)
     const expenses = person.deductions
       .filter((d) => d.category === category)
       .reduce((s, d) => s + d.amount, 0)
@@ -191,14 +174,14 @@ function generateExpenseGapOpts(person: Person, taxYear: number, slug: string): 
   }
 
   // Housing has year-specific cap
-  const housingCap = getHousingCap(taxYear)
+  const { rate: housingRate, cap: housingCap } = configFor('housing', taxYear)
   const housingExpenses = person.deductions
     .filter((d) => d.category === 'housing')
     .reduce((s, d) => s + d.amount, 0)
-  const housingDeduction = Math.min(housingExpenses * HOUSING_RATE, housingCap)
+  const housingDeduction = Math.min(housingExpenses * housingRate, housingCap)
   if (housingDeduction < housingCap) {
     const gap = round2(housingCap - housingDeduction)
-    const requiredSpending = Math.ceil(housingCap / HOUSING_RATE) - housingExpenses
+    const requiredSpending = Math.ceil(housingCap / housingRate) - housingExpenses
     if (requiredSpending > 0) {
       opts.push({
         id: `expense-housing-${slug}`,
