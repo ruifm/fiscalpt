@@ -346,6 +346,8 @@ describe('POST /api/report-problem', () => {
     })
     const res = await POST(req)
     expect(res.status).toBe(429)
+    const json = await res.json()
+    expect(json.error).toBe('Rate limited')
   })
 
   it('returns ok even when email sending fails', async () => {
@@ -537,6 +539,8 @@ describe('POST /api/discount/validate', () => {
     const req = jsonRequest('http://localhost:3000/api/discount/validate', { code: 'TEST' })
     const res = await POST(req)
     expect(res.status).toBe(429)
+    const json = await res.json()
+    expect(json.error).toBe('Too many requests')
   })
 })
 
@@ -653,6 +657,8 @@ describe('POST /api/recommendations', () => {
     })
     const res = await POST(req)
     expect(res.status).toBe(429)
+    const json = await res.json()
+    expect(json.error).toBe('Rate limited')
   })
 })
 
@@ -706,5 +712,7 @@ describe('POST /api/chat', () => {
     })
     const res = await POST(req)
     expect(res.status).toBe(429)
+    const json = await res.json()
+    expect(json.error).toBe('Rate limited')
   })
 })

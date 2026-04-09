@@ -80,6 +80,24 @@ describe('computeProgressiveTax — 2024 (Lei 33/2024)', () => {
     expect(computeProgressiveTax(7703, brackets)).toBe(1001.39)
   })
 
+  it('boundary ±1: tax jumps correctly at bracket edges', () => {
+    // €7,702 — still entirely in bracket 1 (13%)
+    // 7702 × 0.13 = 1001.26
+    expect(computeProgressiveTax(7702, brackets)).toBe(1001.26)
+
+    // €7,704 — €1 spills into bracket 2 (16.5%)
+    // 7703 × 0.13 + 1 × 0.165 = 1001.39 + 0.165 = 1001.56 (rounded)
+    expect(computeProgressiveTax(7704, brackets)).toBe(1001.56)
+
+    // €11,622 — €1 below bracket 2 limit
+    // 7703 × 0.13 + 3919 × 0.165 = 1001.39 + 646.635 = 1648.03
+    expect(computeProgressiveTax(11622, brackets)).toBe(1648.03)
+
+    // €11,624 — €1 above bracket 2 limit → bracket 3 (22%)
+    // 7703 × 0.13 + 3920 × 0.165 + 1 × 0.22 = 1648.19 + 0.22 = 1648.41
+    expect(computeProgressiveTax(11624, brackets)).toBe(1648.41)
+  })
+
   it('€10,000 spans first two brackets', () => {
     // 7703 × 0.13 + (10000-7703) × 0.165
     // = 1001.39 + 2297 × 0.165 = 1001.39 + 379.005 = 1380.395 → 1380.40

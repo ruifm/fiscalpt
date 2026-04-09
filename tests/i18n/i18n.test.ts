@@ -1,24 +1,5 @@
 import { describe, it, expect } from 'vitest'
-
-// Test the pure utility functions directly — resolvePath and interpolate
-// We re-implement them here since they're not exported, but test the same logic
-// through the public API via a minimal dictionary
-
-function resolvePath(dict: Record<string, unknown>, path: string): string | undefined {
-  const parts = path.split('.')
-  let current: unknown = dict
-  for (const part of parts) {
-    if (typeof current !== 'object' || current === null) return undefined
-    current = (current as Record<string, unknown>)[part]
-  }
-  return typeof current === 'string' ? current : undefined
-}
-
-function interpolate(template: string, params: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key) =>
-    params[key] !== undefined ? String(params[key]) : `{${key}}`,
-  )
-}
+import { resolvePath, interpolate } from '@/lib/i18n'
 
 describe('i18n utilities', () => {
   describe('resolvePath', () => {

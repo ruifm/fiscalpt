@@ -33,7 +33,7 @@ interface LocaleContextValue {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null)
 
-function resolvePath(dict: Dictionary, path: string): string | undefined {
+export function resolvePath(dict: Dictionary, path: string): string | undefined {
   const parts = path.split('.')
   let current: DictValue = dict
   for (const part of parts) {
@@ -43,7 +43,7 @@ function resolvePath(dict: Dictionary, path: string): string | undefined {
   return typeof current === 'string' ? current : undefined
 }
 
-function interpolate(template: string, params: Record<string, string | number>): string {
+export function interpolate(template: string, params: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) =>
     params[key] !== undefined ? String(params[key]) : `{${key}}`,
   )

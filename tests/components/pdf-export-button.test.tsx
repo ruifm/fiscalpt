@@ -41,6 +41,7 @@ describe('PdfExportButton', () => {
   })
 
   it('triggers PDF generation on click', async () => {
+    const fakeBlob = new Blob(['pdf'], { type: 'application/pdf' })
     const createObjectURL = vi.fn().mockReturnValue('blob:url')
     const revokeObjectURL = vi.fn()
     Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true })
@@ -52,9 +53,9 @@ describe('PdfExportButton', () => {
     await user.click(screen.getByRole('button', { name: 'common.downloadPdf' }))
 
     await waitFor(() => {
-      expect(mockPdf).toHaveBeenCalled()
-      expect(createObjectURL).toHaveBeenCalled()
-      expect(revokeObjectURL).toHaveBeenCalled()
+      expect(mockPdf).toHaveBeenCalledTimes(1)
+      expect(createObjectURL).toHaveBeenCalledWith(fakeBlob)
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:url')
     })
   })
 

@@ -32,7 +32,7 @@ describe('SectionFileList', () => {
     const { container } = render(
       <SectionFileList files={[]} onRemove={onRemove} processing={false} nifColorMap={nifColorMap} />,
     )
-    expect(container.innerHTML).toBe('')
+    expect(container.firstChild).toBeNull()
   })
 
   it('renders file name and size', () => {

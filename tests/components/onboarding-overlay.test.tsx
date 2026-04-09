@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('@/lib/i18n', () => ({
@@ -39,27 +39,21 @@ describe('OnboardingOverlay', () => {
     })
   })
 
-  it('shows overlay when localStorage key is not set', async () => {
-    await act(async () => {
-      render(<OnboardingOverlay />)
-    })
+  it('shows overlay when localStorage key is not set', () => {
+    render(<OnboardingOverlay />)
     expect(screen.getByRole('dialog')).toBeDefined()
     expect(screen.getByText('onboarding.step1.title')).toBeDefined()
   })
 
-  it('does not show when localStorage key is set', async () => {
+  it('does not show when localStorage key is set', () => {
     storageMock.setItem('fiscalpt:onboarding-seen', '1')
-    await act(async () => {
-      render(<OnboardingOverlay />)
-    })
+    render(<OnboardingOverlay />)
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('navigates through steps with Next button', async () => {
     const user = userEvent.setup()
-    await act(async () => {
-      render(<OnboardingOverlay />)
-    })
+    render(<OnboardingOverlay />)
 
     expect(screen.getByText('onboarding.step1.title')).toBeDefined()
 
@@ -73,9 +67,7 @@ describe('OnboardingOverlay', () => {
 
   it('dismisses on Start click and sets localStorage', async () => {
     const user = userEvent.setup()
-    await act(async () => {
-      render(<OnboardingOverlay />)
-    })
+    render(<OnboardingOverlay />)
 
     await user.click(screen.getByText('common.next'))
     await user.click(screen.getByText('common.next'))
@@ -87,9 +79,7 @@ describe('OnboardingOverlay', () => {
 
   it('dismisses on Skip click', async () => {
     const user = userEvent.setup()
-    await act(async () => {
-      render(<OnboardingOverlay />)
-    })
+    render(<OnboardingOverlay />)
 
     await user.click(screen.getByText('common.skip'))
 
@@ -99,9 +89,7 @@ describe('OnboardingOverlay', () => {
 
   it('dismisses on close (X) button click', async () => {
     const user = userEvent.setup()
-    await act(async () => {
-      render(<OnboardingOverlay />)
-    })
+    render(<OnboardingOverlay />)
 
     await user.click(screen.getByRole('button', { name: 'onboarding.closeLabel' }))
 
@@ -111,9 +99,7 @@ describe('OnboardingOverlay', () => {
 
   it('dismisses on Escape key', async () => {
     const user = userEvent.setup()
-    await act(async () => {
-      render(<OnboardingOverlay />)
-    })
+    render(<OnboardingOverlay />)
 
     await user.keyboard('{Escape}')
 
@@ -135,17 +121,13 @@ describe('OnboardingOverlay', () => {
       configurable: true,
     })
 
-    await act(async () => {
-      render(<OnboardingOverlay />)
-    })
+    render(<OnboardingOverlay />)
     // Component catches the error — overlay stays hidden since setVisible(true) never runs
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('shows step description text', async () => {
-    await act(async () => {
-      render(<OnboardingOverlay />)
-    })
+  it('shows step description text', () => {
+    render(<OnboardingOverlay />)
     expect(screen.getByText('onboarding.step1.description')).toBeDefined()
   })
 })

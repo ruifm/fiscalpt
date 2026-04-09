@@ -77,9 +77,7 @@ describe('DeductionSlotCard', () => {
         onRemove={onRemove}
       />,
     )
-    expect(
-      screen.getByTestId('deduction-textarea-123456789-2024'),
-    ).toBeDefined()
+    expect(screen.getByRole('textbox')).toBeDefined()
   })
 
   it('shows parsed expenses when entry is provided', () => {
@@ -205,7 +203,7 @@ describe('DeductionSlotsSection', () => {
         onRemove={onRemove}
       />,
     )
-    expect(container.innerHTML).toBe('')
+    expect(container.firstChild).toBeNull()
   })
 
   it('renders title and required badge for mandatory slots', () => {
@@ -255,10 +253,10 @@ describe('DeductionSlotsSection', () => {
     )
 
     // Default open — should show slot content
-    expect(screen.getByTestId(`deduction-textarea-${slot.nif}-${slot.year}`)).toBeDefined()
+    expect(screen.getByRole('textbox')).toBeDefined()
 
     // Click to collapse
     await user.click(screen.getByText('Toggle Test'))
-    expect(screen.queryByTestId(`deduction-textarea-${slot.nif}-${slot.year}`)).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 })
