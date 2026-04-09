@@ -38,6 +38,7 @@ import {
 } from './irs-jovem'
 import { isNhrActive, computeNhrTax } from './nhr'
 import { generateProactiveOptimizations } from './proactive-optimizations'
+import { buildOptimizedHousehold } from './optimized-household'
 import { round2, round4, sumGross, formatEuro } from './utils'
 
 // ─── Named Constants ─────────────────────────────────────────
@@ -905,7 +906,12 @@ function generateCatFDurationOptimizations(household: Household): Optimization[]
 
 // ─── Main Analysis ───────────────────────────────────────────
 
-export function analyzeHousehold(household: Household): AnalysisResult {
+export interface AnalyzeOptions {
+  /** When true, skip proactive optimization generation (recursion guard) */
+  skipProactive?: boolean
+}
+
+export function analyzeHousehold(household: Household, options?: AnalyzeOptions): AnalysisResult {
   // Log validation issues but never throw — sanitizeNumber already clamps
   // invalid values, so the engine produces the best result it can.
   if (process.env.NODE_ENV === 'development') {
@@ -959,8 +965,23 @@ export function analyzeHousehold(household: Household): AnalysisResult {
     irs_jovem_savings: irsJovem.totalSavings > 0 ? irsJovem.totalSavings : undefined,
   }
 
-  // Proactive optimizations for projected years
-  optimizations.push(...generateProactiveOptimizations(household, analysisResult))
+  // Proactive optimizations for projected years (guarded against recursion)
+  if (!options?.skipProactive) {
+    const proactiveOpts = generateProactiveOptimizations(household, analysisResult)
+    optimizations.push(...proactiveOpts)
+
+    // Compute optimized burden by re-running the engine with maximized deductions
+    if (proactiveOpts.some((o) => o.estimated_savings > 0)) {
+      const optimizedHousehold = buildOptimizedHousehold(household, proactiveOpts)
+      if (optimizedHousehold !== household) {
+        const optimizedResult = analyzeHousehold(optimizedHousehold, { skipProactive: true })
+        analysisResult.optimized_burdens = optimizedResult.scenarios.map((s) => ({
+          filing_status: s.filing_status,
+          total_tax_burden: s.total_tax_burden,
+        }))
+      }
+    }
+  }
 
   return analysisResult
 }

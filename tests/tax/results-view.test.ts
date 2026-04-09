@@ -60,7 +60,11 @@ function makeScenario(
 function makeResult(
   filingStatus: Household['filing_status'],
   scenarios: ScenarioResult[],
-  overrides: { projected?: boolean; optimizations?: Optimization[] } = {},
+  overrides: {
+    projected?: boolean
+    optimizations?: Optimization[]
+    optimized_burdens?: { filing_status: string; total_tax_burden: number }[]
+  } = {},
 ): AnalysisResult {
   return {
     year: 2024,
@@ -76,6 +80,7 @@ function makeResult(
       a.total_tax_burden <= b.total_tax_burden ? a : b,
     ).label,
     optimizations: overrides.optimizations ?? [],
+    optimized_burdens: overrides.optimized_burdens,
   }
 }
 
@@ -215,30 +220,25 @@ describe('deriveResultsView', () => {
   })
 
   describe('proactive savings', () => {
-    const optimizations: Optimization[] = [
-      { id: 'ppr', title: 'PPR', description: '', estimated_savings: 400 },
-      { id: 'health', title: 'Saúde', description: '', estimated_savings: 150 },
-    ]
-
-    it('includes proactive savings for projected years', () => {
+    it('includes proactive savings for projected years (burden delta)', () => {
       const scenario = makeScenario('Tributação Individual', 'single', 12000)
       const result = makeResult('single', [scenario], {
         projected: true,
-        optimizations,
+        optimized_burdens: [{ filing_status: 'single', total_tax_burden: 11450 }],
       })
 
       const view = deriveResultsView(result)
 
       expect(view.savings).toBe(0) // no filing strategy savings
-      expect(view.proactiveSavings).toBe(550) // 400 + 150
-      expect(view.totalSavings).toBe(550) // combined
+      expect(view.proactiveSavings).toBe(550) // 12000 - 11450
+      expect(view.totalSavings).toBe(550)
     })
 
     it('excludes proactive savings for non-projected (historical) years', () => {
       const scenario = makeScenario('Tributação Individual', 'single', 12000)
       const result = makeResult('single', [scenario], {
         projected: false,
-        optimizations,
+        optimized_burdens: [{ filing_status: 'single', total_tax_burden: 11450 }],
       })
 
       const view = deriveResultsView(result)
@@ -248,9 +248,9 @@ describe('deriveResultsView', () => {
       expect(view.totalSavings).toBe(0)
     })
 
-    it('excludes proactive savings when projected is undefined', () => {
+    it('excludes proactive savings when optimized_burdens is undefined', () => {
       const scenario = makeScenario('Tributação Individual', 'single', 12000)
-      const result = makeResult('single', [scenario], { optimizations })
+      const result = makeResult('single', [scenario], { projected: true })
 
       const view = deriveResultsView(result)
 
@@ -263,29 +263,67 @@ describe('deriveResultsView', () => {
       const separate = makeScenario('Tributação Separada', 'married_separate', 10000)
       const result = makeResult('married_joint', [joint, separate], {
         projected: true,
-        optimizations,
+        optimized_burdens: [
+          { filing_status: 'married_joint', total_tax_burden: 11400 },
+          { filing_status: 'married_separate', total_tax_burden: 9450 },
+        ],
       })
 
       const view = deriveResultsView(result)
 
-      expect(view.savings).toBe(2000) // filing strategy
-      expect(view.proactiveSavings).toBe(550) // proactive
+      expect(view.savings).toBe(2000) // filing strategy: 12000 - 10000
+      expect(view.proactiveSavings).toBe(550) // optimal(10000) - best_optimized(9450)
       expect(view.totalSavings).toBe(2550) // combined
     })
 
-    it('non-amendable projected year: only proactive savings count', () => {
+    it('non-amendable projected year: proactive from current filing only', () => {
       const joint = makeScenario('Tributação Conjunta', 'married_joint', 12000)
       const separate = makeScenario('Tributação Separada', 'married_separate', 10000)
       const result = makeResult('married_joint', [joint, separate], {
         projected: true,
-        optimizations,
+        optimized_burdens: [
+          { filing_status: 'married_joint', total_tax_burden: 11400 },
+          { filing_status: 'married_separate', total_tax_burden: 9450 },
+        ],
       })
 
       const view = deriveResultsView(result, { amendable: false })
 
       expect(view.savings).toBe(0) // non-amendable → no filing savings
-      expect(view.proactiveSavings).toBe(550) // proactive still applies
-      expect(view.totalSavings).toBe(550) // combined
+      expect(view.proactiveSavings).toBe(600) // current(12000) - optimized_joint(11400)
+      expect(view.totalSavings).toBe(600)
+    })
+
+    it('proactive savings is never negative', () => {
+      const scenario = makeScenario('Tributação Individual', 'single', 10000)
+      const result = makeResult('single', [scenario], {
+        projected: true,
+        // Optimized burden higher than current (edge case)
+        optimized_burdens: [{ filing_status: 'single', total_tax_burden: 10500 }],
+      })
+
+      const view = deriveResultsView(result)
+
+      expect(view.proactiveSavings).toBe(0)
+    })
+
+    it('naive sum > engine delta: engine delta used (interaction effects)', () => {
+      // Regression test: individual optimization estimates sum to 800,
+      // but actual engine delta is only 550 due to deduction interactions
+      const scenario = makeScenario('Tributação Individual', 'single', 12000)
+      const result = makeResult('single', [scenario], {
+        projected: true,
+        optimizations: [
+          { id: 'ppr', title: 'PPR', description: '', estimated_savings: 400 },
+          { id: 'health', title: 'Saúde', description: '', estimated_savings: 400 },
+        ],
+        optimized_burdens: [{ filing_status: 'single', total_tax_burden: 11450 }],
+      })
+
+      const view = deriveResultsView(result)
+
+      // Engine delta (550) is used, not naive sum (800)
+      expect(view.proactiveSavings).toBe(550)
     })
   })
 })

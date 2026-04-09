@@ -6,7 +6,7 @@ export interface ResultsView {
   isAlreadyOptimal: boolean
   /** Positive = user saves by switching to optimal filing strategy */
   savings: number
-  /** Sum of estimated_savings from proactive optimizations (projected years only) */
+  /** Savings from proactive optimizations computed via tax engine (projected years only) */
   proactiveSavings: number
   /** Combined savings: filing strategy + proactive optimizations */
   totalSavings: number
@@ -26,12 +26,13 @@ export function deriveResultsView(
   const currentScenario =
     result.scenarios.find((s) => s.filing_status === filingStatus) ?? result.scenarios[0]
 
-  // Proactive savings only count for projected years
-  const proactiveSavings = result.household.projected
-    ? result.optimizations.reduce((sum, o) => sum + o.estimated_savings, 0)
-    : 0
-
   if (!amendable) {
+    // Non-amendable: compare current filing against optimized version of same filing
+    const proactiveSavings = computeProactiveSavings(
+      result,
+      currentScenario.filing_status,
+      currentScenario.total_tax_burden,
+    )
     return {
       currentScenario,
       optimalScenario: currentScenario,
@@ -46,6 +47,9 @@ export function deriveResultsView(
     a.total_tax_burden <= b.total_tax_burden ? a : b,
   )
 
+  // Amendable: compare optimal filing against best optimized scenario
+  const proactiveSavings = computeProactiveSavingsGlobal(result, optimalScenario.total_tax_burden)
+
   const isAlreadyOptimal = currentScenario.filing_status === optimalScenario.filing_status
   const savings = Math.max(0, currentScenario.total_tax_burden - optimalScenario.total_tax_burden)
 
@@ -57,4 +61,23 @@ export function deriveResultsView(
     proactiveSavings,
     totalSavings: savings + proactiveSavings,
   }
+}
+
+/** Proactive savings for a specific filing status (non-amendable case) */
+function computeProactiveSavings(
+  result: AnalysisResult,
+  filingStatus: string,
+  currentBurden: number,
+): number {
+  if (!result.household.projected || !result.optimized_burdens) return 0
+  const optimized = result.optimized_burdens.find((b) => b.filing_status === filingStatus)
+  if (!optimized) return 0
+  return Math.max(0, currentBurden - optimized.total_tax_burden)
+}
+
+/** Proactive savings using global best across all filing strategies (amendable case) */
+function computeProactiveSavingsGlobal(result: AnalysisResult, optimalBurden: number): number {
+  if (!result.household.projected || !result.optimized_burdens) return 0
+  const bestOptimized = Math.min(...result.optimized_burdens.map((b) => b.total_tax_burden))
+  return Math.max(0, optimalBurden - bestOptimized)
 }

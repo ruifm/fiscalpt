@@ -196,6 +196,8 @@ export interface AnalysisResult {
   joint_vs_separate_savings?: number
   irs_jovem_savings?: number
   nhr_savings?: number
+  /** Per-scenario burdens after applying all proactive optimizations (projected years only) */
+  optimized_burdens?: { filing_status: string; total_tax_burden: number }[]
 }
 
 // ─── Validation ───────────────────────────────────────────────
