@@ -364,6 +364,7 @@ describe('Golden pipeline: all years XML (2021-2025)', () => {
       'dependent.1.birth_year': 2022,
       'member.0.first_work_year': 2021,
       'member.0.degree_year': 2020,
+      'member.0.irs_jovem_is_phd': true,
       'member.1.nhr_start_year': 2021,
     })
   })
@@ -595,6 +596,7 @@ describe('Golden pipeline: 2024 primary XML with liquidação', () => {
         'dependent.0.birth_year': 2019,
         'dependent.1.birth_year': 2022,
         'member.0.degree_year': 2020,
+        'member.0.irs_jovem_is_phd': true,
         'member.1.degree_year': 2012,
         'member.1.nhr_start_year': 2021,
         'member.0.cat_b_start_year': 2023,
@@ -673,6 +675,7 @@ describe('Golden pipeline: all years PDF comprovativos (2021-2024)', () => {
       'dependent.0.birth_year': 2019,
       'dependent.1.birth_year': 2022,
       'member.0.degree_year': 2020,
+      'member.0.irs_jovem_is_phd': true,
       'member.1.degree_year': 2012,
       'member.1.nhr_start_year': 2021,
       'member.0.cat_b_start_year': 2023,
@@ -764,6 +767,7 @@ describe('Golden pipeline: 2024 primary PDF with liquidação', () => {
         'dependent.0.birth_year': 2019,
         'dependent.1.birth_year': 2022,
         'member.0.degree_year': 2020,
+        'member.0.irs_jovem_is_phd': true,
         'member.1.degree_year': 2012,
         'member.1.nhr_start_year': 2021,
         'member.0.cat_b_start_year': 2023,

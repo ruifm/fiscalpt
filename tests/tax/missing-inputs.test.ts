@@ -1835,4 +1835,159 @@ describe('question validators', () => {
       expect(q!.priority).toBe('optional')
     })
   })
+
+  describe('PhD question (irs_jovem_is_phd)', () => {
+    it('asks PhD when person aged 27-30 in pre-2025 year with IRS Jovem', () => {
+      // birth_year=1997, year=2024 → age=27 → in [27,30] range
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Ana',
+            birth_year: 1997,
+            incomes: [makeIncome({ category: 'A', gross: 20000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_degree_year: 2020,
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.irs_jovem_is_phd')
+      expect(q).toBeDefined()
+      expect(q!.type).toBe('boolean')
+    })
+
+    it('does not ask PhD when person aged 26 (within standard limit)', () => {
+      // birth_year=1998, year=2024 → age=26 → eligible without PhD
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Ana',
+            birth_year: 1998,
+            incomes: [makeIncome({ category: 'A', gross: 20000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_degree_year: 2020,
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_is_phd')).toBeUndefined()
+    })
+
+    it('does not ask PhD when person aged 31+ (PhD would not help)', () => {
+      // birth_year=1993, year=2024 → age=31 → beyond PhD limit
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Ana',
+            birth_year: 1993,
+            incomes: [makeIncome({ category: 'A', gross: 20000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_degree_year: 2015,
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_is_phd')).toBeUndefined()
+    })
+
+    it('does not ask PhD for post-2025 years (no PhD distinction)', () => {
+      // birth_year=1997, year=2025 → age=28 → within 35 limit, no PhD needed
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          makePerson({
+            name: 'Ana',
+            birth_year: 1997,
+            incomes: [makeIncome({ category: 'A', gross: 20000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_first_work_year: 2021,
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_is_phd')).toBeUndefined()
+    })
+
+    it('does not ask PhD when already answered (true)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Ana',
+            birth_year: 1997,
+            incomes: [makeIncome({ category: 'A', gross: 20000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_degree_year: 2020,
+            irs_jovem_is_phd: true,
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_is_phd')).toBeUndefined()
+    })
+
+    it('does not ask PhD when already answered (false)', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Ana',
+            birth_year: 1997,
+            incomes: [makeIncome({ category: 'A', gross: 20000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_degree_year: 2020,
+            irs_jovem_is_phd: false,
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      expect(qs.find((q) => q.id === 'member.0.irs_jovem_is_phd')).toBeUndefined()
+    })
+
+    it('asks PhD at age 30 (boundary)', () => {
+      // birth_year=1994, year=2024 → age=30 → in [27,30] range
+      const h = makeHousehold({
+        year: 2024,
+        members: [
+          makePerson({
+            name: 'Ana',
+            birth_year: 1994,
+            incomes: [makeIncome({ category: 'A', gross: 20000 })],
+            special_regimes: ['irs_jovem'],
+            irs_jovem_degree_year: 2018,
+          }),
+        ],
+      })
+      const qs = identifyMissingInputs(h)
+      const q = qs.find((q) => q.id === 'member.0.irs_jovem_is_phd')
+      expect(q).toBeDefined()
+    })
+  })
+
+  describe('applyAnswers — irs_jovem_is_phd', () => {
+    it('sets irs_jovem_is_phd=true on member', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Ana', birth_year: 1997 })],
+      })
+      const updated = applyAnswers(h, {
+        'member.0.irs_jovem_is_phd': true,
+      })
+      expect(updated.members[0].irs_jovem_is_phd).toBe(true)
+    })
+
+    it('sets irs_jovem_is_phd=false', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Ana', birth_year: 1997 })],
+      })
+      const updated = applyAnswers(h, {
+        'member.0.irs_jovem_is_phd': false,
+      })
+      expect(updated.members[0].irs_jovem_is_phd).toBe(false)
+    })
+  })
 })

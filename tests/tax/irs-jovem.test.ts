@@ -372,3 +372,141 @@ describe('deriveIrsJovemBenefitYear', () => {
     expect(deriveIrsJovemBenefitYear(undefined, 2022, 2024)).toBe(3)
   })
 })
+
+// ─── Age boundary tests (Art. 12-F CIRS, AT folheto) ────────
+
+describe('IRS Jovem — age eligibility (annual check)', () => {
+  // Pre-2025 regimes: maxAge=26 (standard), maxAgePhd=30 (PhD)
+  // Post-2025 regime: maxAge=35 (no PhD distinction)
+  // Age = taxYear - birthYear (age at 31/12 of tax year)
+
+  describe('pre-2025: standard age limit (26)', () => {
+    it('age 26 → eligible', () => {
+      // birthYear=1998, taxYear=2024 → age=26
+      expect(isEligibleForIrsJovem(1, 2024, 1998, false)).toBe(true)
+    })
+
+    it('age 25 → eligible', () => {
+      expect(isEligibleForIrsJovem(1, 2024, 1999, false)).toBe(true)
+    })
+
+    it('age 27 → ineligible (no PhD)', () => {
+      // birthYear=1997, taxYear=2024 → age=27
+      expect(isEligibleForIrsJovem(1, 2024, 1997, false)).toBe(false)
+    })
+
+    it('age 30 → ineligible (no PhD)', () => {
+      expect(isEligibleForIrsJovem(1, 2024, 1994, false)).toBe(false)
+    })
+
+    it('age 27 → ineligible when isPhd=undefined', () => {
+      expect(isEligibleForIrsJovem(1, 2024, 1997, undefined)).toBe(false)
+    })
+  })
+
+  describe('pre-2025: PhD age limit (30)', () => {
+    it('age 27 + PhD → eligible', () => {
+      expect(isEligibleForIrsJovem(1, 2024, 1997, true)).toBe(true)
+    })
+
+    it('age 30 + PhD → eligible', () => {
+      expect(isEligibleForIrsJovem(1, 2024, 1994, true)).toBe(true)
+    })
+
+    it('age 31 + PhD → ineligible', () => {
+      // birthYear=1993, taxYear=2024 → age=31
+      expect(isEligibleForIrsJovem(1, 2024, 1993, true)).toBe(false)
+    })
+
+    it('age 35 + PhD → ineligible (pre-2025)', () => {
+      expect(isEligibleForIrsJovem(1, 2024, 1989, true)).toBe(false)
+    })
+  })
+
+  describe('pre-2025: consistent across all pre-2025 years', () => {
+    const years = [2021, 2022, 2023, 2024]
+
+    for (const year of years) {
+      it(`${year}: age 26 eligible, 27 not (no PhD)`, () => {
+        const birthYearAt26 = year - 26
+        const birthYearAt27 = year - 27
+        expect(isEligibleForIrsJovem(1, year, birthYearAt26, false)).toBe(true)
+        expect(isEligibleForIrsJovem(1, year, birthYearAt27, false)).toBe(false)
+      })
+
+      it(`${year}: age 30 eligible with PhD, 31 not`, () => {
+        const birthYearAt30 = year - 30
+        const birthYearAt31 = year - 31
+        expect(isEligibleForIrsJovem(1, year, birthYearAt30, true)).toBe(true)
+        expect(isEligibleForIrsJovem(1, year, birthYearAt31, true)).toBe(false)
+      })
+    }
+  })
+
+  describe('post-2025: age limit 35 (no PhD distinction)', () => {
+    it('age 35 → eligible', () => {
+      // birthYear=1990, taxYear=2025 → age=35
+      expect(isEligibleForIrsJovem(1, 2025, 1990)).toBe(true)
+    })
+
+    it('age 35 → eligible (isPhd irrelevant)', () => {
+      expect(isEligibleForIrsJovem(1, 2025, 1990, true)).toBe(true)
+      expect(isEligibleForIrsJovem(1, 2025, 1990, false)).toBe(true)
+    })
+
+    it('age 36 → ineligible', () => {
+      // birthYear=1989, taxYear=2025 → age=36
+      expect(isEligibleForIrsJovem(1, 2025, 1989)).toBe(false)
+    })
+
+    it('age 36 + PhD → still ineligible (no PhD exception post-2025)', () => {
+      expect(isEligibleForIrsJovem(1, 2025, 1989, true)).toBe(false)
+    })
+
+    it('age 26 → eligible', () => {
+      expect(isEligibleForIrsJovem(1, 2025, 1999)).toBe(true)
+    })
+  })
+
+  describe('missing birthYear → age check skipped (backward compat)', () => {
+    it('pre-2025 without birthYear → eligible if benefit year ok', () => {
+      expect(isEligibleForIrsJovem(1, 2024)).toBe(true)
+      expect(isEligibleForIrsJovem(1, 2024, undefined)).toBe(true)
+    })
+
+    it('post-2025 without birthYear → eligible if benefit year ok', () => {
+      expect(isEligibleForIrsJovem(1, 2025)).toBe(true)
+      expect(isEligibleForIrsJovem(1, 2025, undefined)).toBe(true)
+    })
+  })
+
+  describe('combined age + benefit year checks', () => {
+    it('valid age but benefit year exceeds max → ineligible', () => {
+      // 2024 regime: 5yr max, age 25 ok, but benefit year 6
+      expect(isEligibleForIrsJovem(6, 2024, 1999, false)).toBe(false)
+    })
+
+    it('valid benefit year but age exceeded → ineligible', () => {
+      // 2024: benefit year 1 ok, but age 27 without PhD
+      expect(isEligibleForIrsJovem(1, 2024, 1997, false)).toBe(false)
+    })
+
+    it('both valid → eligible', () => {
+      expect(isEligibleForIrsJovem(3, 2024, 1999, false)).toBe(true)
+    })
+
+    it('person ages out mid-benefit: Y1 eligible, later year not', () => {
+      // Person born 1998: age 26 in 2024, age 27 in 2025 (but 2025 has 35 limit)
+      // In 2023: age 25 → eligible
+      expect(isEligibleForIrsJovem(1, 2023, 1998, false)).toBe(true)
+      // In 2024: age 26 → still eligible
+      expect(isEligibleForIrsJovem(2, 2024, 1998, false)).toBe(true)
+    })
+
+    it('person aged 27 in pre-2025 but has PhD → eligible', () => {
+      // Born 1996: age 27 in 2023
+      expect(isEligibleForIrsJovem(1, 2023, 1996, false)).toBe(false)
+      expect(isEligibleForIrsJovem(1, 2023, 1996, true)).toBe(true)
+    })
+  })
+})
