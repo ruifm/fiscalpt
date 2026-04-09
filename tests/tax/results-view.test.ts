@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import type { AnalysisResult, Household, PersonTaxDetail, ScenarioResult } from '@/lib/tax/types'
+import type {
+  AnalysisResult,
+  Household,
+  Optimization,
+  PersonTaxDetail,
+  ScenarioResult,
+} from '@/lib/tax/types'
 import { deriveResultsView } from '@/lib/tax/results-view'
 
 function makePerson(name: string, overrides: Partial<PersonTaxDetail> = {}): PersonTaxDetail {
@@ -54,6 +60,7 @@ function makeScenario(
 function makeResult(
   filingStatus: Household['filing_status'],
   scenarios: ScenarioResult[],
+  overrides: { projected?: boolean; optimizations?: Optimization[] } = {},
 ): AnalysisResult {
   return {
     year: 2024,
@@ -62,12 +69,13 @@ function makeResult(
       filing_status: filingStatus,
       members: [{ name: 'Rui', incomes: [], deductions: [], special_regimes: [] }],
       dependents: [],
+      projected: overrides.projected,
     },
     scenarios,
     recommended_scenario: scenarios.reduce((a, b) =>
       a.total_tax_burden <= b.total_tax_burden ? a : b,
     ).label,
-    optimizations: [],
+    optimizations: overrides.optimizations ?? [],
   }
 }
 
@@ -80,6 +88,8 @@ describe('deriveResultsView', () => {
 
     expect(view.isAlreadyOptimal).toBe(true)
     expect(view.savings).toBe(0)
+    expect(view.proactiveSavings).toBe(0)
+    expect(view.totalSavings).toBe(0)
     expect(view.currentScenario).toBe(view.optimalScenario)
   })
 
@@ -202,5 +212,80 @@ describe('deriveResultsView', () => {
 
     expect(view.optimalScenario.filing_status).toBe('married_separate')
     expect(view.savings).toBe(2000)
+  })
+
+  describe('proactive savings', () => {
+    const optimizations: Optimization[] = [
+      { id: 'ppr', title: 'PPR', description: '', estimated_savings: 400 },
+      { id: 'health', title: 'Saúde', description: '', estimated_savings: 150 },
+    ]
+
+    it('includes proactive savings for projected years', () => {
+      const scenario = makeScenario('Tributação Individual', 'single', 12000)
+      const result = makeResult('single', [scenario], {
+        projected: true,
+        optimizations,
+      })
+
+      const view = deriveResultsView(result)
+
+      expect(view.savings).toBe(0) // no filing strategy savings
+      expect(view.proactiveSavings).toBe(550) // 400 + 150
+      expect(view.totalSavings).toBe(550) // combined
+    })
+
+    it('excludes proactive savings for non-projected (historical) years', () => {
+      const scenario = makeScenario('Tributação Individual', 'single', 12000)
+      const result = makeResult('single', [scenario], {
+        projected: false,
+        optimizations,
+      })
+
+      const view = deriveResultsView(result)
+
+      expect(view.savings).toBe(0)
+      expect(view.proactiveSavings).toBe(0)
+      expect(view.totalSavings).toBe(0)
+    })
+
+    it('excludes proactive savings when projected is undefined', () => {
+      const scenario = makeScenario('Tributação Individual', 'single', 12000)
+      const result = makeResult('single', [scenario], { optimizations })
+
+      const view = deriveResultsView(result)
+
+      expect(view.proactiveSavings).toBe(0)
+      expect(view.totalSavings).toBe(0)
+    })
+
+    it('combines filing strategy and proactive savings for projected years', () => {
+      const joint = makeScenario('Tributação Conjunta', 'married_joint', 12000)
+      const separate = makeScenario('Tributação Separada', 'married_separate', 10000)
+      const result = makeResult('married_joint', [joint, separate], {
+        projected: true,
+        optimizations,
+      })
+
+      const view = deriveResultsView(result)
+
+      expect(view.savings).toBe(2000) // filing strategy
+      expect(view.proactiveSavings).toBe(550) // proactive
+      expect(view.totalSavings).toBe(2550) // combined
+    })
+
+    it('non-amendable projected year: only proactive savings count', () => {
+      const joint = makeScenario('Tributação Conjunta', 'married_joint', 12000)
+      const separate = makeScenario('Tributação Separada', 'married_separate', 10000)
+      const result = makeResult('married_joint', [joint, separate], {
+        projected: true,
+        optimizations,
+      })
+
+      const view = deriveResultsView(result, { amendable: false })
+
+      expect(view.savings).toBe(0) // non-amendable → no filing savings
+      expect(view.proactiveSavings).toBe(550) // proactive still applies
+      expect(view.totalSavings).toBe(550) // combined
+    })
   })
 })

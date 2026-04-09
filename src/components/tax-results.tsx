@@ -51,7 +51,7 @@ export function TaxResults({
     }),
   }))
   const sorted = [...views].sort((a, b) => a.result.year - b.result.year)
-  const totalSavings = sorted.reduce((sum, { view }) => sum + view.savings, 0)
+  const totalSavings = sorted.reduce((sum, { view }) => sum + view.totalSavings, 0)
   const optimizationCount = results.reduce((sum, r) => sum + r.optimizations.length, 0)
   const hasMultipleYears = sorted.length > 1
 
@@ -187,9 +187,9 @@ export function TaxResults({
               return (
                 <TabsTrigger key={result.year} value={String(result.year)} className="gap-1.5">
                   {result.year}
-                  {view.savings > 0 && (
+                  {view.totalSavings > 0 && (
                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                      -{formatEuro(view.savings)}
+                      -{formatEuro(view.totalSavings)}
                     </span>
                   )}
                   {isProjected && (
