@@ -60,6 +60,7 @@ describe('Year-keyed constant accessors — fallback for future years', () => {
 
   describe('getSpecificDeduction', () => {
     it('returns exact value for supported years', () => {
+      // 8.54 × IAS2025(522.50) = 4462.15
       expect(getSpecificDeduction(2025)).toBe(4462.15)
     })
 

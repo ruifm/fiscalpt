@@ -292,7 +292,8 @@ describe('IRS Jovem — edge cases', () => {
     // 2021 regime: catBEligible = false
     const exemption2021 = computeIrsJovemExemption(incomes, 1, 2021)
     // Only Cat A counts: 10000 × 0.30 = 3000 (capped by IAS factor)
-    expect(exemption2021).toBe(Math.min(10000 * 0.3, 7.5 * 509.26))
+    // 10000 × 0.30 = 3000, cap = 7.5 × IAS2021(509.26) = 3819.45 → 3000
+    expect(exemption2021).toBe(3000)
 
     // 2025 regime: catBEligible = true
     const exemption2025 = computeIrsJovemExemption(incomes, 1, 2025)
