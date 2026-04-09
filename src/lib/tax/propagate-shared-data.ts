@@ -53,7 +53,7 @@ function findMatchingDependent(dep: Dependent, others: Dependent[]): Dependent |
  * (single→married, divorce, different spouse).
  *
  * Propagated fields: name, nif, birth_year, nhr_start_year,
- *   irs_jovem_first_work_year, irs_jovem_degree_year.
+ *   irs_jovem_first_work_year, irs_jovem_degree_year, irs_jovem_is_phd.
  * Derived fields: irs_jovem_year, special_regimes['irs_jovem'] — computed from
  *   eligibility data for the target year. Pre-2025 requires degree_year (different
  *   law than post-2025 which only needs first_work_year).
@@ -82,6 +82,7 @@ export function propagateSharedData(primary: Household, target: Household): Hous
         cat_b_start_year: match.cat_b_start_year ?? member.cat_b_start_year,
         irs_jovem_first_work_year: firstWorkYear,
         irs_jovem_degree_year: degreeYear,
+        irs_jovem_is_phd: match.irs_jovem_is_phd ?? member.irs_jovem_is_phd,
       }
 
       // Derive IRS Jovem eligibility for the target year.
@@ -100,10 +101,25 @@ export function propagateSharedData(primary: Household, target: Household): Hous
             ? target.year - degreeYear!
             : target.year - firstWorkYear! + 1
           if (benefitYear >= 1 && benefitYear <= regime.maxBenefitYears) {
-            if (!result.special_regimes.includes('irs_jovem')) {
-              result.special_regimes = [...result.special_regimes, 'irs_jovem']
+            // Annual age check
+            const birthYear = result.birth_year
+            let ageEligible = true
+            if (birthYear !== undefined) {
+              const age = target.year - birthYear
+              const maxAge =
+                result.irs_jovem_is_phd && regime.maxAgePhd ? regime.maxAgePhd : regime.maxAge
+              ageEligible = age <= maxAge
             }
-            result.irs_jovem_year ??= benefitYear
+            if (ageEligible) {
+              if (!result.special_regimes.includes('irs_jovem')) {
+                result.special_regimes = [...result.special_regimes, 'irs_jovem']
+              }
+              result.irs_jovem_year ??= benefitYear
+            } else {
+              // Too old for IRS Jovem — remove stale flags
+              result.special_regimes = result.special_regimes.filter((r) => r !== 'irs_jovem')
+              result.irs_jovem_year = undefined
+            }
           } else {
             // Person is NOT eligible for IRS Jovem in this target year —
             // remove any stale flag that came from PDF extraction.

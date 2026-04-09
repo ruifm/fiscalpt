@@ -229,7 +229,7 @@ function computeTaxableIncome(person: Person, taxYear: number): TaxableIncomeRes
   )
   const hasIrsJovem =
     person.special_regimes.includes('irs_jovem') &&
-    isEligibleForIrsJovem(effectiveBenefitYear, taxYear)
+    isEligibleForIrsJovem(effectiveBenefitYear, taxYear, person.birth_year, person.irs_jovem_is_phd)
 
   const grossTotal = sumGross(person.incomes)
   const specificDeductionCatA = computeSpecificDeduction(person.incomes, 'A', taxYear)
@@ -787,7 +787,12 @@ function generateIrsJovemOptimizations(household: Household): {
     )
     if (
       !person.special_regimes.includes('irs_jovem') ||
-      !isEligibleForIrsJovem(benefitYear, household.year)
+      !isEligibleForIrsJovem(
+        benefitYear,
+        household.year,
+        person.birth_year,
+        person.irs_jovem_is_phd,
+      )
     )
       continue
 
