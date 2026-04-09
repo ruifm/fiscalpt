@@ -1,3 +1,4 @@
+import { getIrsJovemRegime } from './irs-jovem'
 import type { Dependent, Household, Person } from './types'
 
 /**
@@ -41,8 +42,9 @@ function findMatchingDependent(dep: Dependent, others: Dependent[]): Dependent |
  * (single→married, divorce, different spouse).
  *
  * Propagated fields: name, nif, birth_year, nhr_start_year, irs_jovem_first_work_year.
- * NOT propagated: nhr_confirmed, special_regimes — these are year-specific
- * and come from each year's own XML data.
+ * Derived fields: irs_jovem_year, special_regimes['irs_jovem'] — computed from
+ * irs_jovem_first_work_year for the target year when the member is eligible.
+ * NOT propagated: nhr_confirmed — year-specific, comes from each year's XML data.
  */
 export function propagateSharedData(primary: Household, target: Household): Household {
   return {
@@ -55,15 +57,33 @@ export function propagateSharedData(primary: Household, target: Household): Hous
     members: target.members.map((member) => {
       const match = findMatchingMember(member, primary.members)
       if (!match) return member
-      return {
+
+      const firstWorkYear = match.irs_jovem_first_work_year ?? member.irs_jovem_first_work_year
+      const result: Person = {
         ...member,
         name: match.name,
         nif: match.nif ?? member.nif,
         birth_year: match.birth_year ?? member.birth_year,
         nhr_start_year: match.nhr_start_year ?? member.nhr_start_year,
-        irs_jovem_first_work_year:
-          match.irs_jovem_first_work_year ?? member.irs_jovem_first_work_year,
+        irs_jovem_first_work_year: firstWorkYear,
       }
+
+      // Derive IRS Jovem eligibility for the target year.
+      // Only backfill — never overwrite XML-provided target-year data.
+      if (firstWorkYear !== undefined) {
+        const regime = getIrsJovemRegime(target.year)
+        if (regime) {
+          const benefitYear = target.year - firstWorkYear + 1
+          if (benefitYear >= 1 && benefitYear <= regime.maxBenefitYears) {
+            if (!result.special_regimes.includes('irs_jovem')) {
+              result.special_regimes = [...result.special_regimes, 'irs_jovem']
+            }
+            result.irs_jovem_year ??= benefitYear
+          }
+        }
+      }
+
+      return result
     }),
   }
 }

@@ -378,3 +378,162 @@ describe('propagateSharedData', () => {
     expect(result.members[1].nhr_start_year).toBe(2019) // Bob's own, not Charlie's
   })
 })
+
+// ─── IRS Jovem derivation during propagation ──────────────────
+
+describe('IRS Jovem derivation', () => {
+  it('derives irs_jovem eligibility for target year from first_work_year', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Ana', {
+        nif: '111',
+        irs_jovem_first_work_year: 2021,
+        special_regimes: ['irs_jovem'],
+        irs_jovem_year: 5,
+      }),
+    ])
+    const target = makeHousehold(2024, [makePerson('Ana', { nif: '111' })])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].special_regimes).toContain('irs_jovem')
+    expect(result.members[0].irs_jovem_year).toBe(4) // 2024 - 2021 + 1
+    expect(result.members[0].irs_jovem_first_work_year).toBe(2021)
+  })
+
+  it('does not add irs_jovem when benefit year exceeds max for that regime', () => {
+    // Pre-2025 regime (2022-2024): maxBenefitYears = 5
+    const primary = makeHousehold(2025, [
+      makePerson('Ana', {
+        nif: '111',
+        irs_jovem_first_work_year: 2018,
+        special_regimes: ['irs_jovem'],
+        irs_jovem_year: 8,
+      }),
+    ])
+    // 2024 regime: max 5 years. benefitYear = 2024 - 2018 + 1 = 7 → exceeds 5
+    const target = makeHousehold(2024, [makePerson('Ana', { nif: '111' })])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].special_regimes).not.toContain('irs_jovem')
+    expect(result.members[0].irs_jovem_year).toBeUndefined()
+  })
+
+  it('does not add irs_jovem when benefit year is negative (before first work year)', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Ana', {
+        nif: '111',
+        irs_jovem_first_work_year: 2026,
+        special_regimes: [],
+      }),
+    ])
+    const target = makeHousehold(2024, [makePerson('Ana', { nif: '111' })])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].special_regimes).not.toContain('irs_jovem')
+  })
+
+  it('does not duplicate irs_jovem if target already has it — preserves existing irs_jovem_year', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Ana', {
+        nif: '111',
+        irs_jovem_first_work_year: 2021,
+        special_regimes: ['irs_jovem'],
+      }),
+    ])
+    const target = makeHousehold(2024, [
+      makePerson('Ana', {
+        nif: '111',
+        special_regimes: ['irs_jovem'],
+        irs_jovem_year: 3, // XML-provided value
+      }),
+    ])
+
+    const result = propagateSharedData(primary, target)
+    const jovemCount = result.members[0].special_regimes.filter((r) => r === 'irs_jovem').length
+    expect(jovemCount).toBe(1)
+    // Preserves XML-provided value (3), does not overwrite with derived (4)
+    expect(result.members[0].irs_jovem_year).toBe(3)
+  })
+
+  it('preserves other special_regimes when adding irs_jovem', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Ana', {
+        nif: '111',
+        irs_jovem_first_work_year: 2023,
+        special_regimes: ['irs_jovem'],
+      }),
+    ])
+    const target = makeHousehold(2024, [
+      makePerson('Ana', {
+        nif: '111',
+        special_regimes: ['nhr'],
+      }),
+    ])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].special_regimes).toContain('nhr')
+    expect(result.members[0].special_regimes).toContain('irs_jovem')
+    expect(result.members[0].irs_jovem_year).toBe(2) // 2024 - 2023 + 1
+  })
+
+  it('uses target member first_work_year when primary match has none', () => {
+    const primary = makeHousehold(2025, [makePerson('Ana', { nif: '111' })])
+    const target = makeHousehold(2024, [
+      makePerson('Ana', {
+        nif: '111',
+        irs_jovem_first_work_year: 2022,
+      }),
+    ])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].special_regimes).toContain('irs_jovem')
+    expect(result.members[0].irs_jovem_year).toBe(3) // 2024 - 2022 + 1
+  })
+
+  it('handles 2025+ regime with 10-year max benefit', () => {
+    const primary = makeHousehold(2026, [
+      makePerson('Ana', {
+        nif: '111',
+        irs_jovem_first_work_year: 2018,
+        special_regimes: ['irs_jovem'],
+      }),
+    ])
+    // 2025 regime: max 10 years. benefitYear = 2025 - 2018 + 1 = 8 → within 10
+    const target = makeHousehold(2025, [makePerson('Ana', { nif: '111' })])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].special_regimes).toContain('irs_jovem')
+    expect(result.members[0].irs_jovem_year).toBe(8)
+  })
+
+  it('skips derivation for members without first_work_year', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Ana', { nif: '111' }),
+      makePerson('Bob', { nif: '222', irs_jovem_first_work_year: 2023 }),
+    ])
+    const target = makeHousehold(2024, [
+      makePerson('Ana', { nif: '111' }),
+      makePerson('Bob', { nif: '222' }),
+    ])
+
+    const result = propagateSharedData(primary, target)
+    expect(result.members[0].special_regimes).not.toContain('irs_jovem')
+    expect(result.members[1].special_regimes).toContain('irs_jovem')
+    expect(result.members[1].irs_jovem_year).toBe(2)
+  })
+
+  it('does not activate IRS Jovem for pre-regime years (before 2021)', () => {
+    const primary = makeHousehold(2025, [
+      makePerson('Ana', {
+        nif: '111',
+        irs_jovem_first_work_year: 2019,
+        special_regimes: ['irs_jovem'],
+      }),
+    ])
+    const target = makeHousehold(2020, [makePerson('Ana', { nif: '111' })])
+
+    const result = propagateSharedData(primary, target)
+    // 2020 has no IRS Jovem regime → should not activate
+    expect(result.members[0].special_regimes).not.toContain('irs_jovem')
+    expect(result.members[0].irs_jovem_year).toBeUndefined()
+  })
+})
