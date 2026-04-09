@@ -1,5 +1,7 @@
+import { z } from 'zod'
 import { stripe, RECOMMENDATIONS_PRICE_ID } from '@/lib/stripe'
 import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
+import { parseBody } from '@/lib/api-validation'
 
 function siteUrl(): string {
   if (process.env.SITE_URL) return process.env.SITE_URL
@@ -17,6 +19,12 @@ function safeOrigin(request: Request): string {
   return siteUrl()
 }
 
+const schema = z.object({
+  analysisId: z.string().optional(),
+  sessionHash: z.string().optional(),
+  promotionCodeId: z.string().optional(),
+})
+
 export async function POST(request: Request) {
   const origin = safeOrigin(request)
 
@@ -25,11 +33,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as {
-      analysisId?: string
-      sessionHash?: string
-      promotionCodeId?: string
-    }
+    const parsed = await parseBody(request, schema)
+    if (!parsed.ok) return parsed.response
+
+    const body = parsed.data
     const hash = body.sessionHash ? `#s=${body.sessionHash}` : ''
 
     const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {

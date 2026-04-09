@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { Resend } from 'resend'
 import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
+import { parseBody } from '@/lib/api-validation'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const REPORT_TO = process.env.REPORT_EMAIL ?? 'contact@fiscalpt.com'
 const REPORT_FROM = process.env.REPORT_FROM ?? 'FiscalPT <noreply@fiscalpt.com>'
+
+const schema = z.object({
+  email: z.string().email().optional(),
+  description: z.string().min(1),
+  stage: z.string().optional(),
+})
 
 export async function POST(request: Request) {
   if (isRateLimited(rateLimitKey(request, 'report'), { maxRequests: 3, windowMs: 60_000 })) {
@@ -12,16 +20,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as {
-      email?: string
-      description?: string
-      stage?: string
-    }
-    const { email, description, stage } = body
+    const parsed = await parseBody(request, schema)
+    if (!parsed.ok) return parsed.response
 
-    if (!description) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
+    const { email, description, stage } = parsed.data
 
     const timestamp = new Date().toISOString()
     console.info('[report-problem]', { email, description, stage, timestamp })

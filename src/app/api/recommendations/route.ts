@@ -1,12 +1,13 @@
+import { z } from 'zod'
 import { stripe } from '@/lib/stripe'
 import { generateActionableRecommendations } from '@/lib/tax/actionable-recommendations'
-import type { AnalysisResult } from '@/lib/tax/types'
 import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
+import { parseBody } from '@/lib/api-validation'
 
-interface RecommendationsRequest {
-  sessionId?: string
-  results: AnalysisResult[]
-}
+const schema = z.object({
+  sessionId: z.string().min(1),
+  results: z.array(z.object({}).passthrough()).min(1),
+})
 
 export async function POST(request: Request) {
   if (
@@ -15,24 +16,13 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Rate limited' }, { status: 429 })
   }
 
-  let body: RecommendationsRequest
-  try {
-    body = (await request.json()) as RecommendationsRequest
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
+  const parsed = await parseBody(request, schema)
+  if (!parsed.ok) return parsed.response
 
-  if (!body.results?.length) {
-    return Response.json({ error: 'Missing results' }, { status: 400 })
-  }
-
-  // Auth: Stripe payment required
-  if (!body.sessionId) {
-    return Response.json({ error: 'Missing sessionId' }, { status: 400 })
-  }
+  const { sessionId, results } = parsed.data
 
   try {
-    const session = await stripe.checkout.sessions.retrieve(body.sessionId)
+    const session = await stripe.checkout.sessions.retrieve(sessionId)
     if (session.payment_status !== 'paid') {
       return Response.json({ error: 'Payment not verified' }, { status: 402 })
     }
@@ -41,7 +31,9 @@ export async function POST(request: Request) {
   }
 
   // Generate actionable recommendations server-side
-  const recommendations = body.results.map((result) => generateActionableRecommendations(result))
+  const recommendations = (
+    results as unknown as Parameters<typeof generateActionableRecommendations>[0][]
+  ).map((result) => generateActionableRecommendations(result))
 
   return Response.json({ recommendations })
 }

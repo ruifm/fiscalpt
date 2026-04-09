@@ -1,29 +1,34 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { streamChat, type ChatMessage } from '@/lib/llm'
 import { buildChatSystemPrompt } from '@/lib/chat-context'
 import type { AnalysisResult } from '@/lib/tax/types'
 import type { ActionableReport } from '@/lib/tax/actionable-recommendations'
 import type { Locale } from '@/lib/i18n'
 import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
+import { parseBody } from '@/lib/api-validation'
 
 const MAX_MESSAGES = 20
 const MAX_MESSAGE_LENGTH = 2000
 
-interface ChatRequestBody {
-  messages: { role: 'user' | 'assistant'; content: string }[]
-  results: AnalysisResult[]
-  locale?: Locale
-  recommendations?: ActionableReport[]
-}
+const messageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().max(MAX_MESSAGE_LENGTH),
+})
+
+const schema = z.object({
+  messages: z.array(messageSchema).min(1),
+  results: z.array(z.object({}).passthrough()).min(1),
+  locale: z.string().optional(),
+  recommendations: z.array(z.object({}).passthrough()).optional(),
+})
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as ChatRequestBody
-    const { messages, results, locale, recommendations } = body
+    const parsed = await parseBody(request, schema)
+    if (!parsed.ok) return parsed.response
 
-    if (!messages || !results || !Array.isArray(messages) || !Array.isArray(results)) {
-      return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
-    }
+    const { messages, results, locale, recommendations } = parsed.data
 
     if (isRateLimited(rateLimitKey(request, 'chat'), { maxRequests: 30, windowMs: 60_000 })) {
       return NextResponse.json({ error: 'Rate limited' }, { status: 429 })
@@ -34,11 +39,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'message_limit', limit: MAX_MESSAGES }, { status: 429 })
     }
 
-    if (messages.some((m) => m.content.length > MAX_MESSAGE_LENGTH)) {
-      return NextResponse.json({ error: 'Message too long' }, { status: 400 })
-    }
-
-    const systemPrompt = buildChatSystemPrompt({ results, locale, recommendations })
+    const systemPrompt = buildChatSystemPrompt({
+      results: results as unknown as AnalysisResult[],
+      locale: locale as Locale,
+      recommendations: recommendations as unknown as ActionableReport[],
+    })
     const chatMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),

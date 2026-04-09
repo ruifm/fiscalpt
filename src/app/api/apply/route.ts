@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { Resend } from 'resend'
 import { isRateLimited, rateLimitKey } from '@/lib/rate-limit'
 
@@ -13,6 +14,13 @@ const ALLOWED_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ])
 
+const formSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  role: z.string().min(1),
+  coverLetter: z.string().min(1),
+})
+
 export async function POST(request: Request) {
   if (isRateLimited(rateLimitKey(request, 'apply'), { maxRequests: 3, windowMs: 60_000 })) {
     return NextResponse.json({ error: 'Rate limited' }, { status: 429 })
@@ -20,15 +28,22 @@ export async function POST(request: Request) {
 
   try {
     const formData = await request.formData()
-    const name = formData.get('name') as string | null
-    const email = formData.get('email') as string | null
-    const role = formData.get('role') as string | null
-    const coverLetter = formData.get('coverLetter') as string | null
-    const cv = formData.get('cv') as File | null
+    const fields = formSchema.safeParse({
+      name: formData.get('name'),
+      email: formData.get('email'),
+      role: formData.get('role'),
+      coverLetter: formData.get('coverLetter'),
+    })
 
-    if (!name || !email || !role || !coverLetter) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!fields.success) {
+      return NextResponse.json(
+        { error: 'Missing required fields', details: fields.error.flatten().fieldErrors },
+        { status: 400 },
+      )
     }
+
+    const { name, email, role, coverLetter } = fields.data
+    const cv = formData.get('cv') as File | null
 
     if (cv) {
       if (cv.size > MAX_CV_SIZE) {

@@ -1,18 +1,20 @@
+import { z } from 'zod'
 import { stripe } from '@/lib/stripe'
+import { parseBody } from '@/lib/api-validation'
 import type Stripe from 'stripe'
 
-export async function POST(request: Request) {
-  let body: { code?: string }
-  try {
-    body = (await request.json()) as { code?: string }
-  } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
+const schema = z.object({
+  code: z
+    .string()
+    .min(1)
+    .transform((s) => s.trim().toUpperCase()),
+})
 
-  const code = (body.code ?? '').trim().toUpperCase()
-  if (!code) {
-    return Response.json({ error: 'Missing code' }, { status: 400 })
-  }
+export async function POST(request: Request) {
+  const parsed = await parseBody(request, schema)
+  if (!parsed.ok) return parsed.response
+
+  const { code } = parsed.data
 
   // Check Stripe promotion codes
   try {
