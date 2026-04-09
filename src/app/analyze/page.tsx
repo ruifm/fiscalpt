@@ -120,6 +120,12 @@ export default function AnalyzePage() {
             <span className="text-xl font-bold tracking-tight">FiscalPT</span>
           </Link>
           <div className="flex items-center gap-2">
+            <Link href="/simulacao">
+              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+                <Zap className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">{t('simulation.switchToSim')}</span>
+              </Button>
+            </Link>
             <LocaleToggle />
             <ThemeToggle />
             <Link href="/">
