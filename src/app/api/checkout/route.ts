@@ -45,8 +45,10 @@ export async function POST(request: Request) {
     const body = parsed.data
     const hash = body.sessionHash ? `#s=${body.sessionHash}` : ''
     const returnPath = body.returnPath ?? '/analyze'
-    const returnUrl = new URL(returnPath, origin)
-    returnUrl.searchParams.set('session_id', '{CHECKOUT_SESSION_ID}')
+    // Build return URL manually — URL.searchParams.set() encodes braces,
+    // which breaks Stripe's {CHECKOUT_SESSION_ID} template variable.
+    const separator = returnPath.includes('?') ? '&' : '?'
+    const returnUrl = `${origin}${returnPath}${separator}session_id={CHECKOUT_SESSION_ID}${hash}`
 
     const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
       ui_mode: 'embedded_page',
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
       metadata: {
         analysis_id: body.analysisId ?? '',
       },
-      return_url: `${returnUrl.toString()}${hash}`,
+      return_url: returnUrl,
     }
 
     // Pre-apply validated promo code, otherwise let user enter one in Stripe UI
