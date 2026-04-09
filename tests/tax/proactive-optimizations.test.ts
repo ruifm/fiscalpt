@@ -157,6 +157,38 @@ describe('generateProactiveOptimizations', () => {
       expect(catBOpt!.estimated_savings).toBeGreaterThan(0)
     })
 
+    it('uses 0.22 fallback marginal rate when effective_rate_irs is 0', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Bob',
+            nif: '456',
+            birth_year: 1985,
+            incomes: [
+              {
+                category: 'B',
+                gross: 40000,
+                cat_b_documented_expenses: 3000, // 7.5% < 15%
+              },
+            ],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+      })
+      const personDetail = makePerson({
+        name: 'Bob',
+        cat_b_acrescimo: 3000,
+        effective_rate_irs: 0, // triggers 0.22 fallback branch
+      })
+      const result = makeResult(h, makeScenario([personDetail]))
+      const opts = generateProactiveOptimizations(h, result)
+      const catBOpt = opts.find((o) => o.id === 'cat-b-acrescimo-bob')
+      expect(catBOpt).toBeDefined()
+      // savings = round2(3000 × 0.22) = 660
+      expect(catBOpt!.estimated_savings).toBe(660)
+    })
+
     it('does not suggest when no Cat B income', () => {
       const h = makeHousehold()
       const personDetail = makePerson()
@@ -220,6 +252,26 @@ describe('generateProactiveOptimizations', () => {
       const faturaOpt = opts.find((o) => o.id === 'fatura-alice')
       expect(faturaOpt).toBeDefined()
       expect(faturaOpt!.estimated_savings).toBeGreaterThan(0)
+    })
+
+    it('does not suggest e-fatura when already at cap', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Alice',
+            nif: '123',
+            birth_year: 1990,
+            incomes: [{ category: 'A', gross: 30000 }],
+            deductions: [{ category: 'fatura', amount: 2000 }], // 2000 × 0.15 = 300 > 250 cap
+            special_regimes: [],
+          },
+        ],
+      })
+      const personDetail = makePerson()
+      const result = makeResult(h, makeScenario([personDetail]))
+      const opts = generateProactiveOptimizations(h, result)
+      const faturaOpt = opts.find((o) => o.id === 'fatura-alice')
+      expect(faturaOpt).toBeUndefined()
     })
   })
 
@@ -399,6 +451,37 @@ describe('generateProactiveOptimizations', () => {
       // Break-even expenses = gross - simplified = 40000 - 30000 = 10000
       // As % of gross: 10000/40000 = 25%
       expect(catBOpt!.description).toContain('10000') // break-even point
+    })
+
+    it('includes acréscimo in break-even when documented expenses below 15%', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Carol',
+            birth_year: 1990,
+            incomes: [
+              {
+                category: 'B',
+                gross: 40000,
+                cat_b_regime: 'simplified',
+                cat_b_income_code: 403, // coefficient 0.75
+                cat_b_documented_expenses: 2000, // 5% < 15% → acréscimo added
+              },
+            ],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson({ gross_income: 40000 })]))
+      const opts = generateProactiveOptimizations(h, result)
+      const catBRegime = opts.find((o) => o.id === 'cat-b-regime-carol')
+      expect(catBRegime).toBeDefined()
+      // simplifiedTaxable = 40000 × 0.75 = 30000
+      // minExpenses = 40000 × 0.15 = 6000, documented = 2000 < 6000
+      // acréscimo = 6000 - 2000 = 4000, simplifiedTaxable = 34000
+      // breakEvenExpenses = 40000 - 34000 = 6000
+      expect(catBRegime!.description).toContain('6000')
     })
 
     it('does not suggest for organized regime', () => {

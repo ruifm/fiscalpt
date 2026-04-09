@@ -753,6 +753,14 @@ describe('applyAnswers', () => {
     expect(result.dependents[0].disability_degree).toBeUndefined()
   })
 
+  it('applies ascendant birth year', () => {
+    const h = makeHousehold({
+      ascendants: [{ name: 'Avó', income: 3000 }],
+    })
+    const result = applyAnswers(h, { 'ascendant.0.birth_year': 1945 })
+    expect(result.ascendants![0].birth_year).toBe(1945)
+  })
+
   it('adds deduction when member has none', () => {
     const h = makeHousehold()
     const result = applyAnswers(h, { 'member.0.deduction.health': 800 })

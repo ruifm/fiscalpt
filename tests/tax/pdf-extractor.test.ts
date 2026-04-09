@@ -6,10 +6,7 @@ import {
   detectDocumentType,
   validateAgainstLiquidacao,
 } from '@/lib/tax/pdf-extractor'
-import type {
-  LiquidacaoParsed,
-  ComprovativoParsed,
-} from '@/lib/tax/pdf-extractor'
+import type { LiquidacaoParsed, ComprovativoParsed } from '@/lib/tax/pdf-extractor'
 import type { ScenarioResult } from '@/lib/tax/types'
 
 // ─── Real PDF text samples (extracted via pdfjs-dist) ────────
@@ -1239,9 +1236,9 @@ Anexo A Anexo B Anexo C Anexo D Anexo E Anexo F Anexo G Anexo G1 Anexo H Anexo I
     const result = parseComprovativoPdfText(text)
     expect(result.anexoCounts).toBeDefined()
     expect(result.anexoCounts!['A']).toBe(1)
-    expect(result.issues.some((i) => i.code === 'PARSE_FAILED' && i.message.includes('Anexo A'))).toBe(
-      true,
-    )
+    expect(
+      result.issues.some((i) => i.code === 'PARSE_FAILED' && i.message.includes('Anexo A')),
+    ).toBe(true)
   })
 
   it('generates UNSUPPORTED_ANEXO for Anexo E, F, G, H', () => {

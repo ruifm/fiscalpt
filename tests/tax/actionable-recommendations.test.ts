@@ -290,6 +290,111 @@ describe('generateActionableRecommendations', () => {
     expect(report.recommendations.find((r) => r.id === 'deduction-ppr')).toBeDefined()
   })
 
+  it('returns undefined for IRS Jovem when member already using it and none eligible (L131)', () => {
+    const result = makeResult({
+      irs_jovem_savings: 1500,
+      household: makeHousehold({
+        members: [
+          {
+            name: 'Already Using',
+            birth_year: 1996,
+            incomes: [{ category: 'A', gross: 30000 }],
+            deductions: [],
+            special_regimes: ['irs_jovem'],
+            // no irs_jovem_year → not in membersEligible
+          },
+        ],
+      }),
+    })
+
+    const report = generateActionableRecommendations(result)
+    expect(report.recommendations.find((r) => r.id.startsWith('irs-jovem'))).toBeUndefined()
+  })
+
+  it('returns undefined for IRS Jovem when no target members at all (L141)', () => {
+    const result = makeResult({
+      irs_jovem_savings: 1000,
+      household: makeHousehold({
+        year: 2024,
+        members: [
+          {
+            name: 'Old Person',
+            birth_year: 1970, // age 54 > 35
+            incomes: [{ category: 'A', gross: 40000 }],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+      }),
+    })
+
+    const report = generateActionableRecommendations(result)
+    expect(report.recommendations.find((r) => r.id.startsWith('irs-jovem'))).toBeUndefined()
+  })
+
+  it('assigns low priority to deduction optimizations with savings <= 100 (L234)', () => {
+    const result = makeResult({
+      optimizations: [
+        {
+          id: 'deduction-small',
+          title: 'Small optimization',
+          description: 'Tiny saving',
+          estimated_savings: 50,
+        },
+      ],
+    })
+
+    const report = generateActionableRecommendations(result)
+    const rec = report.recommendations.find((r) => r.id === 'deduction-small')
+    expect(rec).toBeDefined()
+    expect(rec!.priority).toBe('low')
+  })
+
+  it('uses plural form when multiple members eligible for IRS Jovem (L170)', () => {
+    const result = makeResult({
+      irs_jovem_savings: 3000,
+      household: makeHousehold({
+        members: [
+          {
+            name: 'Ana',
+            birth_year: 1995,
+            incomes: [{ category: 'A', gross: 25000 }],
+            deductions: [],
+            special_regimes: [],
+            irs_jovem_year: 2,
+          },
+          {
+            name: 'Bruno',
+            birth_year: 1997,
+            incomes: [{ category: 'A', gross: 22000 }],
+            deductions: [],
+            special_regimes: [],
+            irs_jovem_year: 1,
+          },
+        ],
+      }),
+    })
+
+    const report = generateActionableRecommendations(result)
+    const rec = report.recommendations.find((r) => r.id.startsWith('irs-jovem'))
+    expect(rec).toBeDefined()
+    expect(rec!.summary).toContain('podem')
+  })
+
+  it('falls back to scenarios[0] when filing_status matches no scenario (L249-250)', () => {
+    const result = makeResult({
+      household: makeHousehold({ filing_status: 'single' }),
+      scenarios: [
+        makeScenario({ filing_status: 'married_separate', total_tax_burden: 14000 }),
+        makeScenario({ filing_status: 'married_joint', total_tax_burden: 12000 }),
+      ],
+    })
+
+    const report = generateActionableRecommendations(result)
+    // current falls back to scenarios[0] (married_separate)
+    expect(report.current_filing).toBe('Tributação Separada')
+  })
+
   it('IRS Jovem recommendation via age fallback when no member has irs_jovem regime', () => {
     const result = makeResult({
       irs_jovem_savings: 2000,
