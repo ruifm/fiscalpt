@@ -884,28 +884,50 @@ const LIQUIDACAO_RATE_THRESHOLD = 0.1 // 10 percentage points
 export function validateAgainstLiquidacao(
   liquidacao: LiquidacaoParsed,
   scenarioResult: ScenarioResult,
+  personIndex?: number,
 ): LiquidacaoValidation {
   const issues: ValidationIssue[] = []
   const comparison: LiquidacaoValidation['comparison'] = []
 
+  // When personIndex is provided, compare against that specific person's data
+  // (used for separate filing where liquidação is per-person).
+  const persons = personIndex != null
+    ? [scenarioResult.persons[personIndex]]
+    : scenarioResult.persons
+
   if (liquidacao.rendimentoGlobal != null) {
-    // AT's rendimento global = taxable income (after specific deductions, NHR exclusions)
-    const diff = Math.abs(liquidacao.rendimentoGlobal - scenarioResult.total_taxable)
+    // AT's rendimento global (Line 1) = total income after specific deductions,
+    // but BEFORE IRS Jovem deduction (Line 5 "Deduções ao Rendimento").
+    // Engine's total_taxable is AFTER IRS Jovem exemption, so we must add it back.
+    const engineRendimentoGlobal = persons.reduce(
+      (sum, p) => sum + p.taxable_income + p.irs_jovem_exemption,
+      0,
+    )
+    const diff = Math.abs(liquidacao.rendimentoGlobal - engineRendimentoGlobal)
     comparison.push({
       field: 'Rendimento Global',
       expected: liquidacao.rendimentoGlobal,
-      actual: scenarioResult.total_taxable,
+      actual: engineRendimentoGlobal,
       difference: diff,
       withinTolerance: diff <= LIQUIDACAO_IRS_THRESHOLD,
     })
   }
 
   if (liquidacao.coletaTotal != null) {
-    const diff = Math.abs(liquidacao.coletaTotal - scenarioResult.total_irs)
+    // AT's Coleta Total (Line 18) is the GROSS coleta — sum of bracket tax,
+    // autonomous taxation, solidarity surcharge — BEFORE deductions (tax credits).
+    // Engine equivalent: irs_before_deductions + autonomous_tax + solidarity_surcharge + nhr_tax
+    const engineColeta = persons.reduce(
+      (sum, p) =>
+        sum + p.irs_before_deductions + p.autonomous_tax +
+        p.solidarity_surcharge + p.nhr_tax,
+      0,
+    )
+    const diff = Math.abs(liquidacao.coletaTotal - engineColeta)
     comparison.push({
       field: 'Coleta Total',
       expected: liquidacao.coletaTotal,
-      actual: scenarioResult.total_irs,
+      actual: engineColeta,
       difference: diff,
       withinTolerance: diff <= LIQUIDACAO_IRS_THRESHOLD,
     })
@@ -913,13 +935,15 @@ export function validateAgainstLiquidacao(
       issues.push({
         severity: 'info',
         code: 'LIQUIDACAO_MISMATCH',
-        message: `Diferença de ${diff.toFixed(0)}€ no IRS face à liquidação AT (calculado: ${scenarioResult.total_irs.toFixed(2)}€, oficial: ${liquidacao.coletaTotal.toFixed(2)}€).`,
+        message: `Diferença de ${diff.toFixed(0)}€ no IRS face à liquidação AT (calculado: ${engineColeta.toFixed(2)}€, oficial: ${liquidacao.coletaTotal.toFixed(2)}€).`,
       })
     }
   }
 
   if (liquidacao.taxaEfetiva != null) {
-    const calculatedRate = scenarioResult.effective_rate_irs
+    const calculatedRate = personIndex != null
+      ? persons[0].effective_rate_irs
+      : scenarioResult.effective_rate_irs
     const diff = Math.abs(liquidacao.taxaEfetiva - calculatedRate)
     comparison.push({
       field: 'Taxa Efetiva',
