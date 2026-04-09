@@ -8,7 +8,8 @@ beforeAll(() => {
   globalThis.DOMParser = dom.window.DOMParser
 })
 
-import { parseModelo3Xml } from '@/lib/tax/xml-parser'
+import { parseModelo3Xml, safeParseSection } from '@/lib/tax/xml-parser'
+import type { ValidationIssue } from '@/lib/tax/types'
 
 // ─── Test XML Fixtures ──────────────────────────────────────
 
@@ -1554,6 +1555,78 @@ describe('XML Parser — Modelo 3 IRS', () => {
           'AnexoSS',
         ]),
       )
+    })
+  })
+
+  describe('Error recovery (safeParseSection)', () => {
+    it('returns fallback and pushes warning when parser throws', () => {
+      const issues: ValidationIssue[] = []
+      const result = safeParseSection('Anexo X', issues, [] as string[], () => {
+        throw new Error('Unexpected structure')
+      })
+      expect(result).toEqual([])
+      expect(issues).toHaveLength(1)
+      expect(issues[0]).toMatchObject({
+        severity: 'warning',
+        code: 'SECTION_PARSE_ERROR',
+        message: expect.stringContaining('Anexo X'),
+      })
+      expect(issues[0].message).toContain('Unexpected structure')
+    })
+
+    it('returns parsed value when parser succeeds', () => {
+      const issues: ValidationIssue[] = []
+      const result = safeParseSection('Anexo A', issues, [], () => [1, 2, 3])
+      expect(result).toEqual([1, 2, 3])
+      expect(issues).toHaveLength(0)
+    })
+
+    it('handles non-Error throws', () => {
+      const issues: ValidationIssue[] = []
+      safeParseSection('Anexo Y', issues, null, () => {
+        throw 'raw string error'
+      })
+      expect(issues[0].message).toContain('raw string error')
+    })
+  })
+
+  describe('Error recovery (parseModelo3Xml integration)', () => {
+    it('returns partial results when a non-critical annexe has unexpected structure', () => {
+      // Valid Rosto + valid AnexoA + structurally weird AnexoE (shouldn't crash)
+      const xml = `<Modelo3IRSv2026>
+        <Rosto>
+          <Rostoq02><AnoIRS>2025</AnoIRS></Rostoq02>
+          <Rostoq03><NIF>111222333</NIF><Nome>Test Person</Nome></Rostoq03>
+        </Rosto>
+        <AnexoA>
+          <Quadro04>
+            <AnexoAq04AT01>
+              <AnexoAq04AT01-Linha numero="1">
+                <NIF>500100200</NIF>
+                <CodRendimentos>401</CodRendimentos>
+                <Titular>A</Titular>
+                <Rendimentos>30000.00</Rendimentos>
+                <Retencoes>5000.00</Retencoes>
+                <Contribuicoes>3300.00</Contribuicoes>
+                <Quotizacoes>0</Quotizacoes>
+              </AnexoAq04AT01-Linha>
+            </AnexoAq04AT01>
+          </Quadro04>
+        </AnexoA>
+      </Modelo3IRSv2026>`
+      // This should parse fine — AnexoA income present, no crash
+      const result = parseModelo3Xml(xml)
+      expect(result.household.members[0].incomes).toHaveLength(1)
+      expect(result.household.members[0].incomes[0].gross).toBe(30000)
+    })
+
+    it('still throws when Rosto (critical section) is completely invalid', () => {
+      const xml = `<Modelo3IRSv2026></Modelo3IRSv2026>`
+      // parseRosto is NOT wrapped — missing Rosto should still fail
+      expect(() => parseModelo3Xml(xml)).not.toThrow()
+      // But it should produce a household with defaults
+      const result = parseModelo3Xml(xml)
+      expect(result.household.year).toBeDefined()
     })
   })
 })

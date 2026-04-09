@@ -96,6 +96,25 @@ export interface ParsedXmlResult {
 
 const CAT_B_INCOME_CODES = [401, 402, 403, 404, 405, 406, 407, 408] as const
 
+// Run a section parser safely — on failure, push a warning and return the fallback value
+export function safeParseSection<T>(
+  sectionName: string,
+  issues: ValidationIssue[],
+  fallback: T,
+  fn: () => T,
+): T {
+  try {
+    return fn()
+  } catch (err) {
+    issues.push({
+      severity: 'warning',
+      code: 'SECTION_PARSE_ERROR',
+      message: `Não foi possível ler ${sectionName}: ${err instanceof Error ? err.message : String(err)}`,
+    })
+    return fallback
+  }
+}
+
 function findElement(parent: Element | Document, localName: string): Element | null {
   const all = parent.getElementsByTagName('*')
   for (let i = 0; i < all.length; i++) {
@@ -738,7 +757,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
   const anexosPresent = detectAnexos(doc)
 
   // ─── Anexo A — Cat A + Cat H ────────────────────────────
-  const anexoALines = parseAnexoA(doc, issues)
+  const anexoALines = safeParseSection('Anexo A', issues, [] as AnexoALine[], () =>
+    parseAnexoA(doc, issues),
+  )
   const catAIncomeCodes: ParsedXmlResult['raw']['catAIncomeCodes'] = []
 
   for (const line of anexoALines) {
@@ -781,7 +802,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
   }
 
   // ─── Anexo B — Cat B ────────────────────────────────────
-  const parsedAnexoB = parseAnexoB(doc, issues)
+  const parsedAnexoB = safeParseSection('Anexo B', issues, [] as ParsedAnexoBRaw[], () =>
+    parseAnexoB(doc, issues),
+  )
 
   for (const ab of parsedAnexoB) {
     const target = personB && ab.nif === subjectB_nif ? personB : personA
@@ -845,7 +868,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
   }
 
   // ─── Anexo E — Cat E ────────────────────────────────────
-  const anexoELines = parseAnexoE(doc, issues)
+  const anexoELines = safeParseSection('Anexo E', issues, [] as AnexoELine[], () =>
+    parseAnexoE(doc, issues),
+  )
   for (const line of anexoELines) {
     getTarget(line.titular).incomes.push({
       category: 'E',
@@ -856,7 +881,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
   }
 
   // ─── Anexo F — Cat F ────────────────────────────────────
-  const anexoFLines = parseAnexoF(doc, issues)
+  const anexoFLines = safeParseSection('Anexo F', issues, [] as AnexoFLine[], () =>
+    parseAnexoF(doc, issues),
+  )
   for (const line of anexoFLines) {
     getTarget(line.titular).incomes.push({
       category: 'F',
@@ -869,7 +896,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
   }
 
   // ─── Anexo G — Cat G ────────────────────────────────────
-  const anexoGLines = parseAnexoG(doc, issues)
+  const anexoGLines = safeParseSection('Anexo G', issues, [] as AnexoGLine[], () =>
+    parseAnexoG(doc, issues),
+  )
   for (const line of anexoGLines) {
     const gain = line.saleValue - line.acquisitionValue
     getTarget(line.titular).incomes.push({
@@ -882,7 +911,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
   }
 
   // ─── Anexo H — Deductions ──────────────────────────────
-  const anexoHDeductions = parseAnexoH(doc, issues)
+  const anexoHDeductions = safeParseSection('Anexo H', issues, [] as AnexoHDeduction[], () =>
+    parseAnexoH(doc, issues),
+  )
   for (const ded of anexoHDeductions) {
     const target = ded.titular ? getTarget(ded.titular) : personA
     target.deductions.push({
@@ -892,7 +923,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
   }
 
   // ─── Anexo J — Foreign Income ──────────────────────────
-  const anexoJLines = parseAnexoJ(doc)
+  const anexoJLines = safeParseSection('Anexo J', issues, [] as AnexoJLine[], () =>
+    parseAnexoJ(doc),
+  )
   for (const line of anexoJLines) {
     getTarget(line.titular).incomes.push({
       category: line.category,
@@ -913,7 +946,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
 
   // ─── Anexo L — NHR ─────────────────────────────────────
   // Detect NHR status from Anexo L header (independent of income lines)
-  const anexoLNif = parseAnexoLNif(doc)
+  const anexoLNif = safeParseSection('Anexo L (NIF)', issues, null as string | null, () =>
+    parseAnexoLNif(doc),
+  )
   if (anexoLNif) {
     const nhrTarget = personB && anexoLNif === subjectB_nif ? personB : personA
     if (!nhrTarget.special_regimes.includes('nhr')) {
@@ -926,7 +961,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
   // Anexo L income lines are typically the same income already declared
   // in Anexo A. Only add them if the person has no Cat A/H income yet
   // (e.g., when only Anexo L is present without Anexo A).
-  const anexoLLines = parseAnexoL(doc)
+  const anexoLLines = safeParseSection('Anexo L', issues, [] as AnexoLLine[], () =>
+    parseAnexoL(doc),
+  )
   for (const line of anexoLLines) {
     const target = getTarget(line.titular)
     const hasCatAIncome = target.incomes.some((i) => i.category === 'A' || i.category === 'H')
@@ -946,7 +983,9 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
   }
 
   // ─── Anexo SS — Social Security ────────────────────────
-  const parsedAnexoSS = parseAnexoSS(doc, issues)
+  const parsedAnexoSS = safeParseSection('Anexo SS', issues, [] as ParsedAnexoSSRaw[], () =>
+    parseAnexoSS(doc, issues),
+  )
   for (const ss of parsedAnexoSS) {
     if (ss.foreignActivity && ss.foreignActivityEntries.length > 0) {
       issues.push({
