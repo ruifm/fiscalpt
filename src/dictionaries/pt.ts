@@ -6,6 +6,7 @@ const pt = {
     continue: 'Continuar',
     close: 'Fechar',
     skip: 'Saltar',
+    advance: 'Avançar',
     next: 'Seguinte',
     start: 'Começar',
     yes: 'Sim',

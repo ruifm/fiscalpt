@@ -7,6 +7,7 @@ const en: DictShape<PtDict> = {
     continue: 'Continue',
     close: 'Close',
     skip: 'Skip',
+    advance: 'Advance',
     next: 'Next',
     start: 'Start',
     yes: 'Yes',

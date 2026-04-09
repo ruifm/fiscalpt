@@ -141,7 +141,7 @@ export function HouseholdQuestionnaire({
           {t('common.skip')}
         </Button>
         <Button onClick={handleSubmit} className="gap-1.5">
-          {t('common.continue')}
+          {t('common.advance')}
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
