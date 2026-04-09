@@ -10,12 +10,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { MissingInputQuestion } from '@/lib/tax/missing-inputs'
 import { useT } from '@/lib/i18n'
 
-const PRIORITY_BADGE_STYLES: Record<string, string> = {
-  critical: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  important: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-  optional: 'bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400',
-}
-
 export const QuestionField = memo(function QuestionField({
   question,
   value,
@@ -28,9 +22,9 @@ export const QuestionField = memo(function QuestionField({
   error: string | null
 }) {
   const t = useT()
-  const badgeStyle = PRIORITY_BADGE_STYLES[question.priority]
   const inputId = `q-${question.id.replace(/\./g, '-')}`
   const errorId = `${inputId}-error`
+  const showDefault = question.isDefault && (value === undefined || value === '')
 
   return (
     <div
@@ -44,9 +38,14 @@ export const QuestionField = memo(function QuestionField({
             <Label htmlFor={inputId} className="text-sm font-medium">
               {question.label}
             </Label>
-            <Badge className={`text-[10px] px-1.5 py-0 ${badgeStyle}`}>
-              {t(`questionnaire.priority.${question.priority}`)}
-            </Badge>
+            {showDefault && (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 text-muted-foreground italic"
+              >
+                {t('questionnaire.defaultValue')}
+              </Badge>
+            )}
             {question.isPlaceholder && (
               <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                 {t('questionnaire.estimatedValue')}

@@ -4,7 +4,6 @@ import {
   identifyMissingInputs,
   groupBySection,
   applyAnswers,
-  countUnansweredCritical,
   validateAnswer,
   type MissingInputQuestion,
 } from '@/lib/tax/missing-inputs'
@@ -90,7 +89,6 @@ export function useQuestionnaireState({
   const sections = useMemo(() => groupBySection(questions), [questions])
 
   // ─── UI state ──────────────────────────────────────────────
-  const [showSkipWarning, setShowSkipWarning] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({})
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -134,15 +132,14 @@ export function useQuestionnaireState({
     } catch {}
   }, [projectionEnabled, projectedIncomes, projectionStorageKey])
 
-  // ─── Auto-scroll on mount ──────────────────────────────────
+  // ─── Auto-scroll to first unanswered field on mount ─────────
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!containerRef.current) return
       const allFields = containerRef.current.querySelectorAll<HTMLElement>('[data-question-id]')
       for (const el of allFields) {
         const qId = el.getAttribute('data-question-id')
-        const qPriority = el.getAttribute('data-priority')
-        if (!qId || (qPriority !== 'critical' && qPriority !== 'important')) continue
+        if (!qId) continue
         if (isQuestionAnswered(answers, qId)) continue
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
         const input = el.querySelector<HTMLElement>('input, select, textarea')
@@ -158,58 +155,12 @@ export function useQuestionnaireState({
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Computed values ───────────────────────────────────────
-  const criticalUnanswered = countUnansweredCritical(questions, answers)
   const answeredCount = Object.keys(answers).filter(
     (k) => answers[k] !== '' && answers[k] !== undefined,
   ).length
   const totalCount = questions.length
 
-  // ─── Accordion state ───────────────────────────────────────
-  const autoOpenSections = useMemo(
-    () =>
-      new Set(
-        sections
-          .filter((g) =>
-            g.questions.some((q) => q.priority === 'critical' || q.priority === 'important'),
-          )
-          .map((g) => `section-${sections.indexOf(g)}`),
-      ),
-    [sections],
-  )
-
-  const [userToggles, setUserToggles] = useState<Record<string, boolean>>({})
-  const openSections = useMemo(() => {
-    const result: string[] = []
-    for (const g of sections) {
-      const id = `section-${sections.indexOf(g)}`
-      const userToggle = userToggles[id]
-      if (userToggle === true || (userToggle === undefined && autoOpenSections.has(id))) {
-        result.push(id)
-      }
-    }
-    return result
-  }, [sections, autoOpenSections, userToggles])
-
   // ─── Handlers ──────────────────────────────────────────────
-  const handleAccordionChange = useCallback(
-    (value: string[]) => {
-      const valueSet = new Set(value)
-      setUserToggles((prev) => {
-        const next = { ...prev }
-        for (const g of sections) {
-          const id = `section-${sections.indexOf(g)}`
-          const isNowOpen = valueSet.has(id)
-          const wasOpen = openSections.includes(id)
-          if (isNowOpen !== wasOpen) {
-            next[id] = isNowOpen
-          }
-        }
-        return next
-      })
-    },
-    [sections, openSections],
-  )
-
   const setAnswer = useCallback(
     (id: string, value: string | number | boolean) => {
       const question = questions.find((q) => q.id === id)
@@ -225,12 +176,13 @@ export function useQuestionnaireState({
           const allFields = containerRef.current.querySelectorAll<HTMLElement>('[data-question-id]')
           for (const el of allFields) {
             const qId = el.getAttribute('data-question-id')
-            const qPriority = el.getAttribute('data-priority')
-            if (!qId || (qPriority !== 'critical' && qPriority !== 'important')) continue
+            if (!qId) continue
             if (isQuestionAnswered(next, qId)) continue
             el.scrollIntoView({ behavior: 'smooth', block: 'center' })
             el.classList.add('ring-2', 'ring-primary/50')
             setTimeout(() => el.classList.remove('ring-2', 'ring-primary/50'), 1500)
+            const input = el.querySelector<HTMLElement>('input, select, textarea')
+            input?.focus()
             return
           }
         }, 100)
@@ -268,38 +220,18 @@ export function useQuestionnaireState({
     return { updated, projected: buildProjection(updated) }
   }, [household, answers, buildProjection])
 
-  const handleSkip = useCallback(() => {
-    if (criticalUnanswered > 0) {
-      setShowSkipWarning(true)
-      return null
-    }
-    const unansweredImportant = questions.filter(
-      (q) => q.priority === 'important' && !isQuestionAnswered(answers, q.id),
-    ).length
-    if (unansweredImportant > 0 && !showSkipWarning) {
-      setShowSkipWarning(true)
-      return null
-    }
-    const updated = applyAnswers(household, answers)
-    return { updated, projected: buildProjection(updated) }
-  }, [household, answers, questions, criticalUnanswered, showSkipWarning, buildProjection])
-
   return {
     // State
     questions,
     sections,
     answers,
     fieldErrors,
-    showSkipWarning,
-    setShowSkipWarning,
     containerRef,
     history,
 
     // Computed
-    criticalUnanswered,
     answeredCount,
     totalCount,
-    openSections,
 
     // Projection
     projectionEnabled,
@@ -308,9 +240,7 @@ export function useQuestionnaireState({
     setProjectedIncomes,
 
     // Handlers
-    handleAccordionChange,
     setAnswer,
     handleSubmit,
-    handleSkip,
   }
 }

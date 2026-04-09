@@ -465,6 +465,7 @@ const en: DictShape<PtDict> = {
     why: 'Why?',
     selectPlaceholder: '— Select —',
     yearPlaceholder: 'E.g.: 1990',
+    defaultValue: 'Default',
     priority: {
       critical: 'Required',
       important: 'Important',

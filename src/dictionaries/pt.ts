@@ -468,6 +468,7 @@ const pt = {
     why: 'Porquê?',
     selectPlaceholder: '— Selecionar —',
     yearPlaceholder: 'Ex: 1990',
+    defaultValue: 'Predefinido',
     priority: {
       critical: 'Obrigatório',
       important: 'Importante',

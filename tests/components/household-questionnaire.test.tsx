@@ -186,17 +186,16 @@ describe('HouseholdQuestionnaire', () => {
     expect(screen.getByText(/questionnaire\.projection\.title/)).toBeDefined()
   })
 
-  it('disables continue when critical questions are unanswered', () => {
+  it('continue is always enabled', () => {
     render(
       <HouseholdQuestionnaire household={makeHousehold()} onComplete={onComplete} onBack={onBack} />,
     )
     const continueBtn = screen.getByTestId('questionnaire-continue')
-    // If there are critical unanswered questions, continue should be disabled
-    // Note: whether it's disabled depends on if the household has critical missing inputs
     expect(continueBtn).toBeDefined()
+    expect(continueBtn).toHaveProperty('disabled', false)
   })
 
-  it('skip proceeds directly when all questions are optional', async () => {
+  it('skip calls onComplete directly', async () => {
     render(
       <HouseholdQuestionnaire household={makeHousehold()} onComplete={onComplete} onBack={onBack} />,
     )
@@ -233,10 +232,9 @@ describe('HouseholdQuestionnaire', () => {
     render(
       <HouseholdQuestionnaire household={makeHousehold()} onComplete={onComplete} onBack={onBack} />,
     )
-    // Sections should have accordion-like headers
-    // At least one section should be rendered since there are missing inputs
-    const accordionTriggers = screen.getAllByRole('button')
-    expect(accordionTriggers.length).toBeGreaterThan(0)
+    // All sections are rendered expanded (no accordion)
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.length).toBeGreaterThan(0)
   })
 
   it('shows projection toggle switch', () => {

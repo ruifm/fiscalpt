@@ -1,19 +1,13 @@
 'use client'
 
-import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, Undo2, Redo2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Undo2, Redo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from '@/components/ui/accordion'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Household } from '@/lib/tax/types'
-import { applyAnswers, type QuestionSection } from '@/lib/tax/missing-inputs'
+import type { QuestionSection } from '@/lib/tax/missing-inputs'
 import { useQuestionnaireState } from '@/hooks/use-questionnaire-state'
 import { QuestionField } from '@/components/questionnaire/question-field'
 import { ProjectionSection } from '@/components/questionnaire/projection-section'
@@ -41,14 +35,6 @@ const SECTION_ICONS: Record<QuestionSection, string> = {
   income_options: '⚙️',
 }
 
-function isQuestionAnswered(
-  answers: Record<string, string | number | boolean>,
-  questionId: string,
-): boolean {
-  const val = answers[questionId]
-  return val !== undefined && val !== ''
-}
-
 export function HouseholdQuestionnaire({
   household,
   onComplete,
@@ -65,34 +51,21 @@ export function HouseholdQuestionnaire({
     sections,
     answers,
     fieldErrors,
-    showSkipWarning,
-    setShowSkipWarning,
     containerRef,
     history,
-    criticalUnanswered,
     answeredCount,
     totalCount,
-    openSections,
     projectionEnabled,
     setProjectionEnabled,
     projectedIncomes,
     setProjectedIncomes,
-    handleAccordionChange,
     setAnswer,
     handleSubmit: getSubmitResult,
-    handleSkip: getSkipResult,
   } = state
 
   function handleSubmit() {
     const result = getSubmitResult()
     onComplete(result.updated, result.projected)
-  }
-
-  function handleSkip() {
-    const result = getSkipResult()
-    if (result) {
-      onComplete(result.updated, result.projected)
-    }
   }
 
   // No questions needed AND no projection available → data-complete view
@@ -147,16 +120,6 @@ export function HouseholdQuestionnaire({
                 {t('questionnaire.answered', { answered: answeredCount, total: totalCount })}
               </span>
             </div>
-            {criticalUnanswered > 0 && (
-              <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
-                <AlertCircle className="h-4 w-4" aria-hidden="true" />
-                <span className="text-xs font-medium">
-                  {criticalUnanswered !== 1
-                    ? t('questionnaire.criticalPlural', { count: criticalUnanswered })
-                    : t('questionnaire.criticalSingular', { count: criticalUnanswered })}
-                </span>
-              </div>
-            )}
           </div>
           <div
             className="mt-2 h-1.5 w-full rounded-full bg-muted"
@@ -226,90 +189,41 @@ export function HouseholdQuestionnaire({
         />
       )}
 
-      {/* Question sections */}
-      <Accordion multiple value={openSections} onValueChange={handleAccordionChange}>
-        {sections.map((group) => {
-          const sIdx = sections.indexOf(group)
-          return (
-            <AccordionItem key={group.section} value={`section-${sIdx}`}>
-              <Card className="mb-4 border">
-                <AccordionTrigger
-                  className="w-full px-4 py-3 min-h-[44px] hover:no-underline"
-                  tabIndex={-1}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl" aria-hidden="true">
-                      {SECTION_ICONS[group.section]}
-                    </span>
-                    <div className="text-left">
-                      <h3 className="font-semibold">{group.meta.title}</h3>
-                      <p className="text-xs text-muted-foreground">{group.meta.description}</p>
-                    </div>
-                    <Badge variant="outline" className="ml-auto mr-2">
-                      {group.questions.filter((q) => isQuestionAnswered(answers, q.id)).length}/
-                      {group.questions.length}
-                    </Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <CardContent className="pt-0 space-y-4">
-                    <Separator />
-                    {group.questions.map((question) => (
-                      <QuestionField
-                        key={question.id}
-                        question={question}
-                        value={answers[question.id]}
-                        onChange={(val) => setAnswer(question.id, val)}
-                        error={fieldErrors[question.id] ?? null}
-                      />
-                    ))}
-                  </CardContent>
-                </AccordionContent>
-              </Card>
-            </AccordionItem>
-          )
-        })}
-      </Accordion>
-
-      {/* Skip warning */}
-      {showSkipWarning && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                {criticalUnanswered > 0
-                  ? t('questionnaire.skipWarningCritical', { count: criticalUnanswered })
-                  : t('questionnaire.skipWarningImportant')}
-              </p>
-              <div className="flex gap-2 mt-3">
-                <Button variant="outline" size="sm" onClick={() => setShowSkipWarning(false)}>
-                  {t('questionnaire.backToQuestions')}
-                </Button>
-                {criticalUnanswered === 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const updated = applyAnswers(household, answers)
-                      const result = getSubmitResult()
-                      onComplete(updated, result.projected)
-                    }}
-                    className="text-muted-foreground"
-                    data-testid="skip-confirm"
-                  >
-                    {t('questionnaire.continueAnyway')}
-                  </Button>
-                )}
+      {/* Question sections — all expanded, no accordion */}
+      {sections.map((group) => (
+        <Card key={group.section} className="border">
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xl" aria-hidden="true">
+                {SECTION_ICONS[group.section]}
+              </span>
+              <div className="text-left">
+                <h3 className="font-semibold">{group.meta.title}</h3>
+                <p className="text-xs text-muted-foreground">{group.meta.description}</p>
               </div>
+              <Badge variant="outline" className="ml-auto">
+                {
+                  group.questions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== '')
+                    .length
+                }
+                /{group.questions.length}
+              </Badge>
             </div>
           </div>
-        </div>
-      )}
+          <CardContent className="pt-0 space-y-4">
+            <Separator />
+            {group.questions.map((question) => (
+              <QuestionField
+                key={question.id}
+                question={question}
+                value={answers[question.id]}
+                onChange={(val) => setAnswer(question.id, val)}
+                error={fieldErrors[question.id] ?? null}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      ))}
 
       {/* Actions */}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
@@ -326,7 +240,7 @@ export function HouseholdQuestionnaire({
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
-            onClick={handleSkip}
+            onClick={handleSubmit}
             className="text-muted-foreground"
             data-testid="questionnaire-skip"
           >
@@ -334,7 +248,6 @@ export function HouseholdQuestionnaire({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={criticalUnanswered > 0}
             className="flex-1 sm:flex-initial gap-1.5"
             data-testid="questionnaire-continue"
           >
@@ -343,12 +256,6 @@ export function HouseholdQuestionnaire({
           </Button>
         </div>
       </div>
-
-      {criticalUnanswered > 0 && (
-        <p className="text-center text-xs text-muted-foreground">
-          {t('questionnaire.answerRequired')}
-        </p>
-      )}
     </div>
   )
 }
