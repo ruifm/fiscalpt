@@ -11,6 +11,7 @@ import { validateHousehold } from './input-validation'
 import {
   CAT_B_MIN_EXPENSE_RATIO,
   CAT_B_NEW_ACTIVITY_FACTORS,
+  deriveCatBActivityYear,
   getCatBCoefficient,
   getSpecificDeduction,
   AUTONOMOUS_RATE_CAT_E,
@@ -171,14 +172,15 @@ interface TaxableIncomeResult {
  * Compute Cat B taxable income under the simplified regime.
  * Handles coefficient lookup, new-activity reduction, and Art. 31 nº 13 acréscimo.
  */
-function computeCatBSimplifiedTaxable(income: Income): { taxable: number; acrescimo: number } {
+function computeCatBSimplifiedTaxable(
+  income: Income,
+  activityYear: 1 | 2 | undefined,
+): { taxable: number; acrescimo: number } {
   const coefficient = getCatBCoefficient(income.cat_b_income_code)
   let taxable = income.gross * coefficient
 
   // Art. 31 nº 10: reduced coefficient for first years of activity
-  const activityFactor = income.cat_b_activity_year
-    ? CAT_B_NEW_ACTIVITY_FACTORS[income.cat_b_activity_year]
-    : undefined
+  const activityFactor = activityYear ? CAT_B_NEW_ACTIVITY_FACTORS[activityYear] : undefined
   if (activityFactor !== undefined) {
     taxable *= activityFactor
   }
@@ -271,7 +273,8 @@ function computeTaxableIncome(person: Person, taxYear: number): TaxableIncomeRes
         if (income.cat_b_regime === 'organized' && income.expenses !== undefined) {
           taxableForBrackets += Math.max(0, income.gross - income.expenses)
         } else {
-          const { taxable, acrescimo } = computeCatBSimplifiedTaxable(income)
+          const activityYear = deriveCatBActivityYear(person.cat_b_start_year, taxYear)
+          const { taxable, acrescimo } = computeCatBSimplifiedTaxable(income, activityYear)
           taxableForBrackets += taxable + acrescimo
           catBAcrescimo += acrescimo
         }

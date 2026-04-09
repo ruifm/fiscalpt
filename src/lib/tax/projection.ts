@@ -1,5 +1,10 @@
 import type { AnalysisResult, Household, Income, PersonTaxDetail } from './types'
-import { SS_EMPLOYEE_RATE, SS_INDEPENDENT_BASE_RATIO, SS_INDEPENDENT_RATE } from './types'
+import {
+  deriveCatBActivityYear,
+  SS_EMPLOYEE_RATE,
+  SS_INDEPENDENT_BASE_RATIO,
+  SS_INDEPENDENT_RATE,
+} from './types'
 import { deriveIrsJovemBenefitYear, getIrsJovemRegime } from './irs-jovem'
 import { round2 } from './utils'
 
@@ -13,7 +18,6 @@ const PPC_NEW_ACTIVITY_RATE = 0.51
  * - Bumps year by 1, sets projected = true
  * - Strips withholding and ss_paid (unknown for future — use estimateProjectedRetentions after)
  * - Increments irs_jovem_year (drops if exceeds max benefit years)
- * - Increments cat_b_activity_year (drops if exceeds 2)
  * - Applies user-adjusted gross incomes by NIF if provided
  */
 export function buildProjectedHousehold(
@@ -55,20 +59,7 @@ export function buildProjectedHousehold(
           : member.special_regimes.filter((r) => r !== 'irs_jovem'),
         incomes: (adjusted ?? member.incomes).map((income) => {
           const { withholding: _, ss_paid: _ss, ...rest } = income
-
-          // Advance cat_b_activity_year for projection:
-          // 0 = "3rd year or more" → stays beyond new-activity period (undefined)
-          // 1 = "1st year" → becomes 2nd year
-          // 2 = "2nd year" → becomes 3rd+ (undefined, no reduction)
-          let activityYear = rest.cat_b_activity_year
-          if (activityYear === 1) {
-            activityYear = 2
-          } else {
-            // 0 (already past new-activity) or 2 (will be past) → no reduction
-            activityYear = undefined
-          }
-
-          return { ...rest, cat_b_activity_year: activityYear }
+          return { ...rest }
         }),
         deductions: member.deductions.map((d) => ({ ...d })),
       }
@@ -161,7 +152,8 @@ export function estimateProjectedRetentions(
 
           if (income.category === 'B') {
             const baseWithholding = round2(income.gross * CAT_B_RETENTION_RATE)
-            const ppc = primaryDetail ? computePpc(primaryDetail, income.cat_b_activity_year) : 0
+            const activityYear = deriveCatBActivityYear(member.cat_b_start_year, projected.year)
+            const ppc = primaryDetail ? computePpc(primaryDetail, activityYear ?? undefined) : 0
             return {
               ...income,
               withholding: round2(baseWithholding + ppc),

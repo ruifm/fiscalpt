@@ -1004,12 +1004,12 @@ describe('Representative Tax Scenarios — Engine Validation', () => {
       members: [
         {
           name: 'Sujeito A',
+          cat_b_start_year: 2023,
           incomes: [
             {
               category: 'B',
               gross: 52329.2,
               cat_b_documented_expenses: 6236.13,
-              cat_b_activity_year: 2, // Art. 31 nº 10: 2nd full year → factor 0.75
             },
           ],
           deductions: [

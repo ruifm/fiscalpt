@@ -624,12 +624,12 @@ describe('generateProactiveOptimizations', () => {
           {
             name: 'Bob',
             birth_year: 1990,
+            cat_b_start_year: 2026,
             incomes: [
               {
                 category: 'B',
                 gross: 40000,
                 cat_b_income_code: 1519,
-                cat_b_activity_year: 1,
               },
             ],
             deductions: [],

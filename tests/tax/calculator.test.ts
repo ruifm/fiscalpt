@@ -1222,12 +1222,12 @@ describe('Cat B Activity Year (Art. 31 nº 10)', () => {
       members: [
         {
           name: 'Test',
+          cat_b_start_year: 2024,
           incomes: [
             {
               category: 'B',
               gross: 60000,
               cat_b_income_code: 403,
-              cat_b_activity_year: 1,
             },
           ],
           deductions: [],
@@ -1248,12 +1248,12 @@ describe('Cat B Activity Year (Art. 31 nº 10)', () => {
       members: [
         {
           name: 'Test',
+          cat_b_start_year: 2023,
           incomes: [
             {
               category: 'B',
               gross: 60000,
               cat_b_income_code: 403,
-              cat_b_activity_year: 2,
             },
           ],
           deductions: [],
@@ -1274,12 +1274,12 @@ describe('Cat B Activity Year (Art. 31 nº 10)', () => {
       members: [
         {
           name: 'Test',
+          cat_b_start_year: 2021,
           incomes: [
             {
               category: 'B',
               gross: 60000,
               cat_b_income_code: 403,
-              cat_b_activity_year: 3,
             },
           ],
           deductions: [],

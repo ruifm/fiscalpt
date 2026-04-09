@@ -812,15 +812,12 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
     // Create one Income per income code for accurate coefficient handling
     const codes = Object.keys(ab.incomeByCode).map(Number)
 
-    // Infer activity year for Art. 31 nº 10 reduction:
-    // - firstYear=true AND no prior income → year 1 (confident, set silently)
-    // - Prior year income exists → could be year 2 or 3+, cannot distinguish
-    //   from a single XML → leave undefined so questionnaire asks the user
-    let activityYear: number | undefined
+    // Infer activity start year for Art. 31 nº 10 reduction:
+    // - firstYear=true AND no prior income → started this year (confident)
+    // - Otherwise: leave undefined — questionnaire asks the user
     if (ab.firstYear && !ab.priorYearIncome) {
-      activityYear = 1
+      target.cat_b_start_year = year
     }
-    // Otherwise leave undefined — missing-inputs.ts will prompt the user
 
     if (codes.length > 0) {
       for (const code of codes) {
@@ -832,7 +829,6 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
           cat_b_income_code: code,
           cat_b_activity_code: ab.activityCode,
           cat_b_cae: ab.cae,
-          cat_b_activity_year: activityYear,
           withholding: undefined, // withholding is total, allocated proportionally
         }
 
@@ -859,7 +855,6 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
         cat_b_regime: ab.regime || 'simplified',
         cat_b_activity_code: ab.activityCode,
         cat_b_cae: ab.cae,
-        cat_b_activity_year: activityYear,
         withholding: ab.withholding || undefined,
         cat_b_documented_expenses:
           ab.documentedExpensesSales + ab.documentedExpensesOther || undefined,

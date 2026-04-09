@@ -2,6 +2,7 @@ import type { AnalysisResult, Household, Optimization, Person } from './types'
 import {
   CAT_B_MIN_EXPENSE_RATIO,
   CAT_B_NEW_ACTIVITY_FACTORS,
+  deriveCatBActivityYear,
   FATURA_DEDUCTION_CAP,
   FATURA_DEDUCTION_RATE,
   getCatBCoefficient,
@@ -197,20 +198,24 @@ function generateExpenseGapOpts(person: Person, taxYear: number, slug: string): 
 
 // ─── Cat B regime comparison (simplified vs organized) ───────
 
-function generateCatBRegimeOpt(person: Person, slug: string): Optimization | undefined {
+function generateCatBRegimeOpt(
+  person: Person,
+  taxYear: number,
+  slug: string,
+): Optimization | undefined {
   const catBIncomes = person.incomes.filter(
     (i) => i.category === 'B' && i.cat_b_regime !== 'organized',
   )
   if (catBIncomes.length === 0) return undefined
+
+  const activityYear = deriveCatBActivityYear(person.cat_b_start_year, taxYear)
 
   for (const income of catBIncomes) {
     const coefficient = getCatBCoefficient(income.cat_b_income_code)
     let simplifiedTaxable = income.gross * coefficient
 
     // Apply activity year reduction factor if applicable
-    const activityFactor = income.cat_b_activity_year
-      ? CAT_B_NEW_ACTIVITY_FACTORS[income.cat_b_activity_year]
-      : undefined
+    const activityFactor = activityYear ? CAT_B_NEW_ACTIVITY_FACTORS[activityYear] : undefined
     if (activityFactor !== undefined) {
       simplifiedTaxable *= activityFactor
     }
@@ -287,7 +292,7 @@ export function generateProactiveOptimizations(
     const catBOpt = generateCatBAcrescimoOpt(person, i, result, slug)
     if (catBOpt) optimizations.push(catBOpt)
 
-    const catBRegimeOpt = generateCatBRegimeOpt(person, slug)
+    const catBRegimeOpt = generateCatBRegimeOpt(person, taxYear, slug)
     if (catBRegimeOpt) optimizations.push(catBRegimeOpt)
 
     const pprOpt = generatePprOpt(person, taxYear, slug)

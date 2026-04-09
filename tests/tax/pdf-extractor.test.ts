@@ -7,7 +7,7 @@ import {
   validateAgainstLiquidacao,
 } from '@/lib/tax/pdf-extractor'
 import type { LiquidacaoParsed, ComprovativoParsed } from '@/lib/tax/pdf-extractor'
-import type { ScenarioResult } from '@/lib/tax/types'
+import type { ScenarioResult, PersonTaxDetail } from '@/lib/tax/types'
 
 // ─── Real PDF text samples (extracted via pdfjs-dist) ────────
 
@@ -1034,10 +1034,34 @@ describe('Document type detection — content fallback', () => {
 // ─── validateAgainstLiquidacao ───────────────────────────────
 
 describe('validateAgainstLiquidacao', () => {
+  const basePerson: PersonTaxDetail = {
+    name: 'Test',
+    gross_income: 50000,
+    taxable_income: 45000,
+    irs_before_deductions: 10000,
+    deductions_total: 600,
+    irs_after_deductions: 9400,
+    autonomous_tax: 0,
+    solidarity_surcharge: 0,
+    specific_deduction: 4104,
+    cat_b_acrescimo: 0,
+    double_taxation_credit: 0,
+    ss_total: 5000,
+    withholding_total: 0,
+    irs_jovem_exemption: 0,
+    nhr_tax: 0,
+    minimo_existencia_applied: false,
+    effective_rate_irs: 0.2,
+    effective_rate_total: 0.312,
+    dependent_deduction_share: 0,
+    ascendant_deduction_share: 0,
+    disability_deductions: 0,
+  }
+
   const baseScenario: ScenarioResult = {
     label: 'test',
     filing_status: 'single',
-    persons: [],
+    persons: [basePerson],
     total_gross: 50000,
     total_taxable: 45000,
     total_irs: 10000,

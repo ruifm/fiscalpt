@@ -17,10 +17,7 @@ import fs from 'fs'
 import path from 'path'
 import { JSDOM } from 'jsdom'
 import { parseModelo3Xml } from '@/lib/tax/xml-parser'
-import {
-  parseComprovativoPdfText,
-  parseLiquidacaoText,
-} from '@/lib/tax/pdf-extractor'
+import { parseComprovativoPdfText, parseLiquidacaoText } from '@/lib/tax/pdf-extractor'
 import type { LiquidacaoParsed } from '@/lib/tax/pdf-extractor'
 import {
   assembleHouseholds,
@@ -96,7 +93,9 @@ async function loadComprovativoPdf(filename: string): Promise<AssemblyFile> {
   }
 }
 
-async function loadLiquidacaoPdf(filename: string): Promise<{ file: AssemblyFile; parsed: LiquidacaoParsed }> {
+async function loadLiquidacaoPdf(
+  filename: string,
+): Promise<{ file: AssemblyFile; parsed: LiquidacaoParsed }> {
   const filePath = path.join(FIXTURES, filename)
   const text = await extractTextFromPdfNode(filePath)
   const parsed = parseLiquidacaoText(text)
@@ -136,7 +135,13 @@ function goldenDeductionsText(nif: string, year: number): string {
 
 function buildDeductionSlots(years: readonly number[]) {
   const pastedDeductions = new Map<string, { text: string; result: DeductionsParseResult }>()
-  const deductionSlots: { key: string; nif: string; year: number; role: 'taxpayer' | 'dependent'; hasLiquidacao: boolean }[] = []
+  const deductionSlots: {
+    key: string
+    nif: string
+    year: number
+    role: 'taxpayer' | 'dependent'
+    hasLiquidacao: boolean
+  }[] = []
 
   for (const year of years) {
     for (const nif of NIFS) {
@@ -154,11 +159,22 @@ function buildDeductionSlots(years: readonly number[]) {
 // ─── Pipeline Runner ─────────────────────────────────────────
 
 interface PipelineResult {
-  years: Map<number, {
-    household: Household
-    analysis: AnalysisResult
-    regimes: { member: number; name: string; special_regimes: string[]; irs_jovem_year?: number; nhr_start_year?: number; irs_jovem_first_work_year?: number; irs_jovem_degree_year?: number }[]
-  }>
+  years: Map<
+    number,
+    {
+      household: Household
+      analysis: AnalysisResult
+      regimes: {
+        member: number
+        name: string
+        special_regimes: string[]
+        irs_jovem_year?: number
+        nhr_start_year?: number
+        irs_jovem_first_work_year?: number
+        irs_jovem_degree_year?: number
+      }[]
+    }
+  >
   liquidacao?: LiquidacaoParsed
 }
 
@@ -271,11 +287,7 @@ interface ExpectedYear {
 
 // ─── Assertion Helpers ───────────────────────────────────────
 
-function assertScenario(
-  scenario: ScenarioResult,
-  expected: ExpectedScenario,
-  label: string,
-) {
+function assertScenario(scenario: ScenarioResult, expected: ExpectedScenario, _label: string) {
   expect(scenario.total_irs).toBeCloseTo(expected.irs, 0)
   expect(scenario.effective_rate_irs).toBeCloseTo(expected.rate, 2)
 
@@ -317,9 +329,13 @@ function assertRegimes(
 ) {
   const m0 = yearData.regimes[0]
   const m1 = yearData.regimes[1]
-  expect(m0.special_regimes.sort(), `${year} member 0 regimes`).toEqual(expectedMember0Regimes.sort())
+  expect(m0.special_regimes.sort(), `${year} member 0 regimes`).toEqual(
+    expectedMember0Regimes.sort(),
+  )
   if (m1) {
-    expect(m1.special_regimes.sort(), `${year} member 1 regimes`).toEqual(expectedMember1Regimes.sort())
+    expect(m1.special_regimes.sort(), `${year} member 1 regimes`).toEqual(
+      expectedMember1Regimes.sort(),
+    )
   }
 }
 
@@ -357,74 +373,94 @@ describe('Golden pipeline: all years XML (2021-2025)', () => {
     {
       year: 2021,
       current: {
-        irs: 6458.61, rate: 0.156, refundOrPay: 2192.37,
+        irs: 6458.61,
+        rate: 0.156,
+        refundOrPay: 2192.37,
         holderA: { irs: 959.22, rate: 0.069 },
-        holderB: { irs: 5499.39, rate: 0.200 },
+        holderB: { irs: 5499.39, rate: 0.2 },
       },
     },
     {
       year: 2022,
       current: {
-        irs: 7357.20, rate: 0.164, refundOrPay: 2663.37,
+        irs: 7357.2,
+        rate: 0.164,
+        refundOrPay: 2663.37,
         holderA: { irs: 4135.65, rate: 0.144 },
-        holderB: { irs: 3221.55, rate: 0.200 },
+        holderB: { irs: 3221.55, rate: 0.2 },
       },
     },
     {
       year: 2023,
       current: {
-        irs: 15824.25, rate: 0.142, refundOrPay: 844.59,
+        irs: 15824.25,
+        rate: 0.142,
+        refundOrPay: 844.59,
         holderA: { irs: 5155.54, rate: 0.089 },
-        holderB: { irs: 10668.71, rate: 0.200 },
+        holderB: { irs: 10668.71, rate: 0.2 },
       },
       savings: 1892.95,
       optimized: {
-        irs: 13931.30, rate: 0.125, refundOrPay: 1048.36,
+        irs: 13931.3,
+        rate: 0.125,
+        refundOrPay: 1048.36,
         holderA: { irs: 3262.59, rate: 0.056 },
-        holderB: { irs: 10668.71, rate: 0.200 },
+        holderB: { irs: 10668.71, rate: 0.2 },
       },
     },
     {
       year: 2024,
       current: {
-        irs: 10515.47, rate: 0.137, refundOrPay: 5589.32,
+        irs: 10515.47,
+        rate: 0.137,
+        refundOrPay: 5589.32,
         holderA: { irs: 5658.29, rate: 0.108 },
-        holderB: { irs: 4857.18, rate: 0.200 },
+        holderB: { irs: 4857.18, rate: 0.2 },
       },
       savings: 3154.93,
       optimized: {
-        irs: 7360.54, rate: 0.096, refundOrPay: 2434.39,
+        irs: 7360.54,
+        rate: 0.096,
+        refundOrPay: 2434.39,
         holderA: { irs: 2503.36, rate: 0.048 },
-        holderB: { irs: 4857.18, rate: 0.200 },
+        holderB: { irs: 4857.18, rate: 0.2 },
       },
     },
     {
       year: 2025,
       current: {
-        irs: 15050.29, rate: 0.117, refundOrPay: 3880.67,
+        irs: 15050.29,
+        rate: 0.117,
+        refundOrPay: 3880.67,
         holderA: { irs: 2828.84, rate: 0.042 },
-        holderB: { irs: 12221.45, rate: 0.200 },
+        holderB: { irs: 12221.45, rate: 0.2 },
       },
       savings: 2072.33,
       optimized: {
-        irs: 12977.96, rate: 0.101, refundOrPay: 5953.00,
+        irs: 12977.96,
+        rate: 0.101,
+        refundOrPay: 5953.0,
         holderA: { irs: 756.51, rate: 0.011 },
-        holderB: { irs: 12221.45, rate: 0.200 },
+        holderB: { irs: 12221.45, rate: 0.2 },
       },
     },
     {
       year: 2026,
       projected: true,
       current: {
-        irs: 15113.29, rate: 0.118, refundOrPay: 13869.34,
+        irs: 15113.29,
+        rate: 0.118,
+        refundOrPay: 13869.34,
         holderA: { irs: 2891.84, rate: 0.043 },
-        holderB: { irs: 12221.45, rate: 0.200 },
+        holderB: { irs: 12221.45, rate: 0.2 },
       },
       savings: 2009.33,
       optimized: {
-        irs: 13103.96, rate: 0.102, refundOrPay: 15878.67,
+        irs: 13103.96,
+        rate: 0.102,
+        refundOrPay: 15878.67,
         holderA: { irs: 882.51, rate: 0.013 },
-        holderB: { irs: 12221.45, rate: 0.200 },
+        holderB: { irs: 12221.45, rate: 0.2 },
       },
     },
   ]
@@ -477,30 +513,38 @@ describe('Golden pipeline: 2025 only XML', () => {
     {
       year: 2025,
       current: {
-        irs: 15050.29, rate: 0.117, refundOrPay: 3880.67,
+        irs: 15050.29,
+        rate: 0.117,
+        refundOrPay: 3880.67,
         holderA: { irs: 2828.84, rate: 0.042 },
-        holderB: { irs: 12221.45, rate: 0.200 },
+        holderB: { irs: 12221.45, rate: 0.2 },
       },
       savings: 2072.33,
       optimized: {
-        irs: 12977.96, rate: 0.101, refundOrPay: 5953.00,
+        irs: 12977.96,
+        rate: 0.101,
+        refundOrPay: 5953.0,
         holderA: { irs: 756.51, rate: 0.011 },
-        holderB: { irs: 12221.45, rate: 0.200 },
+        holderB: { irs: 12221.45, rate: 0.2 },
       },
     },
     {
       year: 2026,
       projected: true,
       current: {
-        irs: 15113.29, rate: 0.118, refundOrPay: 13869.34,
+        irs: 15113.29,
+        rate: 0.118,
+        refundOrPay: 13869.34,
         holderA: { irs: 2891.84, rate: 0.043 },
-        holderB: { irs: 12221.45, rate: 0.200 },
+        holderB: { irs: 12221.45, rate: 0.2 },
       },
       savings: 2009.33,
       optimized: {
-        irs: 13103.96, rate: 0.102, refundOrPay: 15878.67,
+        irs: 13103.96,
+        rate: 0.102,
+        refundOrPay: 15878.67,
         holderA: { irs: 882.51, rate: 0.013 },
-        holderB: { irs: 12221.45, rate: 0.200 },
+        holderB: { irs: 12221.45, rate: 0.2 },
       },
     },
   ]
@@ -528,7 +572,7 @@ describe('Golden pipeline: 2025 only XML', () => {
 
 describe('Golden pipeline: 2024 primary XML with liquidação', () => {
   let pipeline: PipelineResult
-  let liquidacao: LiquidacaoParsed
+  let _liquidacao: LiquidacaoParsed
   let primaryFiles: AssemblyFile[]
   let liqFile: AssemblyFile
 
@@ -538,36 +582,44 @@ describe('Golden pipeline: 2024 primary XML with liquidação', () => {
       loadXml('decl-m3-irs-2024-holder-b.xml'),
     ]
     const liq = await loadLiquidacaoPdf('liquidacao-2024-holder-a.pdf')
-    liquidacao = liq.parsed
+    _liquidacao = liq.parsed
     liqFile = liq.file
 
-    // Need to find Cat B income index for activity_year answer.
-    // Apply member answers first, then find the Cat B income.
-    pipeline = runPipeline(primaryFiles, [], [2024], {
-      'member.0.birth_year': 1994,
-      'member.1.birth_year': 1989,
-      'dependent.0.birth_year': 2019,
-      'dependent.1.birth_year': 2022,
-      'member.0.degree_year': 2020,
-      'member.1.degree_year': 2012,
-      'member.1.nhr_start_year': 2021,
-      'member.0.income.0.cat_b_activity_year': 2,
-    }, [liqFile])
+    pipeline = runPipeline(
+      primaryFiles,
+      [],
+      [2024],
+      {
+        'member.0.birth_year': 1994,
+        'member.1.birth_year': 1989,
+        'dependent.0.birth_year': 2019,
+        'dependent.1.birth_year': 2022,
+        'member.0.degree_year': 2020,
+        'member.1.degree_year': 2012,
+        'member.1.nhr_start_year': 2021,
+        'member.0.cat_b_start_year': 2023,
+      },
+      [liqFile],
+    )
   })
 
   const EXPECTED: ExpectedYear[] = [
     {
       year: 2024,
       current: {
-        irs: 7193.64, rate: 0.094, refundOrPay: 2267.49,
+        irs: 7193.64,
+        rate: 0.094,
+        refundOrPay: 2267.49,
         holderA: { irs: 2336.46, rate: 0.045 },
-        holderB: { irs: 4857.18, rate: 0.200 },
+        holderB: { irs: 4857.18, rate: 0.2 },
       },
-      savings: 2031.90,
+      savings: 2031.9,
       optimized: {
-        irs: 5161.74, rate: 0.067, refundOrPay: 235.59,
+        irs: 5161.74,
+        rate: 0.067,
+        refundOrPay: 235.59,
         holderA: { irs: 304.56, rate: 0.006 },
-        holderB: { irs: 4857.18, rate: 0.200 },
+        holderB: { irs: 4857.18, rate: 0.2 },
       },
     },
   ]
@@ -623,7 +675,7 @@ describe('Golden pipeline: all years PDF comprovativos (2021-2024)', () => {
       'member.0.degree_year': 2020,
       'member.1.degree_year': 2012,
       'member.1.nhr_start_year': 2021,
-      'member.0.income.0.cat_b_activity_year': 2,
+      'member.0.cat_b_start_year': 2023,
     })
   })
 
@@ -637,15 +689,19 @@ describe('Golden pipeline: all years PDF comprovativos (2021-2024)', () => {
     const expected: ExpectedYear = {
       year: 2024,
       current: {
-        irs: 7193.64, rate: 0.094, refundOrPay: 2267.49,
+        irs: 7193.64,
+        rate: 0.094,
+        refundOrPay: 2267.49,
         holderA: { irs: 2336.46, rate: 0.045 },
-        holderB: { irs: 4857.18, rate: 0.200 },
+        holderB: { irs: 4857.18, rate: 0.2 },
       },
-      savings: 2031.90,
+      savings: 2031.9,
       optimized: {
-        irs: 5161.74, rate: 0.067, refundOrPay: 235.59,
+        irs: 5161.74,
+        rate: 0.067,
+        refundOrPay: 235.59,
         holderA: { irs: 304.56, rate: 0.006 },
-        holderB: { irs: 4857.18, rate: 0.200 },
+        holderB: { irs: 4857.18, rate: 0.2 },
       },
     }
     assertYear(yearData, expected)
@@ -685,7 +741,7 @@ describe('Golden pipeline: all years PDF comprovativos (2021-2024)', () => {
 
 describe('Golden pipeline: 2024 primary PDF with liquidação', () => {
   let pipeline: PipelineResult
-  let liquidacao: LiquidacaoParsed
+  let _liquidacao: LiquidacaoParsed
   let primaryFiles: AssemblyFile[]
   let liqFile: AssemblyFile
 
@@ -695,19 +751,25 @@ describe('Golden pipeline: 2024 primary PDF with liquidação', () => {
       loadComprovativoPdf('comprovativo-2024-holder-b.pdf'),
     ])
     const liq = await loadLiquidacaoPdf('liquidacao-2024-holder-a.pdf')
-    liquidacao = liq.parsed
+    _liquidacao = liq.parsed
     liqFile = liq.file
 
-    pipeline = runPipeline(primaryFiles, [], [2024], {
-      'member.0.birth_year': 1994,
-      'member.1.birth_year': 1989,
-      'dependent.0.birth_year': 2019,
-      'dependent.1.birth_year': 2022,
-      'member.0.degree_year': 2020,
-      'member.1.degree_year': 2012,
-      'member.1.nhr_start_year': 2021,
-      'member.0.income.0.cat_b_activity_year': 2,
-    }, [liqFile])
+    pipeline = runPipeline(
+      primaryFiles,
+      [],
+      [2024],
+      {
+        'member.0.birth_year': 1994,
+        'member.1.birth_year': 1989,
+        'dependent.0.birth_year': 2019,
+        'dependent.1.birth_year': 2022,
+        'member.0.degree_year': 2020,
+        'member.1.degree_year': 2012,
+        'member.1.nhr_start_year': 2021,
+        'member.0.cat_b_start_year': 2023,
+      },
+      [liqFile],
+    )
   })
 
   it('year 2024: matches XML 2024-primary golden values', () => {
@@ -718,15 +780,19 @@ describe('Golden pipeline: 2024 primary PDF with liquidação', () => {
     const expected: ExpectedYear = {
       year: 2024,
       current: {
-        irs: 7193.64, rate: 0.094, refundOrPay: 2267.49,
+        irs: 7193.64,
+        rate: 0.094,
+        refundOrPay: 2267.49,
         holderA: { irs: 2336.46, rate: 0.045 },
-        holderB: { irs: 4857.18, rate: 0.200 },
+        holderB: { irs: 4857.18, rate: 0.2 },
       },
-      savings: 2031.90,
+      savings: 2031.9,
       optimized: {
-        irs: 5161.74, rate: 0.067, refundOrPay: 235.59,
+        irs: 5161.74,
+        rate: 0.067,
+        refundOrPay: 235.59,
         holderA: { irs: 304.56, rate: 0.006 },
-        holderB: { irs: 4857.18, rate: 0.200 },
+        holderB: { irs: 4857.18, rate: 0.2 },
       },
     }
     assertYear(yearData, expected)

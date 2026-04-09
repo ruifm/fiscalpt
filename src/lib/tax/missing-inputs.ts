@@ -188,46 +188,50 @@ export function identifyMissingInputs(
     }
   }
 
-  // ── Cat B activity details ───────────────────────────────
+  // ── Cat B activity start year ────────────────────────────────
   for (let i = 0; i < household.members.length; i++) {
     const member = household.members[i]
-    for (let j = 0; j < member.incomes.length; j++) {
-      const income = member.incomes[j]
-      if (income.category !== 'B') continue
+    const hasCatB = member.incomes.some((inc) => inc.category === 'B')
+    if (!hasCatB) continue
 
-      const hasCatBYear = income.cat_b_activity_year !== undefined
+    const alreadySet = member.cat_b_start_year !== undefined
 
-      // Skip if we can infer ≥3rd year from historical data:
-      // member has Cat B income in ≥2 other tax years → past new-activity period
-      if (!hasCatBYear && otherYearHouseholds) {
-        const otherYearsWithCatB = otherYearHouseholds.filter((hh) => {
+    // Auto-infer from historical data: if 3+ real declarations have Cat B for
+    // this person, they're past the new-activity period. Set start year to the
+    // earliest declaration year with Cat B — the exact value doesn't affect the
+    // reduction (all years are ≥3rd), but keeps the data complete.
+    if (!alreadySet && otherYearHouseholds) {
+      const otherRealYearsWithCatB = otherYearHouseholds
+        .filter((hh) => {
+          if (hh.projected) return false
           const match = findMatchingMember(member, hh.members)
           return match?.incomes.some((inc) => inc.category === 'B')
-        }).length
-        if (otherYearsWithCatB >= 2) continue
-      }
+        })
+        .map((hh) => hh.year)
 
-      questions.push({
-        id: `member.${i}.income.${j}.cat_b_activity_year`,
-        section: 'cat_b_details',
-        label: `Ano de atividade de ${member.name} (Cat. B)`,
-        reason:
-          'Art. 31 nº 10: 1.º ano → apenas 50% do rendimento é tributável; 2.º ano → 75%. A partir do 3.º ano: sem redução.',
-        type: 'select',
-        options: [
-          { value: '0', label: '3.º ano ou mais (sem redução)' },
-          { value: '1', label: '1.º ano de atividade (50% tributável)' },
-          { value: '2', label: '2.º ano de atividade (75% tributável)' },
-        ],
-        priority: hasCatBYear ? 'optional' : 'critical',
-        path: `members.${i}.incomes.${j}.cat_b_activity_year`,
-        currentValue: hasCatBYear ? String(income.cat_b_activity_year) : undefined,
-        validate: (v: string | number | boolean): string | null => {
-          const n = toNumber(v)
-          return n >= 0 && n <= 2 ? null : 'Valor inválido'
-        },
-      })
+      if (otherRealYearsWithCatB.length + 1 >= 3) {
+        member.cat_b_start_year = Math.min(household.year, ...otherRealYearsWithCatB)
+        continue
+      }
     }
+
+    questions.push({
+      id: `member.${i}.cat_b_start_year`,
+      section: 'cat_b_details',
+      label: `Em que ano ${member.name} iniciou atividade independente (Cat. B)?`,
+      reason:
+        'Art. 31 nº 10: 1.º ano → apenas 50% do rendimento é tributável; 2.º ano → 75%. A partir do 3.º ano: sem redução.',
+      type: 'number',
+      priority: alreadySet ? 'optional' : 'critical',
+      currentValue: alreadySet ? String(member.cat_b_start_year) : undefined,
+      path: `members.${i}.cat_b_start_year`,
+      validate: (v: string | number | boolean): string | null => {
+        const n = toNumber(v)
+        return n >= 1990 && n <= household.year
+          ? null
+          : `Ano deve ser entre 1990 e ${household.year}`
+      },
+    })
   }
 
   // ── Cat F rental contract duration ───────────────────────
@@ -524,6 +528,9 @@ export function applyAnswers(
           }
         }
       }
+    } else if (parts[0] === 'member' && parts[2] === 'cat_b_start_year') {
+      const mIdx = parseInt(parts[1])
+      if (h.members[mIdx]) h.members[mIdx].cat_b_start_year = toNumber(value)
     } else if (parts[0] === 'member' && parts[2] === 'income') {
       const mIdx = parseInt(parts[1])
       const iIdx = parseInt(parts[3])
@@ -531,9 +538,7 @@ export function applyAnswers(
       const member = h.members[mIdx]
       if (!member?.incomes[iIdx]) continue
 
-      if (field === 'cat_b_activity_year') {
-        member.incomes[iIdx].cat_b_activity_year = toNumber(value)
-      } else if (field === 'rental_duration' || field === 'rental_contract_duration') {
+      if (field === 'rental_duration' || field === 'rental_contract_duration') {
         member.incomes[iIdx].rental_contract_duration = toNumber(value)
       } else if (field === 'englobamento') {
         member.incomes[iIdx].englobamento = value === true || value === 'true'

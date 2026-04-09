@@ -1862,11 +1862,12 @@ describe('XML Parser — Modelo 3 IRS', () => {
       </Modelo3IRSv2026>`
       const result = parseModelo3Xml(xml)
       const catB = result.household.members[0].incomes.find((i) => i.category === 'B')
-      // firstYear=S but priorYearIncome=12000 → activityYear should be undefined
-      expect(catB!.cat_b_activity_year).toBeUndefined()
+      // firstYear=S but priorYearIncome=12000 → cat_b_start_year should NOT be set to current year
+      expect(result.household.members[0].cat_b_start_year).toBeUndefined()
+      expect(catB).toBeDefined()
     })
 
-    it('sets activityYear=1 when firstYear=true and no prior income', () => {
+    it('sets cat_b_start_year when firstYear=true and no prior income', () => {
       const xml = `<Modelo3IRSv2026>
         <Rosto>
           <Quadro02><Q02C01>2025</Q02C01></Quadro02>
@@ -1883,8 +1884,7 @@ describe('XML Parser — Modelo 3 IRS', () => {
         </AnexoB>
       </Modelo3IRSv2026>`
       const result = parseModelo3Xml(xml)
-      const catB = result.household.members[0].incomes.find((i) => i.category === 'B')
-      expect(catB!.cat_b_activity_year).toBe(1)
+      expect(result.household.members[0].cat_b_start_year).toBe(2025)
     })
 
     it('uses totalGross when no income codes present but SomaC01 > 0', () => {

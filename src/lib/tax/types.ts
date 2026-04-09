@@ -41,11 +41,6 @@ export interface Income {
   // If < 15% of gross, difference is added to taxable income.
   // Includes SS contributions + e-fatura expenses.
   cat_b_documented_expenses?: number
-  // Cat B simplified — Art. 31 nº 10: which year of new activity (1 or 2).
-  // Y1: only 50% of simplified income is taxable.
-  // Y2: only 75% of simplified income is taxable.
-  // undefined/0: no reduction (normal activity or ineligible).
-  cat_b_activity_year?: number
   // Cat B: activity code (tabela de atividades) from AnexoBq03C07
   cat_b_activity_code?: string
   // Cat B: CAE from AnexoBq03C08
@@ -113,6 +108,11 @@ export interface Person {
   // Disability degree (grau de incapacidade) ≥ 60% for tax benefits.
   // Triggers Art. 87 deductions (4 × IAS), companion (4 × IAS if ≥ 90%).
   disability_degree?: number
+  // Art. 31 nº 10: absolute year when Cat B activity started (e.g. 2023).
+  // Applies to ALL Cat B incomes for this person (AT only tracks one per person).
+  // Used to derive activity year: taxYear - cat_b_start_year + 1
+  //   Y1 → 50% of simplified income taxable, Y2 → 75%, Y3+ → no reduction.
+  cat_b_start_year?: number
 }
 
 export interface Household {
@@ -311,6 +311,22 @@ export function getCatBCoefficient(incomeCode?: number): number {
 export const CAT_B_NEW_ACTIVITY_FACTORS: Record<number, number> = {
   1: 0.5, // 1st full period: 50% of simplified income taxable
   2: 0.75, // 2nd full period: 75% of simplified income taxable
+}
+
+/**
+ * Derive the Cat B activity year from an absolute start year and the tax year.
+ * Returns 1 (first year) or 2 (second year) when the new-activity reduction applies,
+ * or undefined when the person is past the new-activity period or data is missing.
+ */
+export function deriveCatBActivityYear(
+  catBStartYear: number | undefined,
+  taxYear: number,
+): 1 | 2 | undefined {
+  if (catBStartYear === undefined) return undefined
+  const year = taxYear - catBStartYear + 1
+  if (year === 1) return 1
+  if (year === 2) return 2
+  return undefined
 }
 
 // Autonomous taxation rates (Art. 72 CIRS)

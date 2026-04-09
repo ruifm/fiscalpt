@@ -33,7 +33,6 @@ function makeHousehold(overrides?: Partial<Household>): Household {
             withholding: 3000,
             ss_paid: 2000,
             cat_b_income_code: 403,
-            cat_b_activity_year: 1,
           },
         ],
         deductions: [{ category: 'health', amount: 500 }],
@@ -142,24 +141,11 @@ describe('buildProjectedHousehold', () => {
     expect(projected.members[0].special_regimes).not.toContain('irs_jovem')
   })
 
-  it('increments cat_b_activity_year from 1st to 2nd year', () => {
+  it('preserves cat_b_start_year on person (no income-level advancement)', () => {
     const h = makeHousehold()
+    h.members[1].cat_b_start_year = 2024
     const projected = buildProjectedHousehold(h)
-    expect(projected.members[1].incomes[0].cat_b_activity_year).toBe(2)
-  })
-
-  it('drops cat_b_activity_year when 2nd year advances past new-activity period', () => {
-    const h = makeHousehold()
-    h.members[1].incomes[0].cat_b_activity_year = 2
-    const projected = buildProjectedHousehold(h)
-    expect(projected.members[1].incomes[0].cat_b_activity_year).toBeUndefined()
-  })
-
-  it('drops cat_b_activity_year=0 (3rd+ year) — no new-activity reduction in projection', () => {
-    const h = makeHousehold()
-    h.members[1].incomes[0].cat_b_activity_year = 0
-    const projected = buildProjectedHousehold(h)
-    expect(projected.members[1].incomes[0].cat_b_activity_year).toBeUndefined()
+    expect(projected.members[1].cat_b_start_year).toBe(2024)
   })
 
   it('preserves NHR regime and start year unchanged', () => {
@@ -417,13 +403,13 @@ describe('estimateProjectedRetentions', () => {
           name: 'Bob',
           nif: '987654321',
           birth_year: 1988,
+          cat_b_start_year: 2025,
           incomes: [
             {
               category: 'B',
               gross: 50000,
               withholding: 5000,
               ss_paid: 7490,
-              cat_b_activity_year: 1,
             },
           ],
           deductions: [],

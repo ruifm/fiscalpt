@@ -164,17 +164,6 @@ export function validateIncome(income: Income, prefix = ''): ValidationError[] {
     )
   }
 
-  if (income.cat_b_activity_year !== undefined) {
-    if (income.cat_b_activity_year < 0) {
-      errors.push({
-        severity: 'error',
-        field: `${p}cat_b_activity_year`,
-        code: 'OUT_OF_RANGE',
-        message: 'Ano de atividade de trabalho independente inválido',
-      })
-    }
-  }
-
   return errors
 }
 
@@ -323,6 +312,17 @@ export function validatePerson(person: Person, taxYear: number, prefix = ''): Va
         field: `${p}disability_degree`,
         code: 'OUT_OF_RANGE',
         message: 'Grau de incapacidade deve ser entre 0 e 100',
+      })
+    }
+  }
+
+  if (person.cat_b_start_year !== undefined) {
+    if (person.cat_b_start_year < 1990 || person.cat_b_start_year > taxYear) {
+      errors.push({
+        severity: 'error',
+        field: `${p}cat_b_start_year`,
+        code: 'OUT_OF_RANGE',
+        message: `Ano de início de atividade deve ser entre 1990 e ${taxYear}`,
       })
     }
   }

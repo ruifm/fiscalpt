@@ -891,9 +891,8 @@ export function validateAgainstLiquidacao(
 
   // When personIndex is provided, compare against that specific person's data
   // (used for separate filing where liquidação is per-person).
-  const persons = personIndex != null
-    ? [scenarioResult.persons[personIndex]]
-    : scenarioResult.persons
+  const persons =
+    personIndex != null ? [scenarioResult.persons[personIndex]] : scenarioResult.persons
 
   if (liquidacao.rendimentoGlobal != null) {
     // AT's rendimento global (Line 1) = total income after specific deductions,
@@ -919,8 +918,7 @@ export function validateAgainstLiquidacao(
     // Engine equivalent: irs_before_deductions + autonomous_tax + solidarity_surcharge + nhr_tax
     const engineColeta = persons.reduce(
       (sum, p) =>
-        sum + p.irs_before_deductions + p.autonomous_tax +
-        p.solidarity_surcharge + p.nhr_tax,
+        sum + p.irs_before_deductions + p.autonomous_tax + p.solidarity_surcharge + p.nhr_tax,
       0,
     )
     const diff = Math.abs(liquidacao.coletaTotal - engineColeta)
@@ -941,9 +939,8 @@ export function validateAgainstLiquidacao(
   }
 
   if (liquidacao.taxaEfetiva != null) {
-    const calculatedRate = personIndex != null
-      ? persons[0].effective_rate_irs
-      : scenarioResult.effective_rate_irs
+    const calculatedRate =
+      personIndex != null ? persons[0].effective_rate_irs : scenarioResult.effective_rate_irs
     const diff = Math.abs(liquidacao.taxaEfetiva - calculatedRate)
     comparison.push({
       field: 'Taxa Efetiva',

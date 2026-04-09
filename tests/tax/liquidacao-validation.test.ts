@@ -1,13 +1,40 @@
 import { describe, it, expect } from 'vitest'
 import { validateAgainstLiquidacao } from '@/lib/tax/pdf-extractor'
 import type { LiquidacaoParsed } from '@/lib/tax/pdf-extractor'
-import type { ScenarioResult } from '@/lib/tax/types'
+import type { ScenarioResult, PersonTaxDetail } from '@/lib/tax/types'
+
+function makePersonTaxDetail(overrides: Partial<PersonTaxDetail> = {}): PersonTaxDetail {
+  return {
+    name: 'Test',
+    gross_income: 50000,
+    taxable_income: 45000,
+    irs_before_deductions: 10000,
+    deductions_total: 738,
+    irs_after_deductions: 9262,
+    autonomous_tax: 0,
+    solidarity_surcharge: 0,
+    specific_deduction: 4104,
+    cat_b_acrescimo: 0,
+    double_taxation_credit: 0,
+    ss_total: 5500,
+    withholding_total: 0,
+    irs_jovem_exemption: 0,
+    nhr_tax: 0,
+    minimo_existencia_applied: false,
+    effective_rate_irs: 0.2,
+    effective_rate_total: 0.31,
+    dependent_deduction_share: 0,
+    ascendant_deduction_share: 0,
+    disability_deductions: 0,
+    ...overrides,
+  }
+}
 
 function makeScenario(overrides: Partial<ScenarioResult> = {}): ScenarioResult {
   return {
     label: 'test',
     filing_status: 'single',
-    persons: [],
+    persons: [makePersonTaxDetail()],
     total_gross: 50000,
     total_taxable: 45000,
     total_irs: 10000,
@@ -103,7 +130,11 @@ describe('validateAgainstLiquidacao', () => {
   it('should handle NHR case where total_gross >> total_taxable', () => {
     const result = validateAgainstLiquidacao(
       makeLiquidacao({ rendimentoGlobal: 36000 }),
-      makeScenario({ total_gross: 80000, total_taxable: 36000 }),
+      makeScenario({
+        total_gross: 80000,
+        total_taxable: 36000,
+        persons: [makePersonTaxDetail({ gross_income: 80000, taxable_income: 36000 })],
+      }),
     )
 
     expect(result.isValid).toBe(true)

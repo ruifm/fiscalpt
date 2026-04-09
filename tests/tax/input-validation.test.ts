@@ -180,20 +180,47 @@ describe('validateIncome', () => {
         cat_b_regime: 'simplified',
         cat_b_income_code: 403,
         cat_b_documented_expenses: 5000,
-        cat_b_activity_year: 1,
       }),
     )
     expect(errors).toHaveLength(0)
   })
+})
 
-  it('accepts cat_b_activity_year of 0 (3rd year or more, no reduction)', () => {
-    const errors = validateIncome(validIncome({ category: 'B', cat_b_activity_year: 0 }))
-    expect(errors.filter((e) => e.field === 'cat_b_activity_year')).toHaveLength(0)
+// ═══════════════════════════════════════════════════════════════
+// 2b. validateMember — cat_b_start_year
+// ═══════════════════════════════════════════════════════════════
+
+describe('validatePerson — cat_b_start_year', () => {
+  it('accepts valid cat_b_start_year within range', () => {
+    const errors = validatePerson(
+      { name: 'Test', cat_b_start_year: 2023, incomes: [], deductions: [], special_regimes: [] },
+      2024,
+    )
+    expect(errors.filter((e) => e.field === 'cat_b_start_year')).toHaveLength(0)
   })
 
-  it('accepts cat_b_activity_year of 3 or more', () => {
-    const errors = validateIncome(validIncome({ category: 'B', cat_b_activity_year: 3 }))
-    expect(errors.filter((e) => e.field === 'cat_b_activity_year')).toHaveLength(0)
+  it('accepts cat_b_start_year equal to tax year', () => {
+    const errors = validatePerson(
+      { name: 'Test', cat_b_start_year: 2024, incomes: [], deductions: [], special_regimes: [] },
+      2024,
+    )
+    expect(errors.filter((e) => e.field === 'cat_b_start_year')).toHaveLength(0)
+  })
+
+  it('rejects cat_b_start_year after tax year', () => {
+    const errors = validatePerson(
+      { name: 'Test', cat_b_start_year: 2025, incomes: [], deductions: [], special_regimes: [] },
+      2024,
+    )
+    expect(errors.filter((e) => e.field === 'cat_b_start_year')).toHaveLength(1)
+  })
+
+  it('rejects cat_b_start_year before 1990', () => {
+    const errors = validatePerson(
+      { name: 'Test', cat_b_start_year: 1989, incomes: [], deductions: [], special_regimes: [] },
+      2024,
+    )
+    expect(errors.filter((e) => e.field === 'cat_b_start_year')).toHaveLength(1)
   })
 })
 

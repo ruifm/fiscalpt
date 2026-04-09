@@ -79,6 +79,7 @@ export function propagateSharedData(primary: Household, target: Household): Hous
         nif: match.nif ?? member.nif,
         birth_year: match.birth_year ?? member.birth_year,
         nhr_start_year: match.nhr_start_year ?? member.nhr_start_year,
+        cat_b_start_year: match.cat_b_start_year ?? member.cat_b_start_year,
         irs_jovem_first_work_year: firstWorkYear,
         irs_jovem_degree_year: degreeYear,
       }

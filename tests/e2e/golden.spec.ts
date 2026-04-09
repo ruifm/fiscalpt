@@ -338,7 +338,7 @@ async function fillStrictQuestionnaire(
     await input.fill(textAnswers[qid])
   }
 
-  // Phase 3: Selects (Cat B activity year)
+  // Phase 3: Selects (if any remain)
   for (const [qid, value] of Object.entries(selectAnswers)) {
     const select = questionnaire.locator('[data-question-id*="' + qid + '"] select')
     await expect(select, 'Select ' + qid).toBeVisible({ timeout: 5_000 })
@@ -548,20 +548,17 @@ test.describe('Golden canary: 2025 only', () => {
     await fillGoldenDeductionSlots(page, [2025])
     await clickAdvance(page)
 
-    // Cat B activity year asked as select (3rd+ year = "0")
+    // Cat B start year asked as text input (3rd+ year → 2023)
     // 2 dependents: born 2019 + 2022
-    await fillStrictQuestionnaire(
-      page,
-      {
-        'member.0.birth_year': '1994',
-        'member.1.birth_year': '1989',
-        'dependent.0.birth_year': '2019',
-        'dependent.1.birth_year': '2022',
-        'member.0.first_work_year': '2021',
-        'member.1.nhr_start_year': '2021',
-      },
-      { cat_b_activity_year: '0' },
-    )
+    await fillStrictQuestionnaire(page, {
+      'member.0.birth_year': '1994',
+      'member.1.birth_year': '1989',
+      'dependent.0.birth_year': '2019',
+      'dependent.1.birth_year': '2022',
+      'member.0.first_work_year': '2021',
+      'member.1.nhr_start_year': '2021',
+      'member.0.cat_b_start_year': '2023',
+    })
 
     await waitForStep(page, 'results')
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible({
@@ -608,21 +605,18 @@ test.describe('Golden canary: 2024 primary with liquidacao', () => {
     await fillGoldenDeductionSlots(page, [2024])
     await clickAdvance(page)
 
-    // 2024 asks degree_year (not first_work_year), Cat B = 2nd year
+    // 2024 asks degree_year (not first_work_year), Cat B start year = 2023
     // 2 dependents: born 2019 + 2022
-    await fillStrictQuestionnaire(
-      page,
-      {
-        'member.0.birth_year': '1994',
-        'member.1.birth_year': '1989',
-        'dependent.0.birth_year': '2019',
-        'dependent.1.birth_year': '2022',
-        'member.0.degree_year': '2020',
-        'member.1.degree_year': '2012',
-        'member.1.nhr_start_year': '2021',
-      },
-      { cat_b_activity_year: '2' },
-    )
+    await fillStrictQuestionnaire(page, {
+      'member.0.birth_year': '1994',
+      'member.1.birth_year': '1989',
+      'dependent.0.birth_year': '2019',
+      'dependent.1.birth_year': '2022',
+      'member.0.degree_year': '2020',
+      'member.1.degree_year': '2012',
+      'member.1.nhr_start_year': '2021',
+      'member.0.cat_b_start_year': '2023',
+    })
 
     await waitForStep(page, 'results')
     const container = page.locator('[data-testid="results-container"]')
@@ -680,19 +674,16 @@ test.describe('Golden canary: all years PDF comprovativos (2021-2024)', () => {
     // Questionnaire — with assembly fix, both holders' data is now present.
     // PDF comprovativos extract IRS Jovem from Anexo A (so no first_work_year needed)
     // and NHR from Anexo L. Both members get degree_year (proactive IRS Jovem check).
-    await fillStrictQuestionnaire(
-      page,
-      {
-        'member.0.birth_year': '1994',
-        'member.1.birth_year': '1989',
-        'dependent.0.birth_year': '2019',
-        'dependent.1.birth_year': '2022',
-        'member.0.degree_year': '2020',
-        'member.1.degree_year': '2012',
-        'member.1.nhr_start_year': '2021',
-      },
-      { cat_b_activity_year: '2' },
-    )
+    await fillStrictQuestionnaire(page, {
+      'member.0.birth_year': '1994',
+      'member.1.birth_year': '1989',
+      'dependent.0.birth_year': '2019',
+      'dependent.1.birth_year': '2022',
+      'member.0.degree_year': '2020',
+      'member.1.degree_year': '2012',
+      'member.1.nhr_start_year': '2021',
+      'member.0.cat_b_start_year': '2023',
+    })
 
     await waitForStep(page, 'results')
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible({
@@ -752,19 +743,16 @@ test.describe('Golden canary: 2024 primary PDF with liquidacao', () => {
     await clickAdvance(page)
 
     // Questionnaire — PDF extracts IRS Jovem from Anexo A, NHR from Anexo L
-    await fillStrictQuestionnaire(
-      page,
-      {
-        'member.0.birth_year': '1994',
-        'member.1.birth_year': '1989',
-        'dependent.0.birth_year': '2019',
-        'dependent.1.birth_year': '2022',
-        'member.0.degree_year': '2020',
-        'member.1.degree_year': '2012',
-        'member.1.nhr_start_year': '2021',
-      },
-      { cat_b_activity_year: '2' },
-    )
+    await fillStrictQuestionnaire(page, {
+      'member.0.birth_year': '1994',
+      'member.1.birth_year': '1989',
+      'dependent.0.birth_year': '2019',
+      'dependent.1.birth_year': '2022',
+      'member.0.degree_year': '2020',
+      'member.1.degree_year': '2012',
+      'member.1.nhr_start_year': '2021',
+      'member.0.cat_b_start_year': '2023',
+    })
 
     await waitForStep(page, 'results')
     const container = page.locator('[data-testid="results-container"]')

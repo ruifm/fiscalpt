@@ -225,43 +225,42 @@ describe('identifyMissingInputs', () => {
         ],
       })
       const qs = identifyMissingInputs(h)
-      const q = qs.find((q) => q.id === 'member.0.income.0.cat_b_activity_year')
+      const q = qs.find((q) => q.id === 'member.0.cat_b_start_year')
       expect(q).toBeDefined()
       expect(q!.priority).toBe('critical')
-      expect(q!.type).toBe('select')
-      expect(q!.options).toHaveLength(3)
+      expect(q!.type).toBe('number')
     })
 
-    it('asks with optional priority when activity year is set', () => {
+    it('asks with optional priority when cat_b_start_year is set', () => {
       const h = makeHousehold({
         members: [
           makePerson({
+            cat_b_start_year: 2024,
             incomes: [
               makeIncome({
                 category: 'B',
                 gross: 50000,
-                cat_b_activity_year: 1,
               }),
             ],
           }),
         ],
       })
       const qs = identifyMissingInputs(h)
-      const q = qs.find((q) => q.id === 'member.0.income.0.cat_b_activity_year')
+      const q = qs.find((q) => q.id === 'member.0.cat_b_start_year')
       expect(q).toBeDefined()
       expect(q!.priority).toBe('optional')
-      expect(q!.currentValue).toBe('1')
+      expect(q!.currentValue).toBe('2024')
     })
 
-    it('does not ask for Cat A income', () => {
+    it('does not ask cat_b_start_year for Cat A income', () => {
       const h = makeHousehold({
         members: [makePerson({ incomes: [makeIncome({ category: 'A' })] })],
       })
       const qs = identifyMissingInputs(h)
-      expect(qs.find((q) => q.id.includes('cat_b_activity_year'))).toBeUndefined()
+      expect(qs.find((q) => q.id.includes('cat_b_start_year'))).toBeUndefined()
     })
 
-    it('skips Cat B activity year when member has Cat B in ≥2 other years', () => {
+    it('auto-sets cat_b_start_year when member has Cat B in ≥2 other years (3+ total)', () => {
       const h = makeHousehold({
         year: 2025,
         members: [
@@ -295,10 +294,12 @@ describe('identifyMissingInputs', () => {
         }),
       ]
       const qs = identifyMissingInputs(h, otherYears)
-      expect(qs.find((q) => q.id.includes('cat_b_activity_year'))).toBeUndefined()
+      expect(qs.find((q) => q.id.includes('cat_b_start_year'))).toBeUndefined()
+      // Auto-inference: earliest year with Cat B = min(2025, 2023, 2024) = 2023
+      expect(h.members[0].cat_b_start_year).toBe(2023)
     })
 
-    it('still asks Cat B activity year when member has Cat B in only 1 other year', () => {
+    it('still asks cat_b_start_year when member has Cat B in only 1 other year', () => {
       const h = makeHousehold({
         year: 2025,
         members: [
@@ -322,7 +323,7 @@ describe('identifyMissingInputs', () => {
         }),
       ]
       const qs = identifyMissingInputs(h, otherYears)
-      expect(qs.find((q) => q.id.includes('cat_b_activity_year'))).toBeDefined()
+      expect(qs.find((q) => q.id.includes('cat_b_start_year'))).toBeDefined()
     })
   })
 
@@ -556,7 +557,7 @@ describe('identifyMissingInputs', () => {
       // Rui: no irs_jovem_year dropdown (derived from first_work_year)
       // But birth_year not set, so first_work_year question won't appear yet
       expect(qs.find((q) => q.id === 'member.0.irs_jovem_year')).toBeUndefined()
-      expect(qs.find((q) => q.id === 'member.0.income.1.cat_b_activity_year')).toBeDefined()
+      expect(qs.find((q) => q.id === 'member.0.cat_b_start_year')).toBeDefined()
 
       // Micha: NHR start year
       expect(qs.find((q) => q.id === 'member.1.nhr_start_year')).toBeDefined()
@@ -701,7 +702,7 @@ describe('applyAnswers', () => {
     expect(result.members[0].nhr_start_year).toBe(2020)
   })
 
-  it('applies Cat B activity year', () => {
+  it('applies Cat B start year', () => {
     const h = makeHousehold({
       members: [
         makePerson({
@@ -710,9 +711,9 @@ describe('applyAnswers', () => {
       ],
     })
     const result = applyAnswers(h, {
-      'member.0.income.0.cat_b_activity_year': '1',
+      'member.0.cat_b_start_year': '2024',
     })
-    expect(result.members[0].incomes[0].cat_b_activity_year).toBe(1)
+    expect(result.members[0].cat_b_start_year).toBe(2024)
   })
 
   it('applies rental contract duration', () => {
@@ -815,13 +816,12 @@ describe('applyAnswers', () => {
     const result = applyAnswers(h, {
       'member.0.birth_year': 1995,
       'member.0.irs_jovem_year': '2',
-      'member.0.income.0.cat_b_activity_year': '0',
+      'member.0.cat_b_start_year': '2023',
       'dependent.0.birth_year': 2023,
     })
     expect(result.members[0].birth_year).toBe(1995)
     expect(result.members[0].irs_jovem_year).toBe(2)
-    // value '0' means "3rd year or more, no reduction" → preserved as 0
-    expect(result.members[0].incomes[0].cat_b_activity_year).toBe(0)
+    expect(result.members[0].cat_b_start_year).toBe(2023)
     expect(result.dependents[0].birth_year).toBe(2023)
   })
 
@@ -1129,8 +1129,8 @@ describe('question validators', () => {
     })
   })
 
-  describe('cat_b_activity_year', () => {
-    function getCatBActivityYearQuestion() {
+  describe('cat_b_start_year', () => {
+    function getCatBStartYearQuestion() {
       const h = makeHousehold({
         members: [
           makePerson({
@@ -1140,23 +1140,23 @@ describe('question validators', () => {
         ],
       })
       const qs = identifyMissingInputs(h)
-      return qs.find((q) => q.id === 'member.0.income.0.cat_b_activity_year')!
+      return qs.find((q) => q.id === 'member.0.cat_b_start_year')!
     }
 
     it('has a validate function', () => {
-      expect(getCatBActivityYearQuestion().validate).toBeDefined()
+      expect(getCatBStartYearQuestion().validate).toBeDefined()
     })
 
-    it('accepts valid values (0, 1, 2)', () => {
-      expect(getCatBActivityYearQuestion().validate!(0)).toBeNull()
-      expect(getCatBActivityYearQuestion().validate!(1)).toBeNull()
-      expect(getCatBActivityYearQuestion().validate!(2)).toBeNull()
-      expect(getCatBActivityYearQuestion().validate!('1')).toBeNull()
+    it('accepts valid years', () => {
+      expect(getCatBStartYearQuestion().validate!(2025)).toBeNull()
+      expect(getCatBStartYearQuestion().validate!(2020)).toBeNull()
+      expect(getCatBStartYearQuestion().validate!(1990)).toBeNull()
+      expect(getCatBStartYearQuestion().validate!('2023')).toBeNull()
     })
 
-    it('rejects invalid values', () => {
-      expect(getCatBActivityYearQuestion().validate!(3)).toBe('Valor inválido')
-      expect(getCatBActivityYearQuestion().validate!(99)).toBe('Valor inválido')
+    it('rejects invalid years', () => {
+      expect(getCatBStartYearQuestion().validate!(2026)).not.toBeNull()
+      expect(getCatBStartYearQuestion().validate!(1989)).not.toBeNull()
     })
   })
 
@@ -1789,9 +1789,8 @@ describe('question validators', () => {
     })
   })
 
-  // Bug fix: select value "0" should be preserved after applyAnswers
-  describe('applyAnswers preserves select value 0', () => {
-    it('preserves cat_b_activity_year = 0 (3rd year or more)', () => {
+  describe('applyAnswers preserves cat_b_start_year', () => {
+    it('preserves cat_b_start_year through applyAnswers', () => {
       const h = makeHousehold({
         members: [
           makePerson({
@@ -1800,24 +1799,24 @@ describe('question validators', () => {
         ],
       })
       const updated = applyAnswers(h, {
-        'member.0.income.0.cat_b_activity_year': '0',
+        'member.0.cat_b_start_year': '2023',
       })
-      // Should be 0, NOT undefined
-      expect(updated.members[0].incomes[0].cat_b_activity_year).toBe(0)
+      expect(updated.members[0].cat_b_start_year).toBe(2023)
     })
 
-    it('round-trips cat_b_activity_year = 0 through identifyMissingInputs', () => {
+    it('round-trips cat_b_start_year through identifyMissingInputs', () => {
       const h = makeHousehold({
         members: [
           makePerson({
-            incomes: [makeIncome({ category: 'B', gross: 20000, cat_b_activity_year: 0 })],
+            cat_b_start_year: 2023,
+            incomes: [makeIncome({ category: 'B', gross: 20000 })],
           }),
         ],
       })
       const qs = identifyMissingInputs(h)
-      const q = qs.find((q) => q.id === 'member.0.income.0.cat_b_activity_year')
+      const q = qs.find((q) => q.id === 'member.0.cat_b_start_year')
       expect(q).toBeDefined()
-      expect(q!.currentValue).toBe('0')
+      expect(q!.currentValue).toBe('2023')
       expect(q!.priority).toBe('optional') // already answered
     })
 
