@@ -207,9 +207,24 @@ describe('validatePerson — cat_b_start_year', () => {
     expect(errors.filter((e) => e.field === 'cat_b_start_year')).toHaveLength(0)
   })
 
-  it('rejects cat_b_start_year after tax year', () => {
+  it('accepts cat_b_start_year after tax year (propagated from later year)', () => {
     const errors = validatePerson(
       { name: 'Test', cat_b_start_year: 2025, incomes: [], deductions: [], special_regimes: [] },
+      2024,
+    )
+    expect(errors.filter((e) => e.field === 'cat_b_start_year')).toHaveLength(0)
+  })
+
+  it('rejects cat_b_start_year in the future', () => {
+    const nextYear = new Date().getFullYear() + 1
+    const errors = validatePerson(
+      {
+        name: 'Test',
+        cat_b_start_year: nextYear,
+        incomes: [],
+        deductions: [],
+        special_regimes: [],
+      },
       2024,
     )
     expect(errors.filter((e) => e.field === 'cat_b_start_year')).toHaveLength(1)

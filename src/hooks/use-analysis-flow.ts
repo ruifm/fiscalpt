@@ -327,7 +327,6 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
           severity: 'warning' as const,
           code: e.code,
           message: e.message,
-          details: e.field,
         }))
 
       dispatch({ type: 'START_CALCULATION' })

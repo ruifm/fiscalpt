@@ -317,12 +317,13 @@ export function validatePerson(person: Person, taxYear: number, prefix = ''): Va
   }
 
   if (person.cat_b_start_year !== undefined) {
-    if (person.cat_b_start_year < 1990 || person.cat_b_start_year > taxYear) {
+    const thisYear = new Date().getFullYear()
+    if (person.cat_b_start_year < 1990 || person.cat_b_start_year > thisYear) {
       errors.push({
         severity: 'error',
         field: `${p}cat_b_start_year`,
         code: 'OUT_OF_RANGE',
-        message: `Ano de início de atividade deve ser entre 1990 e ${taxYear}`,
+        message: `Ano de início de atividade deve ser entre 1990 e ${thisYear}`,
       })
     }
   }
