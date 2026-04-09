@@ -1,5 +1,9 @@
+'use client'
+
+import { useState } from 'react'
 import { Sparkles, Users, User, ArrowUp, ArrowDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import type { AnalysisResult, PersonTaxDetail, ScenarioResult } from '@/lib/tax/types'
 import type { ResultsView } from '@/lib/tax/results-view'
 import { personTotalIrs, scenarioRefund } from '@/lib/tax/historical-comparison'
@@ -15,15 +19,41 @@ export function YearResults({
   view,
   amendable,
   projected,
+  simulationBaseline,
+  hideWithholdings,
+  usePersonTabs,
 }: {
   result: AnalysisResult
   view: ResultsView
   amendable: boolean
   projected?: boolean
+  /** In simulation mode: the baseline scenario (from current result) to compare against */
+  simulationBaseline?: ScenarioResult
+  /** Hide refund/toPay metric (redundant when withholdings are 0) */
+  hideWithholdings?: boolean
+  /** Use tabs instead of side-by-side grid for multi-person display */
+  usePersonTabs?: boolean
 }) {
   const t = useT()
-  const { currentScenario, optimalScenario, isAlreadyOptimal, savings } = view
-  const isMulti = currentScenario.persons.length > 1
+
+  // When simulationBaseline is provided, compare across current vs optimized results
+  // instead of within the same result's filing strategies
+  const effectiveCurrent = simulationBaseline ?? view.currentScenario
+  const effectiveOptimal = view.optimalScenario
+  const effectiveSavings = simulationBaseline
+    ? Math.max(0, simulationBaseline.total_tax_burden - effectiveOptimal.total_tax_burden)
+    : view.savings
+  const effectiveIsOptimal = simulationBaseline
+    ? effectiveSavings <= 0
+    : view.isAlreadyOptimal
+
+  const isMulti = effectiveCurrent.persons.length > 1
+  const sortedPersonNames = isMulti
+    ? [...effectiveCurrent.persons].sort((a, b) => a.name.localeCompare(b.name)).map((p) => p.name)
+    : []
+
+  // Shared person tab state so both sections stay in sync
+  const [activePerson, setActivePerson] = useState(sortedPersonNames[0] ?? '')
 
   return (
     <div className="space-y-6 mt-2">
@@ -53,11 +83,18 @@ export function YearResults({
               ? t('results.currentSituation')
               : t('results.submittedDeclaration')}
         </h2>
-        <ScenarioSummary scenario={currentScenario} isMulti={isMulti} />
+        <ScenarioSummary
+          scenario={effectiveCurrent}
+          isMulti={isMulti}
+          hideWithholdings={hideWithholdings}
+          usePersonTabs={usePersonTabs}
+          activePerson={activePerson}
+          onActivePersonChange={setActivePerson}
+        />
       </div>
 
-      {/* Optimized scenario — only for amendable years */}
-      {amendable && !isAlreadyOptimal && savings > 0 && (
+      {/* Optimized scenario — shown when there are savings */}
+      {amendable && !effectiveIsOptimal && effectiveSavings > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Sparkles
@@ -67,14 +104,18 @@ export function YearResults({
             <h2 className="text-sm font-medium uppercase tracking-wide">
               {t('results.optimizedScenario')}{' '}
               <span className="text-emerald-600 dark:text-emerald-400 font-bold normal-case">
-                ({t('results.saves', { amount: formatEuro(savings) })})
+                ({t('results.saves', { amount: formatEuro(effectiveSavings) })})
               </span>
             </h2>
           </div>
           <ScenarioSummary
-            scenario={optimalScenario}
-            baseline={currentScenario}
+            scenario={effectiveOptimal}
+            baseline={effectiveCurrent}
             isMulti={isMulti}
+            hideWithholdings={hideWithholdings}
+            usePersonTabs={usePersonTabs}
+            activePerson={activePerson}
+            onActivePersonChange={setActivePerson}
           />
         </div>
       )}
@@ -86,15 +127,25 @@ function ScenarioSummary({
   scenario,
   baseline,
   isMulti,
+  hideWithholdings,
+  usePersonTabs,
+  activePerson,
+  onActivePersonChange,
 }: {
   scenario: ScenarioResult
   baseline?: ScenarioResult
   isMulti: boolean
+  hideWithholdings?: boolean
+  usePersonTabs?: boolean
+  activePerson?: string
+  onActivePersonChange?: (name: string) => void
 }) {
   const t = useT()
   const refund = scenarioRefund(scenario)
   const isRefund = refund >= 0
   const baselineRefund = baseline ? scenarioRefund(baseline) : undefined
+
+  const sortedPersons = [...scenario.persons].sort((a, b) => a.name.localeCompare(b.name))
 
   return (
     <div className="space-y-4">
@@ -105,7 +156,13 @@ function ScenarioSummary({
             {isMulti ? t('results.household') : scenario.persons[0].name}
           </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div
+          className={
+            hideWithholdings
+              ? 'grid grid-cols-3 gap-4'
+              : 'grid grid-cols-2 sm:grid-cols-4 gap-4'
+          }
+        >
           <Metric label={t('results.income')} value={formatEuro(scenario.total_gross)} />
           <Metric
             label={t('results.irs')}
@@ -121,34 +178,67 @@ function ScenarioSummary({
             delta={baseline ? scenario.effective_rate_irs - baseline.effective_rate_irs : undefined}
             deltaGoodWhen="negative"
           />
-          <Metric
-            label={isRefund ? t('results.refund') : t('results.toPay')}
-            value={formatEuro(Math.abs(refund))}
-            variant={isRefund ? 'refund' : 'payment'}
-            delta={baselineRefund !== undefined ? refund - baselineRefund : undefined}
-            deltaGoodWhen="positive"
-          />
+          {!hideWithholdings && (
+            <Metric
+              label={isRefund ? t('results.refund') : t('results.toPay')}
+              value={formatEuro(Math.abs(refund))}
+              variant={isRefund ? 'refund' : 'payment'}
+              delta={baselineRefund !== undefined ? refund - baselineRefund : undefined}
+              deltaGoodWhen="positive"
+            />
+          )}
         </div>
       </div>
 
-      {isMulti && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[...scenario.persons]
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((person) => (
+      {isMulti && usePersonTabs && (
+        <Tabs
+          value={activePerson}
+          onValueChange={onActivePersonChange}
+        >
+          <TabsList className="w-full justify-center">
+            {sortedPersons.map((person) => (
+              <TabsTrigger key={person.name} value={person.name} className="flex-1">
+                {person.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {sortedPersons.map((person) => (
+            <TabsContent key={person.name} value={person.name}>
               <PersonCard
-                key={person.name}
                 person={person}
                 baseline={baseline?.persons.find((p) => p.name === person.name)}
+                hideWithholdings={hideWithholdings}
               />
-            ))}
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
+
+      {isMulti && !usePersonTabs && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {sortedPersons.map((person) => (
+            <PersonCard
+              key={person.name}
+              person={person}
+              baseline={baseline?.persons.find((p) => p.name === person.name)}
+              hideWithholdings={hideWithholdings}
+            />
+          ))}
         </div>
       )}
     </div>
   )
 }
 
-function PersonCard({ person, baseline }: { person: PersonTaxDetail; baseline?: PersonTaxDetail }) {
+function PersonCard({
+  person,
+  baseline,
+  hideWithholdings,
+}: {
+  person: PersonTaxDetail
+  baseline?: PersonTaxDetail
+  hideWithholdings?: boolean
+}) {
   const t = useT()
   const refund = personRefund(person)
   const isRefund = refund >= 0
@@ -162,7 +252,7 @@ function PersonCard({ person, baseline }: { person: PersonTaxDetail; baseline?: 
           <User className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <span className="font-semibold">{person.name}</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className={hideWithholdings ? 'grid grid-cols-3 gap-3' : 'grid grid-cols-2 sm:grid-cols-4 gap-3'}>
           <Metric label={t('results.income')} value={formatEuro(person.gross_income)} small />
           <Metric
             label={t('results.irs')}
@@ -180,14 +270,16 @@ function PersonCard({ person, baseline }: { person: PersonTaxDetail; baseline?: 
             delta={baseline ? person.effective_rate_irs - baseline.effective_rate_irs : undefined}
             deltaGoodWhen="negative"
           />
-          <Metric
-            label={isRefund ? t('results.refund') : t('results.toPay')}
-            value={formatEuro(Math.abs(refund))}
-            variant={isRefund ? 'refund' : 'payment'}
-            small
-            delta={baselineRefund !== undefined ? refund - baselineRefund : undefined}
-            deltaGoodWhen="positive"
-          />
+          {!hideWithholdings && (
+            <Metric
+              label={isRefund ? t('results.refund') : t('results.toPay')}
+              value={formatEuro(Math.abs(refund))}
+              variant={isRefund ? 'refund' : 'payment'}
+              small
+              delta={baselineRefund !== undefined ? refund - baselineRefund : undefined}
+              deltaGoodWhen="positive"
+            />
+          )}
         </div>
       </CardContent>
     </Card>

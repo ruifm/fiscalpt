@@ -45,7 +45,7 @@ export function TaxResults({
   sessionHash,
   simulationMode = false,
   simulationSavings,
-  currentResult: _currentResult,
+  currentResult,
 }: TaxResultsProps) {
   const t = useT()
   const amendableYears = new Set(getAmendableYears())
@@ -56,6 +56,14 @@ export function TaxResults({
       amendable: amendableYears.has(r.year) || projectedYears.has(r.year),
     }),
   }))
+
+  // In simulation mode, derive the baseline scenario from currentResult
+  // currentResult has no IRS Jovem and default filing — its currentScenario
+  // is the "what happens if you do nothing special" baseline
+  const simulationBaselineView =
+    simulationMode && currentResult
+      ? deriveResultsView(currentResult, { amendable: true })
+      : undefined
   const sorted = [...views].sort((a, b) => a.result.year - b.result.year)
   const totalSavings =
     simulationMode && simulationSavings != null
@@ -259,6 +267,9 @@ export function TaxResults({
             view={view}
             amendable={amendableYears.has(result.year) || projectedYears.has(result.year)}
             projected={projectedYears.has(result.year)}
+            simulationBaseline={simulationBaselineView?.currentScenario}
+            hideWithholdings={simulationMode}
+            usePersonTabs={simulationMode}
           />
         ))
       )}
