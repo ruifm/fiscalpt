@@ -16,6 +16,15 @@ const ALLOWED_ORIGINS = new Set(
 function safeOrigin(request: Request): string {
   const origin = request.headers.get('origin') ?? ''
   if (ALLOWED_ORIGINS.has(origin)) return origin
+  // In development, allow any HTTP origin (LAN access on any port)
+  if (process.env.NODE_ENV === 'development' && origin) {
+    try {
+      const url = new URL(origin)
+      if (url.protocol === 'http:') return origin
+    } catch {
+      /* invalid origin — fall through */
+    }
+  }
   return siteUrl()
 }
 
