@@ -29,21 +29,21 @@ describe('ThemeToggle', () => {
 
   it('shows dark label in light mode', async () => {
     render(<ThemeToggle />)
-    await act(() => Promise.resolve())
+    await act(async () => {})
     expect(screen.getByRole('button').getAttribute('aria-label')).toBe('theme.dark')
   })
 
   it('shows light label after mount in dark mode', async () => {
     mockResolvedTheme = 'dark'
     render(<ThemeToggle />)
-    await act(() => Promise.resolve())
+    await act(async () => {})
     expect(screen.getByRole('button').getAttribute('aria-label')).toBe('theme.light')
   })
 
   it('toggles from light to dark on click', async () => {
     const user = userEvent.setup()
     render(<ThemeToggle />)
-    await act(() => Promise.resolve())
+    await act(async () => {})
 
     await user.click(screen.getByRole('button'))
     expect(mockSetTheme).toHaveBeenCalledWith('dark')
@@ -54,7 +54,7 @@ describe('ThemeToggle', () => {
     mockResolvedTheme = 'dark'
     const user = userEvent.setup()
     render(<ThemeToggle />)
-    await act(() => Promise.resolve())
+    await act(async () => {})
 
     await user.click(screen.getByRole('button'))
     expect(mockSetTheme).toHaveBeenCalledWith('light')

@@ -75,7 +75,7 @@ describe('ErrorBoundary', () => {
       return <p>Recovered</p>
     }
 
-    const { rerender } = render(
+    render(
       <ErrorBoundary>
         <MaybeThrow />
       </ErrorBoundary>,
@@ -87,11 +87,6 @@ describe('ErrorBoundary', () => {
     shouldThrow = false
     await user.click(screen.getByText('error.retry'))
 
-    rerender(
-      <ErrorBoundary>
-        <MaybeThrow />
-      </ErrorBoundary>,
-    )
     expect(screen.getByText('Recovered')).toBeDefined()
   })
 })

@@ -102,7 +102,7 @@ describe('generateProactiveOptimizations', () => {
       const opts = generateProactiveOptimizations(h, result)
       const genOpt = opts.find((o) => o.id === 'general-deduction-alice')
       expect(genOpt).toBeDefined()
-      expect(genOpt!.estimated_savings).toBeGreaterThan(0)
+      expect(genOpt!.estimated_savings).toBe(110)
     })
 
     it('does not suggest when general deduction is already at cap', () => {
@@ -154,7 +154,7 @@ describe('generateProactiveOptimizations', () => {
       const opts = generateProactiveOptimizations(h, result)
       const catBOpt = opts.find((o) => o.id === 'cat-b-acrescimo-bob')
       expect(catBOpt).toBeDefined()
-      expect(catBOpt!.estimated_savings).toBeGreaterThan(0)
+      expect(catBOpt!.estimated_savings).toBe(525.15)
     })
 
     it('uses 0.22 fallback marginal rate when effective_rate_irs is 0', () => {
@@ -251,7 +251,7 @@ describe('generateProactiveOptimizations', () => {
       const opts = generateProactiveOptimizations(h, result)
       const faturaOpt = opts.find((o) => o.id === 'fatura-alice')
       expect(faturaOpt).toBeDefined()
-      expect(faturaOpt!.estimated_savings).toBeGreaterThan(0)
+      expect(faturaOpt!.estimated_savings).toBe(175)
     })
 
     it('does not suggest e-fatura when already at cap', () => {
@@ -294,7 +294,7 @@ describe('generateProactiveOptimizations', () => {
       const opts = generateProactiveOptimizations(h, result)
       const healthOpt = opts.find((o) => o.id === 'expense-health-alice')
       expect(healthOpt).toBeDefined()
-      expect(healthOpt!.estimated_savings).toBeGreaterThan(0)
+      expect(healthOpt!.estimated_savings).toBe(700)
     })
 
     it('does not suggest health target when at cap', () => {
@@ -376,7 +376,7 @@ describe('generateProactiveOptimizations', () => {
       const opts = generateProactiveOptimizations(h, result)
       const pprOpt = opts.find((o) => o.id === 'ppr-maximize-alice')
       expect(pprOpt).toBeDefined()
-      expect(pprOpt!.estimated_savings).toBeGreaterThan(0)
+      expect(pprOpt!.estimated_savings).toBe(200)
       expect(pprOpt!.description).toContain('1000') // additional €1000 needed
     })
 

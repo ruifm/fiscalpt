@@ -121,28 +121,19 @@ describe('makeT', () => {
 
 describe('fmtEuro', () => {
   it('formats positive number in pt-PT locale', () => {
-    const result = fmtEuro(1234.56)
-    expect(result).toContain('1')
-    expect(result).toContain('234')
-    expect(result).toContain('56')
-    expect(result).toContain('€')
+    expect(fmtEuro(1234.56)).toBe('1234,56\u00a0€')
   })
 
   it('formats zero', () => {
-    const result = fmtEuro(0)
-    expect(result).toContain('0')
-    expect(result).toContain('€')
+    expect(fmtEuro(0)).toBe('0,00\u00a0€')
   })
 
   it('formats negative number', () => {
-    const result = fmtEuro(-500)
-    expect(result).toContain('500')
-    expect(result).toContain('€')
+    expect(fmtEuro(-500)).toBe('-500,00\u00a0€')
   })
 
   it('includes exactly 2 decimal places', () => {
-    const result = fmtEuro(100)
-    expect(result).toMatch(/00\s*€|€\s*.*00/)
+    expect(fmtEuro(100)).toBe('100,00\u00a0€')
   })
 })
 

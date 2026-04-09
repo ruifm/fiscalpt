@@ -35,7 +35,13 @@ describe('ShareResults', () => {
     await user.click(screen.getByRole('button', { name: 'share.button' }))
 
     expect(shareFn).toHaveBeenCalledOnce()
-    expect(shareFn.mock.calls[0][0].title).toBe('FiscalPT')
+    expect(shareFn.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        title: 'FiscalPT',
+        url: 'https://fiscalpt.com',
+      }),
+    )
+    expect(shareFn.mock.calls[0][0].text).toBeDefined()
   })
 
   it('toggles menu when navigator.share is not available', async () => {
