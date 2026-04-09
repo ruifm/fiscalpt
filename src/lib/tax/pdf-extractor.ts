@@ -368,17 +368,25 @@ export function parseComprovativoPdfText(text: string): ComprovativoParsed {
 
   // Determine filing status
   if (result.nifConjuge) {
-    // Check X pattern between main NIF and cônjuge NIF on page 1.
-    // Two X's = Casado + tributação conjunta; one X = Casado only (separate filing)
-    const nifIdx = page1.indexOf(result.nif!)
-    const conjIdx = page1.indexOf(result.nifConjuge, nifIdx + 9)
-    if (nifIdx >= 0 && conjIdx > nifIdx) {
-      const between = page1.substring(nifIdx + 9, conjIdx)
-      const xCount = (between.match(/\bX\b/g) || []).length
-      result.tributacaoConjunta = xCount >= 2
-      result.filingStatus = xCount >= 2 ? 'married_joint' : 'married_separate'
+    // Parse Quadro 5: "OPÇÃO PELA TRIBUTAÇÃO CONJUNTA DOS RENDIMENTOS"
+    // The PDF text contains: "...tributação conjunta dos rendimentos: Sim 01 [X] Não 02 [X]"
+    // Sim marked = joint filing; Não marked = separate filing.
+    const conjuntaIdx = page1.toLowerCase().indexOf('tributação conjunta')
+    if (conjuntaIdx >= 0) {
+      // Look at the first Sim/Não answer after the heading (within 500 chars)
+      const chunk = page1.substring(conjuntaIdx, conjuntaIdx + 500)
+      const simMarked = /Sim\s+\d+\s+X\b/i.test(chunk)
+      const naoMarked = /N[ãa]o\s+\d+\s+X\b/i.test(chunk)
+      if (simMarked && !naoMarked) {
+        result.tributacaoConjunta = true
+        result.filingStatus = 'married_joint'
+      } else {
+        // Não marked, or ambiguous → separate (safer default)
+        result.tributacaoConjunta = false
+        result.filingStatus = 'married_separate'
+      }
     } else {
-      // Cônjuge NIF found but can't determine X pattern — don't assume joint
+      // Can't find tributação conjunta section — default to separate
       result.tributacaoConjunta = false
       result.filingStatus = 'married_separate'
     }
@@ -764,8 +772,15 @@ export function comprativoParsedToHousehold(parsed: ComprovativoParsed): {
           withholding: a.retencoesIRS || 0,
           ss_paid: a.contribuicoesSS || 0,
           cat_a_code: a.incomeCode ? parseInt(a.incomeCode) : undefined,
-          union_dues: a.quotizacoesSindicais || undefined,
         })
+
+        // Union dues → sindical deduction (same as XML parser)
+        if (a.quotizacoesSindicais && a.quotizacoesSindicais > 0) {
+          person.deductions.push({
+            category: 'sindical',
+            amount: a.quotizacoesSindicais,
+          })
+        }
       }
       if (a.irsJovem) {
         if (!person.special_regimes.includes('irs_jovem')) {
