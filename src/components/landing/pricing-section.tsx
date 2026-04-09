@@ -105,7 +105,7 @@ export function PricingSection() {
                   </li>
                 ))}
               </ul>
-              <Link href="/analyze" className="block">
+              <Link href="/simulacao" className="block">
                 <Button variant="outline" className="w-full" size="lg">
                   {t('landing.pricing.free.cta')}
                 </Button>

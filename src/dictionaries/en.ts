@@ -40,7 +40,8 @@ const en: DictShape<PtDict> = {
       titleEnd: ' in taxes',
       subtitle:
         'Upload your IRS declaration and receive a complete analysis in minutes. Calculation engine verified to the cent, automatic scenario comparison, and actionable recommendations with Portal das Finanças links.',
-      cta: 'Start free analysis',
+      cta: 'Quick Simulation — 2 minutes',
+      ctaFull: 'Personalized Analysis',
       secondary: 'How it works',
     },
 
@@ -258,7 +259,7 @@ const en: DictShape<PtDict> = {
       title: 'Stop overpaying',
       subtitle:
         'Upload your declaration and discover in minutes how much you can save. Free, no registration, no commitment.',
-      button: 'Start free analysis',
+      button: "Simulate now — it's free",
     },
   },
 

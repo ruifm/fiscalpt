@@ -110,23 +110,30 @@ export function HeroSection() {
           {t('landing.hero.subtitle')}
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link href="/analyze" className="w-full sm:w-auto">
+          <Link href="/simulacao" className="w-full sm:w-auto">
             <Button size="lg" className="w-full sm:w-auto gap-2 text-base px-8 h-12">
               {t('landing.hero.cta')}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Button>
           </Link>
-          <a href="#how-it-works" className="w-full sm:w-auto">
+          <Link href="/analyze" className="w-full sm:w-auto">
             <Button
               variant="outline"
               size="lg"
               className="w-full sm:w-auto gap-2 text-base px-8 h-12"
             >
-              {t('landing.hero.secondary')}
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              {t('landing.hero.ctaFull')}
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Button>
-          </a>
+          </Link>
         </div>
+        <a
+          href="#how-it-works"
+          className="mt-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {t('landing.hero.secondary')}
+          <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
       </div>
     </section>
   )

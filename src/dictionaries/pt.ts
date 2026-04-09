@@ -40,7 +40,8 @@ const pt = {
       titleEnd: ' em impostos',
       subtitle:
         'Carregue a sua declaração de IRS e receba uma análise completa em minutos. Motor de cálculo verificado ao cêntimo, comparação automática de cenários, e recomendações acionáveis com links para o Portal das Finanças.',
-      cta: 'Começar análise gratuita',
+      cta: 'Simulação Rápida — 2 minutos',
+      ctaFull: 'Análise Personalizada',
       secondary: 'Como funciona',
     },
 
@@ -259,7 +260,7 @@ const pt = {
       title: 'Pare de pagar mais do que deve',
       subtitle:
         'Carregue a sua declaração e descubra em minutos quanto pode poupar. Gratuito, sem registo, sem compromisso.',
-      button: 'Começar análise gratuita',
+      button: 'Simular agora — é grátis',
     },
   },
 

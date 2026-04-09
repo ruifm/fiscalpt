@@ -111,7 +111,7 @@ export function CtaSection() {
             {t('landing.cta.title')}
           </h2>
           <p className="text-lg opacity-90 max-w-2xl mx-auto mb-8">{t('landing.cta.subtitle')}</p>
-          <Link href="/analyze" className="block w-full sm:inline sm:w-auto">
+          <Link href="/simulacao" className="block w-full sm:inline sm:w-auto">
             <Button
               size="lg"
               variant="secondary"
