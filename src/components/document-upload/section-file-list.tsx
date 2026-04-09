@@ -82,6 +82,9 @@ export function SectionFileList({
           {uf.status === 'done' && uf.error && (
             <p className="mt-1 pl-6 text-xs text-red-600 dark:text-red-400">⚠ {uf.error}</p>
           )}
+          {uf.status === 'done' && uf.warning && !uf.error && (
+            <p className="mt-1 pl-6 text-xs text-amber-600 dark:text-amber-400">ℹ {uf.warning}</p>
+          )}
           {uf.status === 'done' && uf.meta && (
             <div className="mt-1 space-y-0.5 pl-6">
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">

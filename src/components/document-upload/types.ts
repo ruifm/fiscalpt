@@ -28,6 +28,7 @@ export interface UploadedFile {
   type: DocumentType
   status: 'pending' | 'processing' | 'done' | 'error'
   error?: string
+  warning?: string
   meta?: FileMeta
   parsedXml?: ParsedXmlResult
   parsedComprovativo?: ComprovativoParsed

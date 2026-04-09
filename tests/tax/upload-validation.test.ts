@@ -26,11 +26,11 @@ describe('validateDeclarationFiles', () => {
     expect(validateDeclarationFiles(files)).toEqual([])
   })
 
-  it('errors when single file references a spouse NIF', () => {
+  it('warns when single file references a spouse NIF', () => {
     const files = [makeFile({ name: 'a.xml', nif: '123', year: 2024, nifConjuge: '456' })]
     const errors = validateDeclarationFiles(files)
     expect(errors).toHaveLength(1)
-    expect(errors[0].severity).toBeUndefined() // default = error
+    expect(errors[0].severity).toBe('warning')
     expect(errors[0].message).toContain('456')
     expect(errors[0].message).toContain('cônjuge')
   })
@@ -276,6 +276,7 @@ describe('validatePreviousYearsFiles', () => {
     ]
     const errors = validatePreviousYearsFiles(files)
     expect(errors).toHaveLength(1)
+    expect(errors[0].severity).toBe('warning')
     expect(errors[0].message).toContain('cônjuge')
     expect(errors[0].message).toContain('222')
   })
@@ -373,13 +374,6 @@ describe('Severity classification', () => {
       expect(errors[0].severity).toBeUndefined()
     })
 
-    it('missing spouse declaration is a blocking error', () => {
-      const files = [makeFile({ name: 'a.xml', nif: '111', year: 2024, nifConjuge: '222' })]
-      const errors = validateDeclarationFiles(files)
-      expect(errors).toHaveLength(1)
-      expect(errors[0].severity).toBeUndefined()
-    })
-
     it('liquidação NIF not matching any declaration is a blocking error', () => {
       const decls = [makeFile({ name: 'decl.xml', nif: '111', year: 2024 })]
       const files = [
@@ -425,6 +419,13 @@ describe('Severity classification', () => {
   })
 
   describe('warnings (non-blocking)', () => {
+    it('missing spouse declaration is a warning', () => {
+      const files = [makeFile({ name: 'a.xml', nif: '111', year: 2024, nifConjuge: '222' })]
+      const errors = validateDeclarationFiles(files)
+      expect(errors).toHaveLength(1)
+      expect(errors[0].severity).toBe('warning')
+    })
+
     it('spouse NIF mismatch is a warning', () => {
       const files = [
         makeFile({ name: 'a.xml', nif: '111', year: 2024, nifConjuge: '333' }),
@@ -439,6 +440,13 @@ describe('Severity classification', () => {
       const declaration = [makeFile({ name: 'decl.xml', year: 2024 })]
       const previousYears = [makeFile({ name: 'prev.xml', year: 2024 })]
       const errors = validateCrossSection(declaration, previousYears)
+      expect(errors).toHaveLength(1)
+      expect(errors[0].severity).toBe('warning')
+    })
+
+    it('missing spouse in previous years is a warning', () => {
+      const files = [makeFile({ name: 'a.xml', nif: '111', year: 2022, nifConjuge: '222' })]
+      const errors = validatePreviousYearsFiles(files)
       expect(errors).toHaveLength(1)
       expect(errors[0].severity).toBe('warning')
     })

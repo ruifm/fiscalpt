@@ -184,6 +184,7 @@ export function validateDeclarationFiles(files: FileInfo[]): UploadValidationErr
           message:
             `A declaração contém o cônjuge/unido de facto (NIF ${f.nifConjuge}). ` +
             `Carregue também a declaração do cônjuge para uma análise completa do agregado.`,
+          severity: 'warning',
         })
       }
     }
@@ -325,6 +326,7 @@ export function validatePreviousYearsFiles(files: FileInfo[]): UploadValidationE
           message:
             `A declaração de ${year} contém o cônjuge/unido de facto (NIF ${f.nifConjuge}). ` +
             `Carregue também a declaração do cônjuge para uma análise completa.`,
+          severity: 'warning',
         })
       }
     }

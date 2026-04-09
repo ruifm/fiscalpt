@@ -226,16 +226,22 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
       // Re-run validation on all files in the section after a successful parse
       const revalidateSection = () => {
         setSectionFiles((prev) => {
-          const errs = runSectionValidation(section, prev[section], prev)
-          const errByFile = new Map(errs.map((e) => [e.file, e.message]))
+          const results = runSectionValidation(section, prev[section], prev)
+          const errByFile = new Map<string, string>()
+          const warnByFile = new Map<string, string>()
+          for (const r of results) {
+            if (r.severity === 'warning') warnByFile.set(r.file, r.message)
+            else errByFile.set(r.file, r.message)
+          }
           return {
             ...prev,
             [section]: prev[section].map((f) => {
               if (f.status !== 'done') return f
-              const msg = errByFile.get(f.file.name)
-              if (msg && f.error !== msg) return { ...f, error: msg }
-              if (!msg && f.error) return { ...f, error: undefined }
-              return f
+              const err = errByFile.get(f.file.name)
+              const warn = warnByFile.get(f.file.name)
+              const needsUpdate =
+                f.error !== (err ?? undefined) || f.warning !== (warn ?? undefined)
+              return needsUpdate ? { ...f, error: err, warning: warn } : f
             }),
           }
         })
@@ -425,18 +431,23 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
   function removeFile(section: Section, index: number) {
     setSectionFiles((prev) => {
       const updated = prev[section].filter((_, i) => i !== index)
-      // Re-run validation on remaining files to update/clear errors
+      // Re-run validation on remaining files to update/clear errors/warnings
       const next = { ...prev, [section]: updated }
-      const errs = runSectionValidation(section, updated, next)
-      const errByFile = new Map(errs.map((e) => [e.file, e.message]))
+      const results = runSectionValidation(section, updated, next)
+      const errByFile = new Map<string, string>()
+      const warnByFile = new Map<string, string>()
+      for (const r of results) {
+        if (r.severity === 'warning') warnByFile.set(r.file, r.message)
+        else errByFile.set(r.file, r.message)
+      }
       return {
         ...next,
         [section]: updated.map((f) => {
           if (f.status !== 'done') return f
-          const msg = errByFile.get(f.file.name)
-          if (msg && f.error !== msg) return { ...f, error: msg }
-          if (!msg && f.error) return { ...f, error: undefined }
-          return f
+          const err = errByFile.get(f.file.name)
+          const warn = warnByFile.get(f.file.name)
+          const needsUpdate = f.error !== (err ?? undefined) || f.warning !== (warn ?? undefined)
+          return needsUpdate ? { ...f, error: err, warning: warn } : f
         }),
       }
     })
