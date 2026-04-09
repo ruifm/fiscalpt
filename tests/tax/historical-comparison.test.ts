@@ -382,4 +382,15 @@ describe('buildHistoricalSeriesData', () => {
     // Micha: 3000 - 2500 = 500
     expect(michaData[0].currentRefund).toBe(500)
   })
+
+  it('returns zeros when personName does not exist in scenario', () => {
+    const entry = makeJointViewEntry(2024)
+    const data = buildHistoricalSeriesData([entry], new Set([2024]), 'NonExistent')
+
+    expect(data).toHaveLength(1)
+    expect(data[0].currentIncome).toBe(0)
+    expect(data[0].currentIrs).toBe(0)
+    expect(data[0].currentRate).toBe(0)
+    expect(data[0].currentRefund).toBe(0)
+  })
 })

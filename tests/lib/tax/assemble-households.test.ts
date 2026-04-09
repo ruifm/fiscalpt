@@ -8,7 +8,7 @@ import {
 } from '../../../src/lib/tax/assemble-households'
 import type { Household, Person } from '../../../src/lib/tax/types'
 import type { ParsedXmlResult } from '../../../src/lib/tax/xml-parser'
-import type { LiquidacaoParsed } from '../../../src/lib/tax/pdf-extractor'
+import type { LiquidacaoParsed, ComprovativoParsed } from '../../../src/lib/tax/pdf-extractor'
 import type { DeductionSlot } from '../../../src/lib/tax/upload-validation'
 import type { DeductionsParseResult } from '../../../src/lib/tax/deductions-parser'
 
@@ -147,6 +147,23 @@ describe('assembleHouseholds', () => {
       expect(result.ok).toBe(false)
       if (!result.ok) {
         expect(result.code).toBe('EXTRACTION_FAILED')
+      }
+    })
+
+    it('returns VALIDATION_FAILED when pre-validation produces errors', () => {
+      const h = makeHousehold()
+      // 3 declarations triggers "Máximo de 2 declarações" error (severity undefined = error)
+      const sections: AssemblySectionFiles = {
+        declaration: [makeDeclFile(h), makeDeclFile(h), makeDeclFile(h)],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.code).toBe('VALIDATION_FAILED')
+        expect(result.validationMessages!.length).toBeGreaterThan(0)
       }
     })
   })
@@ -952,6 +969,178 @@ describe('assembleHouseholds', () => {
       if (result.ok) {
         expect(Array.isArray(result.households)).toBe(true)
         expect(Array.isArray(result.issues)).toBe(true)
+      }
+    })
+  })
+
+  // ─── Comprovativo Fallback ──────────────────────────────────
+
+  describe('comprovativo fallback', () => {
+    it('uses comprovativo when no XML is available', () => {
+      const comprovativo: ComprovativoParsed = {
+        nif: '111222333',
+        year: 2024,
+        filingStatus: 'single',
+        anexoA: [
+          {
+            titular: 'A',
+            rendimentoBruto: 25000,
+            retencoesIRS: 4000,
+            contribuicoesSS: 2750,
+          },
+        ],
+        issues: [],
+      }
+      const sections: AssemblySectionFiles = {
+        declaration: [
+          {
+            fileName: 'comp.pdf',
+            status: 'done',
+            nif: '111222333',
+            year: 2024,
+            parsedComprovativo: comprovativo,
+          },
+        ],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.households).toHaveLength(1)
+        expect(result.issues.some((i) => i.code === 'PDF_FALLBACK')).toBe(true)
+      }
+    })
+  })
+
+  // ─── Previous Years Non-Merged ──────────────────────────────
+
+  describe('previous years non-merged path', () => {
+    it('uses first declaration when mergeSpouseHouseholds returns null for previous year', () => {
+      const primary = makeHousehold({ year: 2024 })
+      const prev = makeHousehold({
+        year: 2023,
+        members: [makePerson({ name: 'PrevPerson' })],
+      })
+      const sections: AssemblySectionFiles = {
+        declaration: [makeDeclFile(primary)],
+        liquidacao: [],
+        // Single previous-year file — mergeSpouseHouseholds returns null for 1 decl
+        previousYears: [
+          {
+            fileName: 'prev.xml',
+            status: 'done',
+            nif: '111222333',
+            year: 2023,
+            parsedXml: makeParsedXml(prev, '111222333'),
+          },
+        ],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.households).toHaveLength(2)
+        expect(result.households.map((h) => h.year)).toContain(2023)
+      }
+    })
+  })
+
+  // ─── Deduction NIF Matching ────────────────────────────────
+
+  describe('deduction member matching by NIF', () => {
+    it('matches pasted deductions to member via declaration file NIF', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Alice' })],
+      })
+      const declFile = makeDeclFile(h, '111222333')
+      const deductionSlots: DeductionSlot[] = [
+        {
+          key: 'taxpayer-111222333',
+          nif: '111222333',
+          year: 2024,
+          role: 'taxpayer',
+          hasLiquidacao: false,
+        },
+      ]
+      const pastedDeductions = new Map<string, { text: string; result: DeductionsParseResult }>([
+        [
+          'taxpayer-111222333',
+          {
+            text: 'pasted',
+            result: {
+              ok: true,
+              data: {
+                nif: '111222333',
+                name: 'Matched Person',
+                year: 2024,
+                expenses: [
+                  { category: 'health' as const, expenseAmount: 500, deductionAmount: 75 },
+                ],
+              },
+            },
+          },
+        ],
+      ])
+
+      const sections: AssemblySectionFiles = {
+        declaration: [declFile],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds({
+        sectionFiles: sections,
+        pastedDeductions,
+        deductionSlots,
+      })
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const alice = result.households[0].members[0]
+        expect(alice.deductions.some((d) => d.category === 'health' && d.amount === 500)).toBe(true)
+      }
+    })
+  })
+
+  // ─── Liquidação Deduction Override ─────────────────────────
+
+  describe('liquidação deduction override', () => {
+    it('overrides existing deduction from liquidação data', () => {
+      const h = makeHousehold({
+        year: 2024,
+        members: [makePerson({ name: 'Alice', deductions: [{ category: 'health', amount: 100 }] })],
+      })
+      const declFile = makeDeclFile(h, '111222333')
+      const liqFile: AssemblyFile = {
+        fileName: 'liq.pdf',
+        status: 'done',
+        nif: '111222333',
+        year: 2024,
+        parsedLiquidacao: {
+          nif: '111222333',
+          year: 2024,
+          deducoesSaude: 150,
+          issues: [],
+        } as LiquidacaoParsed,
+      }
+
+      const sections: AssemblySectionFiles = {
+        declaration: [declFile],
+        liquidacao: [liqFile],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const alice = result.households[0].members[0]
+        const health = alice.deductions.find((d) => d.category === 'health')
+        expect(health).toBeDefined()
+        // Liquidação deducoesSaude=150, rate=0.15, so expense = 150/0.15 = 1000
+        // This overrides the original 100
+        expect(health!.amount).toBe(1000)
       }
     })
   })

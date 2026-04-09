@@ -60,6 +60,17 @@ describe('findMatchingMember', () => {
     const member = makePerson('Rui', { nif: '111' })
     expect(findMatchingMember(member, [])).toBeUndefined()
   })
+
+  it('returns undefined when member has no NIF and no name', () => {
+    const member: Person = {
+      name: '',
+      incomes: [],
+      deductions: [],
+      special_regimes: [],
+    }
+    const others = [makePerson('Rui', { nif: '111' })]
+    expect(findMatchingMember(member, others)).toBeUndefined()
+  })
 })
 
 // ─── propagateSharedData ──────────────────────────────────────
@@ -330,6 +341,22 @@ describe('propagateSharedData', () => {
 
     const result = propagateSharedData(primary, target)
     expect(result.members[0].irs_jovem_first_work_year).toBe(2020)
+  })
+
+  it('skips dependent propagation when dependent has no name and no birth_year', () => {
+    const primary = makeHousehold(2025, [makePerson('Rui', { nif: '111' })], {
+      dependents: [{ name: 'Sofia', birth_year: 2020 }],
+    })
+    const target = makeHousehold(2024, [makePerson('Rui', { nif: '111' })], {
+      dependents: [
+        { name: undefined as unknown as string, birth_year: undefined as unknown as number },
+      ],
+    })
+
+    const result = propagateSharedData(primary, target)
+    // No name or birth_year → findMatchingDependent returns undefined → keeps as-is
+    expect(result.dependents[0].name).toBeUndefined()
+    expect(result.dependents[0].birth_year).toBeUndefined()
   })
 
   // Divorce/remarriage: different spouse across years

@@ -520,4 +520,63 @@ describe('estimateProjectedRetentions', () => {
     expect(estimated.members[0].incomes[1].withholding).toBeUndefined()
     expect(estimated.members[0].incomes[1].ss_paid).toBeUndefined()
   })
+
+  it('defaults Cat A withholding to 0 when member has no NIF', () => {
+    const primary = makeHousehold({
+      members: [
+        {
+          name: 'NoNif',
+          birth_year: 1990,
+          incomes: [{ category: 'A', gross: 30000, withholding: 6000, ss_paid: 3300 }],
+          deductions: [],
+          special_regimes: [],
+        },
+      ],
+      dependents: [],
+    })
+    const projected = buildProjectedHousehold(primary)
+
+    const personDetail = makePersonDetail({ name: 'NoNif', withholding_total: 6000 })
+    const result = makeResult(primary, makeScenario([personDetail]))
+
+    const estimated = estimateProjectedRetentions(projected, primary, result)
+    // No NIF → primaryIncomes undefined → effective rate 0 → withholding 0
+    expect(estimated.members[0].incomes[0].withholding).toBe(0)
+    // SS still estimated at 11%
+    expect(estimated.members[0].incomes[0].ss_paid).toBe(3300)
+  })
+
+  it('defaults Cat B PPC to 0 when member name has no matching detail', () => {
+    const primary = makeHousehold({
+      filing_status: 'single',
+      members: [
+        {
+          name: 'UnmatchedName',
+          nif: '111222333',
+          birth_year: 1990,
+          incomes: [
+            {
+              category: 'B',
+              gross: 30000,
+              withholding: 7500,
+              ss_paid: 4494,
+              cat_b_income_code: 1519,
+            },
+          ],
+          deductions: [],
+          special_regimes: [],
+        },
+      ],
+      dependents: [],
+    })
+    const projected = buildProjectedHousehold(primary)
+
+    // PersonTaxDetail uses a different name → no match in primaryDetailByName
+    const personDetail = makePersonDetail({ name: 'DifferentName' })
+    const result = makeResult(primary, makeScenario([personDetail]))
+
+    const estimated = estimateProjectedRetentions(projected, primary, result)
+    // Cat B: 25% base withholding, PPC = 0 (no primaryDetail match)
+    expect(estimated.members[0].incomes[0].withholding).toBe(7500) // 30000 × 0.25
+  })
 })

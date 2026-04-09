@@ -487,4 +487,81 @@ describe('generateProactiveOptimizations', () => {
       expect(opts.find((o) => o.id === 'fatura-correction-alice')).toBeUndefined()
     })
   })
+
+  describe('branch coverage — PPR age > 50', () => {
+    it('uses €300 PPR cap for person over 50', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Senior',
+            birth_year: 1970, // age 56 at tax year 2026
+            incomes: [{ category: 'A', gross: 40000 }],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson({ gross_income: 40000 })]))
+      const opts = generateProactiveOptimizations(h, result)
+      const ppr = opts.find((o) => o.id === 'ppr-senior')
+      expect(ppr).toBeDefined()
+      // Cap €300 × 20% = €60
+      expect(ppr!.estimated_savings).toBe(60)
+    })
+  })
+
+  describe('branch coverage — housing with existing expenses', () => {
+    it('accounts for existing housing deductions in gap calculation', () => {
+      const h = makeHousehold({
+        year: 2025,
+        members: [
+          {
+            name: 'Alice',
+            birth_year: 1990,
+            incomes: [{ category: 'A', gross: 30000 }],
+            deductions: [{ category: 'housing', amount: 2000 }], // 2000 × 15% = 300 < 800 cap
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson()]))
+      const opts = generateProactiveOptimizations(h, result)
+      const housing = opts.find((o) => o.id === 'expense-housing-alice')
+      expect(housing).toBeDefined()
+      // Current deduction: min(2000 × 0.15, 800) = 300
+      // Gap: 800 - 300 = 500
+      expect(housing!.estimated_savings).toBe(500)
+    })
+  })
+
+  describe('branch coverage — Cat B activity year factor', () => {
+    it('applies activity year reduction factor in Cat B regime suggestion', () => {
+      const h = makeHousehold({
+        members: [
+          {
+            name: 'Bob',
+            birth_year: 1990,
+            incomes: [
+              {
+                category: 'B',
+                gross: 40000,
+                cat_b_income_code: 1519,
+                cat_b_activity_year: 1,
+              },
+            ],
+            deductions: [],
+            special_regimes: [],
+          },
+        ],
+      })
+      const result = makeResult(h, makeScenario([makePerson({ gross_income: 40000 })]))
+      const opts = generateProactiveOptimizations(h, result)
+      const catBRegime = opts.find((o) => o.id === 'cat-b-regime-bob')
+      expect(catBRegime).toBeDefined()
+      // coefficient = 0.75 (1519 unknown → default), factor for year 1 = 0.5
+      // simplifiedTaxable = 40000 × 0.75 × 0.5 = 15000
+      // breakEvenExpenses = 40000 - 15000 = 25000
+      expect(catBRegime!.description).toContain('€25000')
+    })
+  })
 })

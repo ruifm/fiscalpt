@@ -289,4 +289,29 @@ describe('generateActionableRecommendations', () => {
     // PPR should still be there
     expect(report.recommendations.find((r) => r.id === 'deduction-ppr')).toBeDefined()
   })
+
+  it('IRS Jovem recommendation via age fallback when no member has irs_jovem regime', () => {
+    const result = makeResult({
+      irs_jovem_savings: 2000,
+      household: makeHousehold({
+        year: 2024,
+        members: [
+          {
+            name: 'Young Worker',
+            birth_year: 1994, // age 30, ≤ 35
+            incomes: [{ category: 'A', gross: 30000, withholding: 5000, ss_paid: 3300 }],
+            deductions: [],
+            special_regimes: [], // no irs_jovem, no nhr
+            // no irs_jovem_year
+          },
+        ],
+      }),
+    })
+
+    const report = generateActionableRecommendations(result)
+    const irsJovem = report.recommendations.find((r) => r.id === 'irs-jovem-2024')
+    expect(irsJovem).toBeDefined()
+    expect(irsJovem!.total_savings).toBe(2000)
+    expect(irsJovem!.steps[1].description).toContain('Young Worker')
+  })
 })
