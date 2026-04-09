@@ -47,8 +47,25 @@ export async function uploadMultipleXml(page: Page, filenames: string[]) {
   await fileChooser.setFiles(filePaths)
 }
 
+/** Expand the outer "Despesas para Deduções" section if collapsed */
+export async function expandDeductionSection(page: Page) {
+  const btn = page.locator('[data-testid="deduction-section-toggle"]')
+  try {
+    await btn.waitFor({ state: 'visible', timeout: 5_000 })
+    const expanded = await btn.getAttribute('aria-expanded')
+    if (expanded !== 'true') {
+      await btn.click()
+      // Wait for the conditional content to render
+      await page.waitForTimeout(800)
+    }
+  } catch {
+    // Not present (no deduction slots)
+  }
+}
+
 /** Fill deduction paste areas for all visible taxpayer slots */
 export async function fillDeductionSlots(page: Page, nifs: string[], year: number) {
+  await expandDeductionSection(page)
   for (const nif of nifs) {
     const textarea = page.locator(`[data-testid="deduction-textarea-${nif}-${year}"]`)
     // Wait for the deduction accordion to render after XML processing

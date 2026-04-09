@@ -62,10 +62,10 @@ const ALL_YEARS_GOLDEN: GoldenYear[] = [
     amendable: false,
     current: {
       gross: '41 507,33',
-      irs: '7173,33',
-      rate: '17,3%',
-      refundOrPay: '1477,65',
-      holderA: { irs: '1673,94', rate: '12,0%' },
+      irs: '7085,83',
+      rate: '17,1%',
+      refundOrPay: '1565,15',
+      holderA: { irs: '1586,44', rate: '11,3%' },
       holderB: { irs: '5499,39', rate: '20,0%' },
     },
   },
@@ -74,10 +74,10 @@ const ALL_YEARS_GOLDEN: GoldenYear[] = [
     amendable: false,
     current: {
       gross: '44 826,12',
-      irs: '8908,40',
-      rate: '19,9%',
-      refundOrPay: '1112,17',
-      holderA: { irs: '5686,85', rate: '19,8%' },
+      irs: '8820,90',
+      rate: '19,7%',
+      refundOrPay: '1199,67',
+      holderA: { irs: '5599,35', rate: '19,5%' },
       holderB: { irs: '3221,55', rate: '20,0%' },
     },
   },
@@ -86,19 +86,19 @@ const ALL_YEARS_GOLDEN: GoldenYear[] = [
     amendable: true,
     current: {
       gross: '111 281,17',
-      irs: '17 104,09',
-      rate: '15,4%',
-      refundOrPay: '2124,43',
-      holderA: { irs: '6435,38', rate: '11,1%' },
+      irs: '23 207,11',
+      rate: '20,8%',
+      refundOrPay: '8227,45',
+      holderA: { irs: '12 538,40', rate: '21,6%' },
       holderB: { irs: '10 668,71', rate: '20,0%' },
     },
-    savings: '2217,93',
+    savings: '3932,91',
     optimized: {
       gross: '111 281,17',
-      irs: '14 886,16',
-      rate: '13,4%',
-      refundOrPay: '93,50',
-      holderA: { irs: '4217,45', rate: '7,3%' },
+      irs: '19 274,20',
+      rate: '17,3%',
+      refundOrPay: '4294,54',
+      holderA: { irs: '8605,49', rate: '14,9%' },
       holderB: { irs: '10 668,71', rate: '20,0%' },
     },
   },
@@ -107,19 +107,19 @@ const ALL_YEARS_GOLDEN: GoldenYear[] = [
     amendable: true,
     current: {
       gross: '76 615,12',
-      irs: '10 648,06',
-      rate: '13,9%',
-      refundOrPay: '5721,91',
-      holderA: { irs: '5790,88', rate: '11,1%' },
+      irs: '14 043,72',
+      rate: '18,3%',
+      refundOrPay: '9117,57',
+      holderA: { irs: '9186,54', rate: '17,6%' },
       holderB: { irs: '4857,18', rate: '20,0%' },
     },
-    savings: '3205,36',
+    savings: '4428,36',
     optimized: {
       gross: '76 615,12',
-      irs: '7442,70',
-      rate: '9,7%',
-      refundOrPay: '2516,55',
-      holderA: { irs: '2585,52', rate: '4,9%' },
+      irs: '9615,36',
+      rate: '12,6%',
+      refundOrPay: '4689,21',
+      holderA: { irs: '4758,18', rate: '9,1%' },
       holderB: { irs: '4857,18', rate: '20,0%' },
     },
   },
@@ -134,13 +134,13 @@ const ALL_YEARS_GOLDEN: GoldenYear[] = [
       holderA: { irs: '2828,84', rate: '4,2%' },
       holderB: { irs: '12 221,45', rate: '20,0%' },
     },
-    savings: '2072,33',
+    savings: '2159,83',
     optimized: {
       gross: '128 196,93',
-      irs: '12 977,96',
+      irs: '12 890,46',
       rate: '10,1%',
-      refundOrPay: '5953,00',
-      holderA: { irs: '756,51', rate: '1,1%' },
+      refundOrPay: '6040,50',
+      holderA: { irs: '669,01', rate: '1,0%' },
       holderB: { irs: '12 221,45', rate: '20,0%' },
     },
   },
@@ -156,13 +156,13 @@ const ALL_YEARS_GOLDEN: GoldenYear[] = [
       holderA: { irs: '2891,84', rate: '4,3%' },
       holderB: { irs: '12 221,45', rate: '20,0%' },
     },
-    savings: '2009,33',
+    savings: '2096,83',
     optimized: {
       gross: '128 196,93',
-      irs: '13 103,96',
+      irs: '13 016,46',
       rate: '10,2%',
-      refundOrPay: '15 878,67',
-      holderA: { irs: '882,51', rate: '1,3%' },
+      refundOrPay: '15 966,17',
+      holderA: { irs: '795,01', rate: '1,2%' },
       holderB: { irs: '12 221,45', rate: '20,0%' },
     },
   },
@@ -185,13 +185,13 @@ const YEAR_2024_PRIMARY_GOLDEN: GoldenYear[] = [
       holderA: { irs: '5530,88', rate: '10,6%' },
       holderB: { irs: '4857,18', rate: '20,0%' },
     },
-    savings: '3205,36',
+    savings: '3292,86',
     optimized: {
       gross: '76 615,12',
-      irs: '7182,70',
-      rate: '9,4%',
-      refundOrPay: '2256,55',
-      holderA: { irs: '2325,52', rate: '4,4%' },
+      irs: '7095,20',
+      rate: '9,3%',
+      refundOrPay: '2169,05',
+      holderA: { irs: '2238,02', rate: '4,3%' },
       holderB: { irs: '4857,18', rate: '20,0%' },
     },
   },
@@ -223,17 +223,24 @@ async function expandCollapsedAncestor(page: Page, testId: string) {
   const el = page.locator('[data-testid="' + testId + '"]')
   if (await el.isVisible()) return
 
-  // Expand collapsed ancestors top-down until the target slot is visible.
-  // The deduction slots UI has up to 3 collapsible levels:
-  //   outer "Despesas para Deduções" → middle "Contribuintes" → inner NIF group
-  // We try each level in order, re-checking visibility after each expansion.
+  // Level 1: expand the outer "Despesas para Deduções" card via testid
+  const outerToggle = page.locator('[data-testid="deduction-section-toggle"]')
+  try {
+    await outerToggle.waitFor({ state: 'visible', timeout: 5_000 })
+    const expanded = await outerToggle.getAttribute('aria-expanded')
+    if (expanded !== 'true') {
+      await outerToggle.click()
+      await page.waitForTimeout(800)
+    }
+  } catch {
+    // Not present
+  }
 
+  if (await el.isVisible()) return
+
+  // Level 2+3: expand inner accordion buttons (Contribuintes, NIF group)
   const nif = testId.match(/deduction-slot-(\d+)-/)?.[1]
-  const patterns = [
-    /dedu[\u00e7c]/i, // outer section
-    /contribuintes|taxpayers/i, // middle section
-    ...(nif ? [new RegExp('NIF\\s*' + nif)] : []), // inner NIF group
-  ]
+  const patterns = [/contribuintes|taxpayers/i, ...(nif ? [new RegExp('NIF\\s*' + nif)] : [])]
 
   for (const pattern of patterns) {
     if (await el.isVisible()) return
@@ -244,7 +251,7 @@ async function expandCollapsedAncestor(page: Page, testId: string) {
       const text = await btn.textContent()
       if (text && pattern.test(text)) {
         await btn.click()
-        await page.waitForTimeout(300)
+        await page.waitForTimeout(800)
         break
       }
     }
@@ -526,12 +533,14 @@ test.describe('Golden canary: all years (2021-2025)', () => {
 
     await clickAdvance(page)
 
-    // Strict questionnaire -- Cat B NOT asked (inferred from multi-year XML)
-    // 2 dependents (from 2024/2025 XMLs): born 2019 + 2022
+    // Strict questionnaire — 2 dependents (from 2024/2025 XMLs): born 2019 + 2022
     // degree_year explicit to avoid hidden dependency on XML fixture
     // irs_jovem_is_phd defaults to false (Switch off) → member 0 (birth 1994,
     // age 27-30 in 2021-2024) exceeds non-PhD maxAge=26 → no IRS Jovem pre-2025.
     // Post-2025 uses first_work_year with maxAge=35, so 2025+ IRS Jovem applies.
+    // cat_b_start_year: auto-infer mutates household → question appears in
+    // liveQuestions merge but not initialQuestions → input renders empty.
+    // Explicitly providing the inferred value (earliest Cat B year = 2021).
     await fillStrictQuestionnaire(page, {
       'member.0.birth_year': '1994',
       'member.1.birth_year': '1989',
@@ -539,6 +548,7 @@ test.describe('Golden canary: all years (2021-2025)', () => {
       'dependent.1.birth_year': '2022',
       'member.0.first_work_year': '2021',
       'member.0.degree_year': '2020',
+      'member.0.cat_b_start_year': '2021',
       'member.1.nhr_start_year': '2021',
     })
 

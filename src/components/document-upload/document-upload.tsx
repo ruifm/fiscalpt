@@ -485,6 +485,7 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
       <Card>
         <button
           type="button"
+          data-testid="deduction-section-toggle"
           onClick={() => setDeductionsPasteOpen(!deductionsPasteOpen)}
           aria-expanded={deductionsPasteOpen}
           className="flex w-full items-center gap-2 px-4 py-3 min-h-[44px] text-left"

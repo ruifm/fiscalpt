@@ -97,13 +97,11 @@ test.describe('Upload → Results flow', () => {
     await uploadXml(page, 'decl-m3-irs-2024-holder-a.xml')
     await expect(page.locator('[data-testid="upload-slot"]')).toHaveCount(1, { timeout: 10_000 })
 
-    // Try to advance — should show validation error about missing spouse
+    // Advance — spouse-missing is now a warning (not blocking error)
     await clickAdvance(page)
 
-    // Should show validation error since the XML declares a spouse NIF
-    await expect(page.locator('[data-testid="upload-validation-error"]')).toBeVisible({
-      timeout: 5000,
-    })
+    // Should proceed to questionnaire despite missing spouse declaration
+    await waitForStep(page, 'questionnaire')
   })
 })
 

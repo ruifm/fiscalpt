@@ -5,6 +5,7 @@ import {
   dismissOnboarding,
   uploadXml,
   fillDeductionSlots,
+  expandDeductionSection,
   waitForStep,
   clickAdvance,
   completeQuestionnaire,
@@ -173,6 +174,9 @@ test.describe('Questionnaire interaction', () => {
   test('deduction text area accepts pasted AT page content', async ({ page }) => {
     await uploadXml(page, 'decl-m3-irs-2025-single-cat-a.xml')
     await expect(page.locator('[data-testid="upload-slot"]')).toHaveCount(1, { timeout: 10_000 })
+
+    // Expand the (now-collapsed-by-default) deduction section
+    await expandDeductionSection(page)
 
     // Fill deduction with realistic text
     const textarea = page.locator('[data-testid="deduction-textarea-200000001-2025"]')
