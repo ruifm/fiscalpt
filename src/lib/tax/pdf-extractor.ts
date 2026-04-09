@@ -43,6 +43,13 @@ function extractNumbers(text: string): number[] {
 
 // ─── Liquidação Parser ───────────────────────────────────────
 
+type NumericKeys<T> = Exclude<
+  {
+    [K in keyof T]: T[K] extends number | undefined ? K : never
+  }[keyof T],
+  undefined
+>
+
 export interface LiquidacaoParsed {
   nif?: string
   year?: number
@@ -152,48 +159,41 @@ export function parseLiquidacaoText(text: string): LiquidacaoParsed {
   if (initValues.length >= 1) result.deducoesEspecificas = initValues[0]
   if (initValues.length >= 2) result.perdasRecuperar = initValues[1]
 
-  // Map main block → Lines 4, valor_pagar, 5-9, 11-29
-  // Position 0 = Line 4 (Abatimento)
-  // Position 1 = Valor a pagar/reembolsar (not a numbered line!)
-  // Position 2 = Line 5 (Deduções ao rendimento)
-  // Position 3 = Line 6 (Rendimento Coletável)
-  // Position 4 = Line 7, Position 5 = Line 8, Position 6 = Line 9
-  // Position 7 = Line 11 (Importância), Position 8 = Line 12 (Parcela)
-  // Positions 9-13 = Lines 13-17
-  // Position 14 = Line 18 (Coleta Total)
-  // Position 15 = Line 19, Position 16 = Line 20
-  // Position 17 = Line 21, Position 18 = Line 22 (Coleta Líquida)
-  // Position 19 = Line 23, Position 20 = Line 24 (Retenções)
-  // Position 21 = Line 25 (Impostos Apurados)
-  // Positions 22-25 = Lines 26-29
-  const m = mainValues
-  if (m.length >= 26) {
-    result.abatimentoMinimo = m[0]
-    result.valorPagarReembolsar = m[1]
-    result.deducoesRendimento = m[2]
-    result.rendimentoColetavel = m[3]
-    result.quocienteAnosAnteriores = m[4]
-    result.rendimentosIsentosEnglobados = m[5]
-    result.rendimentosParaTaxa = m[6]
-    result.importanciaApurada = m[7]
-    result.parcelaAbater = m[8]
-    result.impostoAnosAnteriores = m[9]
-    result.impostoRendimentosIsentos = m[10]
-    result.taxaAdicional = m[11]
-    result.excessoQuocienteFamiliar = m[12]
-    result.impostoTributacoesAutonomas = m[13]
-    result.coletaTotal = m[14]
-    result.deducoesColeta = m[15]
-    result.beneficioMunicipal = m[16]
-    result.acrescimosColeta = m[17]
-    result.coletaLiquida = m[18]
-    result.pagamentosConta = m[19]
-    result.retencoesFonte = m[20]
-    result.impostosApurados = m[21]
-    result.jurosRetencaoPoupanca = m[22]
-    result.sobretaxaResultado = m[23]
-    result.jurosCompensatorios = m[24]
-    result.jurosIndemnizatorios = m[25]
+  // Positional mapping: array index → LiquidacaoParsed field.
+  // The AT content stream renders values in this specific order.
+  const MAIN_BLOCK_FIELDS: NumericKeys<LiquidacaoParsed>[] = [
+    'abatimentoMinimo', // 0 — Line 4
+    'valorPagarReembolsar', // 1 — not a numbered line
+    'deducoesRendimento', // 2 — Line 5
+    'rendimentoColetavel', // 3 — Line 6
+    'quocienteAnosAnteriores', // 4 — Line 7
+    'rendimentosIsentosEnglobados', // 5 — Line 8
+    'rendimentosParaTaxa', // 6 — Line 9
+    'importanciaApurada', // 7 — Line 11
+    'parcelaAbater', // 8 — Line 12
+    'impostoAnosAnteriores', // 9 — Line 13
+    'impostoRendimentosIsentos', // 10 — Line 14
+    'taxaAdicional', // 11 — Line 15
+    'excessoQuocienteFamiliar', // 12 — Line 16
+    'impostoTributacoesAutonomas', // 13 — Line 17
+    'coletaTotal', // 14 — Line 18
+    'deducoesColeta', // 15 — Line 19
+    'beneficioMunicipal', // 16 — Line 20
+    'acrescimosColeta', // 17 — Line 21
+    'coletaLiquida', // 18 — Line 22
+    'pagamentosConta', // 19 — Line 23
+    'retencoesFonte', // 20 — Line 24
+    'impostosApurados', // 21 — Line 25
+    'jurosRetencaoPoupanca', // 22 — Line 26
+    'sobretaxaResultado', // 23 — Line 27
+    'jurosCompensatorios', // 24 — Line 28
+    'jurosIndemnizatorios', // 25 — Line 29
+  ]
+
+  if (mainValues.length >= MAIN_BLOCK_FIELDS.length) {
+    for (let i = 0; i < MAIN_BLOCK_FIELDS.length; i++) {
+      result[MAIN_BLOCK_FIELDS[i]] = mainValues[i]
+    }
   }
 
   // Line 1 (RENDIMENTO GLOBAL) — rendered last in content stream
@@ -212,11 +212,17 @@ export function parseLiquidacaoText(text: string): LiquidacaoParsed {
     return undefined
   }
 
-  result.deducoesDependentes = extractDeduction('Dedução dependentes')
-  result.deducoesGerais = extractDeduction('Dedução despesas gerais e familiares')
-  result.deducoesSaude = extractDeduction('Dedução com despesas de saúde e com seguros de saúde')
-  result.deducoesEducacao = extractDeduction('Dedução com despesas de educação e formação')
-  result.deducoesExigenciaFatura = extractDeduction('Dedução exigência de fatura')
+  // Deduction labels → LiquidacaoParsed field
+  const DEDUCTION_FIELDS: [string, NumericKeys<LiquidacaoParsed>][] = [
+    ['Dedução dependentes', 'deducoesDependentes'],
+    ['Dedução despesas gerais e familiares', 'deducoesGerais'],
+    ['Dedução com despesas de saúde e com seguros de saúde', 'deducoesSaude'],
+    ['Dedução com despesas de educação e formação', 'deducoesEducacao'],
+    ['Dedução exigência de fatura', 'deducoesExigenciaFatura'],
+  ]
+  for (const [label, field] of DEDUCTION_FIELDS) {
+    result[field] = extractDeduction(label)
+  }
 
   // Total deductions
   const totalDedMatch = text.match(/Total das Deduções\s*:\s+(\d{1,3}(?:\.\d{3})*,\d{2})/)
