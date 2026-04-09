@@ -217,27 +217,30 @@ async function expandCollapsedAncestor(page: Page, testId: string) {
   const el = page.locator('[data-testid="' + testId + '"]')
   if (await el.isVisible()) return
 
-  // Expand NIF group accordion
-  for (const nif of NIFS) {
-    const btn = page
-      .locator('button[aria-expanded="false"]', { hasText: new RegExp('NIF\\s*' + nif) })
-      .first()
-    if ((await btn.count()) > 0) {
-      await btn.click()
-      await page.waitForTimeout(300)
-      if (await el.isVisible()) return
-    }
-  }
+  // Expand collapsed ancestors top-down until the target slot is visible.
+  // The deduction slots UI has up to 3 collapsible levels:
+  //   outer "Despesas para Deduções" → middle "Contribuintes" → inner NIF group
+  // We try each level in order, re-checking visibility after each expansion.
 
-  // Expand deduction section accordion
-  const sectionBtns = page.locator('button[aria-expanded="false"]')
-  for (let i = 0; i < (await sectionBtns.count()); i++) {
-    const btn = sectionBtns.nth(i)
-    const text = await btn.textContent()
-    if (text && /dedu[\u00e7c]/i.test(text)) {
-      await btn.click()
-      await page.waitForTimeout(300)
-      break
+  const nif = testId.match(/deduction-slot-(\d+)-/)?.[1]
+  const patterns = [
+    /dedu[\u00e7c]/i, // outer section
+    /contribuintes|taxpayers/i, // middle section
+    ...(nif ? [new RegExp('NIF\\s*' + nif)] : []), // inner NIF group
+  ]
+
+  for (const pattern of patterns) {
+    if (await el.isVisible()) return
+    const btns = page.locator('button[aria-expanded="false"]')
+    const count = await btns.count()
+    for (let i = 0; i < count; i++) {
+      const btn = btns.nth(i)
+      const text = await btn.textContent()
+      if (text && pattern.test(text)) {
+        await btn.click()
+        await page.waitForTimeout(300)
+        break
+      }
     }
   }
 }
