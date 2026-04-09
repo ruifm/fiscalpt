@@ -295,6 +295,11 @@ const pt = {
       'Com base na informação fornecida, os resultados são apenas indicativos. Para uma análise mais precisa, preencha o questionário e forneça o máximo de documentação possível.',
     missingDeductionsWarning:
       'Deduções não fornecidas — a utilizar o valor predefinido de €250 (despesas gerais). Carregue o documento de liquidação ou preencha as deduções para resultados mais precisos.',
+    noDocuments:
+      'Não tem os documentos à mão? Experimente a Simulação Rápida para uma estimativa instantânea — pode voltar aqui depois com os documentos.',
+    noDocumentsCta: 'Simulação Rápida',
+    draftXmlTip:
+      'Dica: para o ano corrente (2025), pode obter o XML como rascunho no Portal das Finanças sem submeter a declaração. Não precisa de entregar o IRS para usar esta ferramenta.',
   },
 
   upload: {
@@ -991,7 +996,6 @@ const pt = {
     aiConsultCta: 'Consulta fiscal com IA',
     aiConsultDesc:
       'Fale com o nosso consultor fiscal AI para recomendações personalizadas à sua situação específica.',
-    comingSoon: 'Em breve',
     switchToFull: 'Análise Personalizada',
     switchToSim: 'Simulação Rápida',
     birthYearError: 'Ano de nascimento inválido',

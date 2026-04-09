@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Mail,
   Zap,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DocumentUpload } from '@/components/document-upload'
@@ -228,6 +229,10 @@ export default function AnalyzePage() {
                   {t('analyze.title')}
                 </h1>
                 <p className="mt-2 text-muted-foreground">{t('analyze.subtitle')}</p>
+                <p className="mt-1.5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground/80">
+                  <FileText className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  {t('analyze.draftXmlTip')}
+                </p>
                 <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1">
                   <ShieldCheck
                     className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400"
@@ -330,6 +335,22 @@ export default function AnalyzePage() {
                 </div>
               )}
               <DocumentUpload onExtracted={handleExtracted} />
+              {step === 'upload' && households.length === 0 && (
+                <div
+                  className="mt-6 rounded-lg border border-dashed border-muted-foreground/25 bg-muted/30 p-4 text-center"
+                  data-testid="no-documents-callout"
+                >
+                  <p className="text-sm text-muted-foreground">
+                    {t('analyze.noDocuments')}
+                  </p>
+                  <Link href="/simulacao">
+                    <Button variant="outline" size="sm" className="mt-3 gap-1.5">
+                      <Zap className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t('analyze.noDocumentsCta')}
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
 
             {!calculating && step === 'questionnaire' && primaryHousehold && (

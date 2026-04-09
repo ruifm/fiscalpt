@@ -293,6 +293,11 @@ const en: DictShape<PtDict> = {
       'Based on the information provided, results are indicative only. For a more precise analysis, fill in the questionnaire and provide as much documentation as possible.',
     missingDeductionsWarning:
       'Deductions not provided — using default value of €250 (general expenses). Upload your tax assessment or fill in deductions for more precise results.',
+    noDocuments:
+      "Don't have your documents handy? Try the Quick Simulation for an instant estimate — you can come back here later with your documents.",
+    noDocumentsCta: 'Quick Simulation',
+    draftXmlTip:
+      "Tip: for the current year (2025), you can get the XML as a draft from Portal das Finanças without submitting the declaration. You don't need to file your taxes to use this tool.",
   },
 
   upload: {
@@ -976,7 +981,6 @@ const en: DictShape<PtDict> = {
     aiConsultCta: 'AI tax consultation',
     aiConsultDesc:
       'Talk to our AI tax consultant for personalized recommendations specific to your situation.',
-    comingSoon: 'Coming soon',
     switchToFull: 'Personalized Analysis',
     switchToSim: 'Quick Simulation',
     birthYearError: 'Invalid birth year',
