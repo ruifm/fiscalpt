@@ -24,6 +24,8 @@ const eslintConfig = defineConfig([
     'build/**',
     'coverage/**',
     'next-env.d.ts',
+    // Vendored files:
+    'public/pdf.worker.min.mjs',
   ]),
 ])
 

@@ -5,7 +5,7 @@
 export async function extractTextFromPdf(file: File): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist')
 
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
   const arrayBuffer = await file.arrayBuffer()
   const data = new Uint8Array(arrayBuffer)
@@ -19,7 +19,7 @@ export async function extractTextFromPdf(file: File): Promise<string> {
     pages.push(text)
   }
 
-  return pages.join('\n')
+  return pages.join('\n---PAGE---\n')
 }
 
 import type { Household, Person, Dependent, ValidationIssue } from './types'
@@ -326,8 +326,9 @@ export function parseComprovativoPdfText(text: string): ComprovativoParsed {
   const result: ComprovativoParsed = { issues: [] }
 
   // ── Identification ──────────────────────────────────────────
-  // Year and NIF from the footer: "Comprovativo Mod.3 IRS: 100000001 / 2024 / ..."
-  const footerMatch = text.match(/Comprovativo Mod\.3 IRS:\s*(\d{9})\s*\/\s*(\d{4})/)
+  // Year and NIF from the footer: "Comprovativo Mod.3 IRS: NIF / YEAR / ..."
+  // Some years use "Declaração Automática Mod.3 IRS:" instead of "Comprovativo Mod.3 IRS:"
+  const footerMatch = text.match(/Mod\.3 IRS:\s*(\d{9})\s*\/\s*(\d{4})/)
   if (footerMatch) {
     result.nif = footerMatch[1]
     result.year = parseInt(footerMatch[2])
@@ -355,12 +356,14 @@ export function parseComprovativoPdfText(text: string): ComprovativoParsed {
     const afterConjuge = page1.substring(page1.lastIndexOf(result.nifConjuge) + 9)
     const depNifs = afterConjuge.match(/\b\d{9}\b/g) || []
     // Filter out the main NIF, cônjuge NIF, and validation code
-    result.dependentNifs = depNifs.filter((n) => n !== result.nif && n !== result.nifConjuge)
+    result.dependentNifs = [
+      ...new Set(depNifs.filter((n) => n !== result.nif && n !== result.nifConjuge)),
+    ]
   } else if (result.nif) {
     // Single filer — look for dependent NIFs after the main NIF
     const afterNif = page1.substring(page1.indexOf(result.nif) + 9)
     const depNifs = afterNif.match(/\b\d{9}\b/g) || []
-    result.dependentNifs = depNifs.filter((n) => n !== result.nif)
+    result.dependentNifs = [...new Set(depNifs.filter((n) => n !== result.nif))]
   }
 
   // Determine filing status
@@ -435,33 +438,45 @@ export function parseComprovativoPdfText(text: string): ComprovativoParsed {
         titular: 'A',
       }
 
-      // Try structured tail pattern: year nif nifEmployer code titularLetter amounts...
-      const tailMatch = page.match(/(\d{4})\s+(\d{9})\s+(\d{9})\s+(\d{3})\s+([AB])\s+/)
-      if (tailMatch) {
-        const titularNif = tailMatch[2]
+      // Titular: match NIF against holder/spouse
+      const nifMatches = page.match(/\b\d{9}\b/g) || []
+      const titularNif = nifMatches.find((n) => n === result.nif || n === result.nifConjuge)
+      if (titularNif) {
         entry.titular = titularNif === result.nif ? 'A' : 'B'
+      }
+
+      // Metadata: try structured tail (single-employer: year NIF empNIF code AB)
+      const tailMatch = page.match(/(\d{4})\s+(\d{9})\s+(\d{9})\s+(\d{3})\s+([AB])/)
+      if (tailMatch) {
         entry.nifEmployer = tailMatch[3]
         entry.incomeCode = tailMatch[4]
+      } else {
+        // Fallback: first 3-digit code before A/B titular letter
+        const codeMatch = page.match(/\b(\d{3})\s+[AB]\b/)
+        if (codeMatch) entry.incomeCode = codeMatch[1]
+      }
 
-        const afterTail = page.substring(page.indexOf(tailMatch[0]) + tailMatch[0].length)
-        const numbers = extractNumbers(afterTail)
+      // Amounts: prefer summary row (last 5 numbers on real PDFs), fall back
+      // to positional for synthetic/minimal pages.
+      // Real Anexo A pages always end with: [gross, wh, ss, sobretaxa, sindical]
+      // This works for both single and multi-employer pages.
+      const numbers = extractNumbers(page)
+      if (numbers.length >= 5) {
+        const summary = numbers.slice(-5)
+        entry.rendimentoBruto = summary[0]
+        entry.retencoesIRS = summary[1]
+        entry.contribuicoesSS = summary[2]
+        // summary[3] = retenção da sobretaxa (not stored)
+        entry.quotizacoesSindicais = summary[4]
+      } else if (numbers.length >= 4) {
+        entry.rendimentoBruto = numbers[0]
+        entry.retencoesIRS = numbers[1]
+        entry.contribuicoesSS = numbers[2]
+        entry.quotizacoesSindicais = numbers[3]
+      } else {
         if (numbers.length >= 1) entry.rendimentoBruto = numbers[0]
         if (numbers.length >= 2) entry.retencoesIRS = numbers[1]
         if (numbers.length >= 3) entry.contribuicoesSS = numbers[2]
-        if (numbers.length >= 4) entry.quotizacoesSindicais = numbers[3]
-      } else {
-        // Fallback: positional extraction from older format
-        const nifMatches = page.match(/\b\d{9}\b/g) || []
-        const titularNif = nifMatches.find((n) => n === result.nif || n === result.nifConjuge)
-        if (titularNif) {
-          entry.titular = titularNif === result.nif ? 'A' : 'B'
-        }
-
-        const numbers = extractNumbers(page)
-        const amounts = numbers.filter((n) => n > 0)
-        if (amounts.length >= 1) entry.rendimentoBruto = amounts[0]
-        if (amounts.length >= 2) entry.retencoesIRS = amounts[1]
-        if (amounts.length >= 3) entry.contribuicoesSS = amounts[2]
       }
 
       // IRS Jovem: code 417 or explicit "IRS Jovem ano X" marker
@@ -481,7 +496,7 @@ export function parseComprovativoPdfText(text: string): ComprovativoParsed {
   // ── Anexo B (Cat B income) ─────────────────────────────────
   // Look for Anexo B pages
   const anexoBMatch = text.match(
-    /Anexo B[\s\S]*?RENDIMENTOS.*?CATEGORIA B[\s\S]*?(?=Comprovativo Mod\.3)/g,
+    /Anexo B[\s\S]*?RENDIMENTOS.*?CATEGORIA B[\s\S]*?(?=(?:Comprovativo|Declara\u00e7\u00e3o Autom\u00e1tica) Mod\.3)/g,
   )
   if (anexoBMatch) {
     result.anexoB = []
@@ -779,6 +794,7 @@ export function comprativoParsedToHousehold(parsed: ComprovativoParsed): {
     for (const l of anexoLEntries) {
       if (l.nhrStatus && !person.special_regimes.includes('nhr')) {
         person.special_regimes.push('nhr')
+        person.nhr_confirmed = true
       }
     }
 
