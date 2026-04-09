@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,12 +30,20 @@ import { cn } from '@/lib/utils'
 
 // ─── Types ───────────────────────────────────────────────────
 
-interface PersonFormState {
+export interface PersonFormState {
   birth_year: string
   gross_cat_a: string
   has_cat_b: boolean
   gross_cat_b: string
   nhr: boolean
+}
+
+export interface SimulationFormState {
+  married: boolean
+  persons: PersonFormState[]
+  depsUnder3: number
+  deps3to6: number
+  depsOver6: number
 }
 
 interface FormErrors {
@@ -47,16 +55,26 @@ interface FormErrors {
 
 interface SimulationFormProps {
   onResults: (results: SimulationResults, inputs: SimulationInputs) => void
+  initialState?: SimulationFormState
+  onStateChange?: (state: SimulationFormState) => void
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-const DEFAULT_PERSON: PersonFormState = {
+export const DEFAULT_PERSON: PersonFormState = {
   birth_year: '',
   gross_cat_a: '',
   has_cat_b: false,
   gross_cat_b: '',
   nhr: false,
+}
+
+export const DEFAULT_FORM_STATE: SimulationFormState = {
+  married: false,
+  persons: [{ ...DEFAULT_PERSON }],
+  depsUnder3: 0,
+  deps3to6: 0,
+  depsOver6: 0,
 }
 
 function toPersonInput(state: PersonFormState): SimulationPersonInput {
@@ -275,16 +293,30 @@ function PersonCard({
 
 // ─── Main Form ───────────────────────────────────────────────
 
-export function SimulationForm({ onResults }: SimulationFormProps) {
+export function SimulationForm({ onResults, initialState, onStateChange }: SimulationFormProps) {
   const t = useT()
 
-  const [married, setMarried] = useState(false)
-  const [persons, setPersons] = useState<PersonFormState[]>([{ ...DEFAULT_PERSON }])
-  const [depsUnder3, setDepsUnder3] = useState(0)
-  const [deps3to6, setDeps3to6] = useState(0)
-  const [depsOver6, setDepsOver6] = useState(0)
+  const [married, setMarried] = useState(initialState?.married ?? false)
+  const [persons, setPersons] = useState<PersonFormState[]>(
+    initialState?.persons ?? [{ ...DEFAULT_PERSON }],
+  )
+  const [depsUnder3, setDepsUnder3] = useState(initialState?.depsUnder3 ?? 0)
+  const [deps3to6, setDeps3to6] = useState(initialState?.deps3to6 ?? 0)
+  const [depsOver6, setDepsOver6] = useState(initialState?.depsOver6 ?? 0)
   const [calculating, setCalculating] = useState(false)
-  const [errors, setErrors] = useState<FormErrors>({ persons: [{}] })
+  const [errors, setErrors] = useState<FormErrors>({
+    persons: (initialState?.persons ?? [{ ...DEFAULT_PERSON }]).map(() => ({})),
+  })
+
+  // Emit state changes to parent for persistence
+  const formState = useMemo(
+    () => ({ married, persons, depsUnder3, deps3to6, depsOver6 }),
+    [married, persons, depsUnder3, deps3to6, depsOver6],
+  )
+
+  useEffect(() => {
+    onStateChange?.(formState)
+  }, [formState, onStateChange])
 
   const handleMarriedChange = useCallback(
     (isMarried: boolean) => {

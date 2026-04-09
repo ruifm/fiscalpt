@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SimulationForm } from '@/components/simulation-form'
+import type { SimulationFormState } from '@/components/simulation-form'
 import { ResultsSkeleton } from '@/components/results-skeleton'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LocaleToggle } from '@/components/locale-toggle'
@@ -19,15 +20,78 @@ const TaxResults = dynamic(() => import('@/components/tax-results').then((mod) =
   loading: () => <ResultsSkeleton />,
 })
 
+// ─── localStorage persistence ────────────────────────────────
+
+const STORAGE_KEY = 'fiscalpt-simulation'
+const STORAGE_VERSION = 1
+
+interface SimulationStorage {
+  version: number
+  formState: SimulationFormState
+  results?: SimulationResults | null
+  inputs?: SimulationInputs | null
+}
+
+function readStorage(): SimulationStorage | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw) as SimulationStorage
+    if (data.version !== STORAGE_VERSION) {
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
+    return data
+  } catch {
+    return null
+  }
+}
+
+function writeStorage(data: SimulationStorage) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch {
+    // Storage full or unavailable — silently ignore
+  }
+}
+
+function clearStorage() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // Ignore
+  }
+}
+
 export default function SimulacaoPage() {
   const t = useT()
-  const [results, setResults] = useState<SimulationResults | null>(null)
-  const [_inputs, setInputs] = useState<SimulationInputs | null>(null)
+
+  // Lazy-read localStorage on mount (sync, no race condition)
+  const [stored] = useState<SimulationStorage | null>(() => {
+    if (typeof window === 'undefined') return null
+    return readStorage()
+  })
+
+  const [results, setResults] = useState<SimulationResults | null>(
+    () => stored?.results ?? null,
+  )
+  const [_inputs, setInputs] = useState<SimulationInputs | null>(
+    () => stored?.inputs ?? null,
+  )
+  const [formState, setFormState] = useState<SimulationFormState | undefined>(
+    () => stored?.formState,
+  )
+  const [formKey, setFormKey] = useState(0)
   const resultsRef = useRef<HTMLDivElement>(null)
 
   const handleResults = useCallback((r: SimulationResults, i: SimulationInputs) => {
     setResults(r)
     setInputs(i)
+    // Persist results alongside form state
+    const current = readStorage()
+    if (current) {
+      writeStorage({ ...current, results: r, inputs: i })
+    }
   }, [])
 
   // Scroll to results when they appear
@@ -39,11 +103,32 @@ export default function SimulacaoPage() {
 
   const handleBack = useCallback(() => {
     setResults(null)
+    setInputs(null)
+    // Clear results from storage, keep form state
+    const current = readStorage()
+    if (current) {
+      writeStorage({ ...current, results: null, inputs: null })
+    }
   }, [])
 
   const handleReset = useCallback(() => {
     setResults(null)
     setInputs(null)
+    setFormState(undefined)
+    setFormKey((k) => k + 1)
+    clearStorage()
+  }, [])
+
+  const handleFormStateChange = useCallback((state: SimulationFormState) => {
+    setFormState(state)
+    // Preserve existing results when only form state changes
+    const current = readStorage()
+    writeStorage({
+      version: STORAGE_VERSION,
+      formState: state,
+      results: current?.results ?? null,
+      inputs: current?.inputs ?? null,
+    })
   }, [])
 
   return (
@@ -90,7 +175,12 @@ export default function SimulacaoPage() {
               </div>
 
               {/* Form */}
-              <SimulationForm onResults={handleResults} />
+              <SimulationForm
+                key={formKey}
+                onResults={handleResults}
+                initialState={formState}
+                onStateChange={handleFormStateChange}
+              />
 
               {/* Disclaimer */}
               <p className="mt-4 text-center text-xs text-muted-foreground">
