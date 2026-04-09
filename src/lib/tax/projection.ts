@@ -1,6 +1,6 @@
 import type { AnalysisResult, Household, Income, PersonTaxDetail } from './types'
 import { SS_EMPLOYEE_RATE, SS_INDEPENDENT_BASE_RATIO, SS_INDEPENDENT_RATE } from './types'
-import { getIrsJovemRegime } from './irs-jovem'
+import { deriveIrsJovemBenefitYear, getIrsJovemRegime } from './irs-jovem'
 import { round2 } from './utils'
 
 const CAT_B_RETENTION_RATE = 0.25
@@ -33,12 +33,15 @@ export function buildProjectedHousehold(
     members: primary.members.map((member) => {
       const adjusted = member.nif ? adjustedIncomes?.get(member.nif) : undefined
 
-      // Derive benefit year for projected year from stable first_work_year
-      const derivedBenefitYear = member.irs_jovem_first_work_year
-        ? projectedYear - member.irs_jovem_first_work_year + 1
-        : member.irs_jovem_year
-          ? member.irs_jovem_year + 1
-          : undefined
+      // Derive benefit year for projected year using regime-aware logic
+      // when stable anchors exist; fall back to incrementing explicit year
+      const derivedBenefitYear =
+        deriveIrsJovemBenefitYear(
+          undefined,
+          member.irs_jovem_first_work_year,
+          projectedYear,
+          member.irs_jovem_degree_year,
+        ) ?? (member.irs_jovem_year != null ? member.irs_jovem_year + 1 : undefined)
       const irsJovemActive =
         derivedBenefitYear !== undefined &&
         derivedBenefitYear >= 1 &&

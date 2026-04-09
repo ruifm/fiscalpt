@@ -109,6 +109,30 @@ describe('buildProjectedHousehold', () => {
     expect(projected.members[0].special_regimes).toContain('irs_jovem')
   })
 
+  it('uses degree_year for pre-2025 projection', () => {
+    const h = makeHousehold({ year: 2023 })
+    h.members[0].irs_jovem_degree_year = 2020
+    h.members[0].irs_jovem_first_work_year = 2022
+    h.members[0].irs_jovem_year = undefined
+    const projected = buildProjectedHousehold(h)
+    // projectedYear = 2024, degree_year = 2020 → benefitYear = 2024 - 2020 = 4
+    // NOT 2024 - 2022 + 1 = 3 (wrong formula for pre-2025)
+    expect(projected.members[0].irs_jovem_year).toBe(4)
+    expect(projected.members[0].special_regimes).toContain('irs_jovem')
+  })
+
+  it('uses first_work_year for post-2025 projection even with degree_year', () => {
+    const h = makeHousehold()
+    h.members[0].irs_jovem_degree_year = 2020
+    h.members[0].irs_jovem_first_work_year = 2022
+    h.members[0].irs_jovem_year = undefined
+    const projected = buildProjectedHousehold(h)
+    // projectedYear = 2026, first_work_year = 2022 → 2026 - 2022 + 1 = 5
+    // NOT 2026 - 2020 = 6 (that's degree-based)
+    expect(projected.members[0].irs_jovem_year).toBe(5)
+    expect(projected.members[0].special_regimes).toContain('irs_jovem')
+  })
+
   it('drops IRS Jovem when derived year from first_work_year exceeds max', () => {
     const h = makeHousehold()
     h.members[0].irs_jovem_first_work_year = 2015
