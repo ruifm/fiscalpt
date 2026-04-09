@@ -25,7 +25,7 @@ function buildPiiMap(results: AnalysisResult[]): PiiMap {
         memberIdx++
       }
     }
-    for (const d of r.household.dependents) {
+    for (const d of r.household.dependents ?? []) {
       if (!dependents.has(d.name)) {
         depIdx++
         dependents.set(d.name, `Dependente ${depIdx}`)
@@ -88,9 +88,9 @@ function buildInputsSection(results: AnalysisResult[], pii: PiiMap): string {
       }
     }
 
-    if (h.dependents.length > 0) {
+    if ((h.dependents ?? []).length > 0) {
       lines.push('\n#### Dependentes')
-      for (const d of h.dependents) {
+      for (const d of h.dependents ?? []) {
         const label = redactName(d.name, pii)
         const parts = [label]
         if (d.birth_year) parts.push(`nascimento=${d.birth_year}`)

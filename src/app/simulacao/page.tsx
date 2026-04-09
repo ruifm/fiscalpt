@@ -91,17 +91,24 @@ export default function SimulacaoPage() {
     return readStorage()?.pendingCheckoutSessionId ?? null
   })
 
-  const [results, setResults] = useState<SimulationResults | null>(
-    () => stored?.results ?? null,
-  )
-  const [_inputs, setInputs] = useState<SimulationInputs | null>(
-    () => stored?.inputs ?? null,
-  )
+  // Results and inputs start null to match server render (avoids hydration mismatch).
+  // Restored from localStorage in useEffect below after hydration.
+  const [results, setResults] = useState<SimulationResults | null>(null)
+  const [_inputs, setInputs] = useState<SimulationInputs | null>(null)
   const [formState, setFormState] = useState<SimulationFormState | undefined>(
     () => stored?.formState,
   )
   const [formKey, setFormKey] = useState(0)
   const resultsRef = useRef<HTMLDivElement>(null)
+
+  // Restore results from localStorage after hydration
+  useEffect(() => {
+    if (stored?.results) {
+      setResults(stored.results)
+      setInputs(stored.inputs ?? null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
+  }, [])
 
   const handleResults = useCallback((r: SimulationResults, i: SimulationInputs) => {
     setResults(r)
