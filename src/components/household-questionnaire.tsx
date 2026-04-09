@@ -42,7 +42,7 @@ interface HouseholdQuestionnaireProps {
   household: Household
   onComplete: (household: Household, projectedHousehold?: Household) => void
   onBack: () => void
-  onSkip: () => void
+  onSkip?: () => void
   /** If set, show projection section for this year */
   projectionYear?: number
   /** Households from other tax years (for cross-year inference, e.g. Cat B activity) */
@@ -70,7 +70,7 @@ export function HouseholdQuestionnaire({
   household,
   onComplete,
   onBack,
-  onSkip,
+  onSkip: _onSkip,
   projectionYear,
   otherYearHouseholds,
 }: HouseholdQuestionnaireProps) {
@@ -329,7 +329,6 @@ export function HouseholdQuestionnaire({
     }
     // Apply whatever answers were given before skipping
     const updated = applyAnswers(household, answers)
-    onSkip()
     onComplete(updated, buildProjection(updated))
   }
 

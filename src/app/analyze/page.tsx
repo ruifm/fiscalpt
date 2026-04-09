@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
@@ -27,30 +27,14 @@ const TaxResults = dynamic(() => import('@/components/tax-results').then((mod) =
   ssr: false,
   loading: () => <ResultsSkeleton />,
 })
-import type { Household, AnalysisResult, ValidationIssue } from '@/lib/tax/types'
-import { analyzeHousehold } from '@/lib/tax'
-import { validateHousehold } from '@/lib/tax/input-validation'
-import { validateAgainstLiquidacao, type LiquidacaoParsed } from '@/lib/tax/pdf-extractor'
-import {
-  saveSessionState,
-  loadSessionState,
-  clearSessionState,
-  generateSessionId,
-  migrateLegacySession,
-} from '@/lib/session-persistence'
-import { propagateSharedData } from '@/lib/tax/propagate-shared-data'
-import { estimateProjectedRetentions } from '@/lib/tax/projection'
+import { generateSessionId } from '@/lib/session-persistence'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LocaleToggle } from '@/components/locale-toggle'
 import { OnboardingOverlay } from '@/components/onboarding-overlay'
 import { FeedbackButton } from '@/components/feedback-button'
 import { useT } from '@/lib/i18n'
-import { trackEvent } from '@/lib/analytics'
-
-type Step = 'upload' | 'questionnaire' | 'results'
-
-const STEPS: Step[] = ['upload', 'questionnaire', 'results']
+import { useAnalysisFlow, STEPS, type Step } from '@/hooks/use-analysis-flow'
 
 const STEP_LABEL_KEYS: Record<Step, string> = {
   upload: 'analyze.steps.upload',
@@ -60,21 +44,6 @@ const STEP_LABEL_KEYS: Record<Step, string> = {
 
 export default function AnalyzePage() {
   const t = useT()
-  const [step, setStep] = useState<Step>('upload')
-  const [households, setHouseholds] = useState<Household[]>([])
-  const [results, setResults] = useState<AnalysisResult[]>([])
-  const [issues, setIssues] = useState<ValidationIssue[]>([])
-  const [liquidacao, setLiquidacao] = useState<LiquidacaoParsed | null>(null)
-  const [calculating, setCalculating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const restoredRef = useRef(false)
-  // Keeps the households as originally parsed from documents, before
-  // questionnaire answers are baked in by applyAnswers. This allows the
-  // questionnaire to regenerate all questions when the user navigates back.
-  const uploadedHouseholdsRef = useRef<Household[]>([])
-  const [furthestStep, setFurthestStep] = useState<number>(0)
-  const mainContentRef = useRef<HTMLDivElement>(null)
-  const errorBannerRef = useRef<HTMLDivElement>(null)
 
   // Session ID: read from URL hash or generate a new one
   const [sessionId] = useState(() => {
@@ -90,55 +59,24 @@ export default function AnalyzePage() {
     return params.get('session_id')
   })
 
-  // Primary household = most recent year (first in sorted-descending array)
-  const primaryHousehold = households[0] ?? null
+  const {
+    state,
+    primaryHousehold,
+    questionnaireHousehold,
+    projectionYear,
+    handleExtracted,
+    handleQuestionnaireComplete,
+    handleClearAll,
+    goToStep,
+    advanceStep,
+    reloadDocuments,
+    dismissError,
+  } = useAnalysisFlow({ sessionId, t })
 
-  // The household to pass to the questionnaire: always use the original
-  // uploaded household (before answers are baked in) so all questions appear.
-  const questionnaireHousehold = uploadedHouseholdsRef.current[0] ?? primaryHousehold
+  const { step, households, results, issues, calculating, error, furthestStep } = state
 
-  function goToStep(target: Step) {
-    setStep(target)
-    setError(null)
-    persistState(target, households, results, issues, liquidacao)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  function advanceStep(target: Step) {
-    const idx = STEPS.indexOf(target)
-    setStep(target)
-    setFurthestStep((prev) => Math.max(prev, idx))
-    setError(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  // Restore session state on mount
-  useEffect(() => {
-    if (restoredRef.current) return
-    restoredRef.current = true
-
-    trackEvent('page_view')
-
-    // Try session-ID-based localStorage first, then legacy sessionStorage
-    const saved = loadSessionState(sessionId) ?? migrateLegacySession(sessionId)
-    if (saved) {
-      const step = saved.step === 'review' ? 'questionnaire' : saved.step
-      setStep(step as Step)
-      setHouseholds(saved.households)
-      setResults(saved.results)
-      setIssues(saved.issues)
-      setLiquidacao(saved.liquidacao)
-      setFurthestStep(STEPS.indexOf(step as Step))
-
-      // Restore original uploaded households so questionnaire shows all questions
-      if (saved.uploadedHouseholds?.length) {
-        uploadedHouseholdsRef.current = saved.uploadedHouseholds
-      }
-    }
-
-    // Set URL hash so user can bookmark
-    window.history.replaceState(null, '', `#s=${sessionId}`)
-  }, [sessionId])
+  const mainContentRef = useRef<HTMLDivElement>(null)
+  const errorBannerRef = useRef<HTMLDivElement>(null)
 
   // Focus main heading after step transitions
   const prevStepRef = useRef(step)
@@ -162,219 +100,6 @@ export default function AnalyzePage() {
       errorBannerRef.current.focus()
     }
   }, [error])
-
-  // Persist state on every meaningful change
-  const persistState = useCallback(
-    (
-      s: Step,
-      hs: Household[],
-      rs: AnalysisResult[],
-      i: ValidationIssue[],
-      l: LiquidacaoParsed | null,
-    ) => {
-      saveSessionState(sessionId, {
-        step: s,
-        households: hs,
-        uploadedHouseholds:
-          uploadedHouseholdsRef.current.length > 0 ? uploadedHouseholdsRef.current : undefined,
-        results: rs,
-        issues: i,
-        liquidacao: l,
-      })
-    },
-    [sessionId],
-  )
-
-  function handleExtracted(hs: Household[], i: ValidationIssue[], liq?: LiquidacaoParsed) {
-    trackEvent('upload_complete', { householdCount: hs.length })
-    setHouseholds(hs)
-    uploadedHouseholdsRef.current = hs
-    setIssues(i)
-    setResults([])
-    const newLiq = liq ?? liquidacao
-    if (liq) setLiquidacao(liq)
-    // Reset to questionnaire — force fresh start since documents changed
-    const qIdx = STEPS.indexOf('questionnaire')
-    setStep('questionnaire')
-    setFurthestStep(qIdx)
-    setError(null)
-    persistState('questionnaire', hs, [], i, newLiq)
-  }
-
-  // Project next year's taxes if primary year is current or last year
-  const projectionYear = (() => {
-    if (!primaryHousehold) return undefined
-    const currentYear = new Date().getFullYear()
-    if (primaryHousehold.year >= currentYear - 1) return primaryHousehold.year + 1
-    return undefined
-  })()
-
-  function handleQuestionnaireComplete(h: Household, projectedHousehold?: Household) {
-    trackEvent('questionnaire_complete')
-    // Strip any previously-appended projected households before rebuilding
-    const nonProjected = households.filter((hh) => !hh.projected)
-    // Update primary household, propagate, then analyze all
-    const allHouseholds = nonProjected.map((hh, idx) => {
-      if (idx === 0) return h
-      const propagated = propagateSharedData(h, hh)
-      // Log propagation details for debugging
-      console.info('[FiscalPT] Propagation year:', hh.year, {
-        members: propagated.members.map((m) => ({
-          name: m.name,
-          nif: m.nif ?? '?',
-          regimes: m.special_regimes,
-          nhr_confirmed: m.nhr_confirmed,
-          nhr_start_year: m.nhr_start_year,
-          irs_jovem_first_work_year: m.irs_jovem_first_work_year,
-        })),
-      })
-      return propagated
-    })
-    if (projectedHousehold) allHouseholds.push(projectedHousehold)
-    computeAndShowResults(allHouseholds)
-  }
-
-  function handleQuestionnaireSkip() {
-    computeAndShowResults(households.filter((hh) => !hh.projected))
-  }
-
-  function computeAndShowResults(allHouseholds: Household[]) {
-    // Validate but never block — the engine sanitizes values and produces
-    // the best result it can. Surface issues as warnings alongside results.
-    const freshErrors = allHouseholds.flatMap((hh) => validateHousehold(hh))
-    const validationWarnings: ValidationIssue[] = freshErrors
-      .filter((e) => e.severity === 'error')
-      .map((e) => ({
-        severity: 'warning' as const,
-        code: e.code,
-        message: e.message,
-        details: e.field,
-      }))
-    if (validationWarnings.length > 0) {
-      setIssues((prev) => {
-        const existing = new Set(prev.map((i) => `${i.code}:${i.message}`))
-        return [
-          ...prev,
-          ...validationWarnings.filter((w) => !existing.has(`${w.code}:${w.message}`)),
-        ]
-      })
-    }
-
-    setCalculating(true)
-    setError(null)
-    try {
-      // Separate projected from non-projected households
-      const nonProjected = allHouseholds.filter((hh) => !hh.projected)
-      const projectedRaw = allHouseholds.filter((hh) => hh.projected)
-
-      // Analyze non-projected first
-      const allResults: AnalysisResult[] = nonProjected.map((hh) => analyzeHousehold(hh))
-
-      // Enrich projected households with estimated retentions, then analyze
-      const primaryHH = nonProjected[0]
-      const primaryResult = allResults.find((r) => r.year === primaryHH?.year)
-      const enrichedHouseholds = [...nonProjected]
-
-      for (const proj of projectedRaw) {
-        const enriched =
-          primaryHH && primaryResult
-            ? estimateProjectedRetentions(proj, primaryHH, primaryResult)
-            : proj
-        enrichedHouseholds.push(enriched)
-        allResults.push(analyzeHousehold(enriched))
-      }
-
-      // Diagnostic: log per-year member and scenario data (all years including projected)
-      for (const r of allResults) {
-        console.info('[FiscalPT] Year:', r.year, r.household.projected ? '(projected)' : '(real)', {
-          members: r.household.members.map((m) => ({
-            name: m.name,
-            nif: m.nif ?? '?',
-            nhr: m.special_regimes.includes('nhr'),
-            nhr_confirmed: m.nhr_confirmed ?? false,
-            nhr_start: m.nhr_start_year ?? '?',
-            regimes: m.special_regimes,
-            irs_jovem_year: m.irs_jovem_year ?? '?',
-            first_work: m.irs_jovem_first_work_year ?? '?',
-          })),
-          filing: r.household.filing_status,
-          scenarios: r.scenarios.map((s) => ({
-            filing: s.filing_status,
-            burden: s.total_tax_burden.toFixed(2),
-          })),
-          personRates: r.scenarios[0]?.persons.map((p) => ({
-            name: p.name,
-            gross: p.gross_income,
-            taxable: p.taxable_income,
-            rate: (p.effective_rate_irs * 100).toFixed(2) + '%',
-            irs_jovem_exempt: p.irs_jovem_exemption.toFixed(2),
-            nhr_tax: p.nhr_tax.toFixed(2),
-            irs_after: p.irs_after_deductions.toFixed(2),
-          })),
-          optimizations: r.optimizations.length,
-        })
-      }
-
-      setHouseholds(enrichedHouseholds)
-
-      // Cross-validate ALL years against liquidação if available
-      if (liquidacao) {
-        for (const result of allResults) {
-          if (result.year !== liquidacao.year) continue
-          if (result.scenarios.length === 0) continue
-          const validation = validateAgainstLiquidacao(liquidacao, result.scenarios[0])
-          if (!validation.isValid) {
-            setIssues((prev) => [...prev, ...validation.issues])
-          }
-        }
-      }
-
-      setResults(allResults)
-      trackEvent('results_viewed', { scenarioCount: allResults.length })
-      advanceStep('results')
-      persistState('results', enrichedHouseholds, allResults, issues, liquidacao)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('analyze.calcError')
-      setError(message)
-      setIssues((prev) =>
-        prev.some((i) => i.message === message)
-          ? prev
-          : [
-              ...prev,
-              {
-                severity: 'error' as const,
-                code: 'CALC_ERROR',
-                message: t('analyze.calcErrorPrefix', { message }),
-              },
-            ],
-      )
-      setStep('questionnaire')
-    } finally {
-      setCalculating(false)
-    }
-  }
-
-  function handleClearAll() {
-    setStep('upload')
-    setHouseholds([])
-    uploadedHouseholdsRef.current = []
-    setResults([])
-    setIssues([])
-    setLiquidacao(null)
-    setError(null)
-    setFurthestStep(0)
-    clearSessionState(sessionId)
-    // Clear cached questionnaire data
-    try {
-      for (const key of Object.keys(sessionStorage)) {
-        if (key.startsWith('fiscalpt-answers-') || key.startsWith('fiscalpt-projection-')) {
-          sessionStorage.removeItem(key)
-        }
-      }
-    } catch {}
-    // Clear URL hash
-    window.history.replaceState(null, '', window.location.pathname)
-  }
 
   const currentStepIdx = STEPS.indexOf(step)
 
@@ -476,12 +201,7 @@ export default function AnalyzePage() {
                   </p>
                   <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setError(null)}
-                  className="text-red-600"
-                >
+                <Button variant="ghost" size="sm" onClick={dismissError} className="text-red-600">
                   {t('common.close')}
                 </Button>
               </div>
@@ -606,12 +326,7 @@ export default function AnalyzePage() {
                     <div className="flex flex-col sm:flex-row justify-center gap-3">
                       <Button
                         variant="outline"
-                        onClick={() => {
-                          setHouseholds([])
-                          setResults([])
-                          setIssues([])
-                          setLiquidacao(null)
-                        }}
+                        onClick={reloadDocuments}
                         className="w-full sm:w-auto gap-1.5"
                       >
                         <RefreshCw className="h-4 w-4" aria-hidden="true" />
@@ -639,7 +354,6 @@ export default function AnalyzePage() {
                   household={questionnaireHousehold ?? primaryHousehold}
                   onComplete={handleQuestionnaireComplete}
                   onBack={() => goToStep('upload')}
-                  onSkip={handleQuestionnaireSkip}
                   projectionYear={projectionYear}
                   otherYearHouseholds={households.slice(1)}
                 />
