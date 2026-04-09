@@ -6,14 +6,25 @@ import type { Dependent, Household, Person } from './types'
  * NIF takes priority (exact match). Name match is case-insensitive.
  * Returns undefined if no match found — caller must handle gracefully.
  */
-export function findMatchingMember(member: Person, others: Person[]): Person | undefined {
+export function findMatchingMember(
+  member: Person,
+  others: Person[],
+  positionHint?: number,
+): Person | undefined {
   if (member.nif) {
     const byNif = others.find((m) => m.nif === member.nif)
     if (byNif) return byNif
   }
   if (member.name) {
     const normalized = member.name.toLowerCase()
-    return others.find((m) => m.name?.toLowerCase() === normalized)
+    const nameMatches = others.filter((m) => m.name?.toLowerCase() === normalized)
+    if (nameMatches.length === 1) return nameMatches[0]
+    // Ambiguous name match (e.g. PDF "Sujeito Passivo A" for all members) —
+    // use positional hint to disambiguate.
+    if (nameMatches.length > 1 && positionHint !== undefined && positionHint < others.length) {
+      return others[positionHint]
+    }
+    if (nameMatches.length > 0) return nameMatches[0]
   }
   return undefined
 }
@@ -56,8 +67,8 @@ export function propagateSharedData(primary: Household, target: Household): Hous
       if (!match) return dep
       return { ...dep, birth_year: match.birth_year || dep.birth_year }
     }),
-    members: target.members.map((member) => {
-      const match = findMatchingMember(member, primary.members)
+    members: target.members.map((member, idx) => {
+      const match = findMatchingMember(member, primary.members, idx)
       if (!match) return member
 
       const firstWorkYear = match.irs_jovem_first_work_year ?? member.irs_jovem_first_work_year
@@ -92,7 +103,16 @@ export function propagateSharedData(primary: Household, target: Household): Hous
               result.special_regimes = [...result.special_regimes, 'irs_jovem']
             }
             result.irs_jovem_year ??= benefitYear
+          } else {
+            // Person is NOT eligible for IRS Jovem in this target year —
+            // remove any stale flag that came from PDF extraction.
+            result.special_regimes = result.special_regimes.filter((r) => r !== 'irs_jovem')
+            result.irs_jovem_year = undefined
           }
+        } else {
+          // No IRS Jovem regime exists for this year — clean up stale flags
+          result.special_regimes = result.special_regimes.filter((r) => r !== 'irs_jovem')
+          result.irs_jovem_year = undefined
         }
       }
 

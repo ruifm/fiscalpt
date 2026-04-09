@@ -493,6 +493,9 @@ export function applyAnswers(
               member.special_regimes = [...member.special_regimes, 'irs_jovem']
             }
             member.irs_jovem_year = benefitYear
+          } else {
+            member.special_regimes = member.special_regimes.filter((r) => r !== 'irs_jovem')
+            member.irs_jovem_year = undefined
           }
         }
       }
@@ -515,6 +518,9 @@ export function applyAnswers(
               member.special_regimes = [...member.special_regimes, 'irs_jovem']
             }
             member.irs_jovem_year = benefitYear
+          } else {
+            member.special_regimes = member.special_regimes.filter((r) => r !== 'irs_jovem')
+            member.irs_jovem_year = undefined
           }
         }
       }
