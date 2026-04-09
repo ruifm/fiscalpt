@@ -956,6 +956,45 @@ const pt = {
     reportSentTitle: 'Mensagem enviada',
     reportSentDescription: 'Iremos analisar a sua situação e responder por email em breve.',
   },
+  simulation: {
+    title: 'Simulação Rápida',
+    subtitle: 'Estime o seu IRS em menos de 2 minutos',
+    filingStatus: 'Situação Fiscal',
+    single: 'Solteiro/a',
+    married: 'Casado/a',
+    taxYear: 'Ano Fiscal',
+    income: 'Rendimentos',
+    personLabel: 'Sujeito Passivo {letter}',
+    singleLabel: 'Contribuinte',
+    birthYear: 'Ano de nascimento',
+    grossCatA: 'Rendimento bruto anual (Cat A)',
+    grossCatAHelp: 'Rendimento bruto de trabalho dependente (antes de impostos)',
+    hasCatB: 'Rendimentos como independente?',
+    grossCatB: 'Rendimento bruto Cat B',
+    grossCatBHelp: 'Rendimento bruto de trabalho independente (recibos verdes)',
+    nhr: 'Residente Não Habitual (NHR)?',
+    nhrHelp:
+      'Se tem estatuto de Residente Não Habitual, taxa fixa de 20% sobre rendimentos qualificados',
+    dependents: 'Dependentes',
+    dependentsUnder3: 'Filhos < 3 anos',
+    dependents3to6: 'Filhos 3–6 anos',
+    dependentsOver6: 'Filhos > 6 anos',
+    calculate: 'Calcular',
+    calculating: 'A calcular...',
+    resultsTitle: 'Simulação Fiscal',
+    disclaimer:
+      '* Valores estimados com base em pressupostos padrão. Para resultados precisos, faça uma Análise Personalizada com os seus documentos fiscais.',
+    fullAnalysisCta: 'Resultados mais precisos',
+    fullAnalysisDesc:
+      'Carregue os seus documentos da AT para uma análise detalhada com valores reais de retenção, deduções e comparação com anos anteriores.',
+    aiConsultCta: 'Consulta fiscal com IA',
+    aiConsultDesc:
+      'Fale com o nosso consultor fiscal AI para recomendações personalizadas à sua situação específica.',
+    switchToFull: 'Análise Personalizada',
+    switchToSim: 'Simulação Rápida',
+    birthYearError: 'Ano de nascimento inválido',
+    incomeError: 'Introduza pelo menos um rendimento',
+  },
 } as const satisfies Dictionary
 
 export default pt

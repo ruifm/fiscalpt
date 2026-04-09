@@ -11,7 +11,6 @@ import type {
 import { analyzeHousehold } from './calculator'
 import { isEligibleForIrsJovem } from './irs-jovem'
 
-
 // ─── Simulation Input Types ──────────────────────────────────
 
 export interface SimulationPersonInput {
