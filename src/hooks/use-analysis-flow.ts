@@ -451,7 +451,9 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
             birth_year: m.birth_year,
           })),
         })
-        return propagated
+        // Apply defaults to fill any remaining gaps (e.g. dependents
+        // not matched across years)
+        return applyDefaults(propagated)
       })
       if (projectedHousehold) allHouseholds.push(projectedHousehold)
       computeAndShowResults(allHouseholds)
@@ -467,7 +469,9 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
     const withDefaults = applyDefaults(primary)
     const allHouseholds = currentHouseholds.map((hh, idx) => {
       if (idx === 0) return withDefaults
-      return propagateSharedData(withDefaults, hh)
+      // Propagate shared data from primary, then apply defaults to fill
+      // any remaining gaps (e.g. dependents not matched across years)
+      return applyDefaults(propagateSharedData(withDefaults, hh))
     })
     const defaultsWarning: ValidationIssue = {
       severity: 'warning',
