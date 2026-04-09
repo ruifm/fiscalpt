@@ -364,6 +364,51 @@ export default function AnalyzePage() {
 
             {!calculating && step === 'questionnaire' && primaryHousehold && (
               <div data-testid="step-questionnaire">
+                {issues.filter(
+                  (i) =>
+                    (i.severity === 'warning' || i.severity === 'info') &&
+                    i.code !== 'APPROXIMATE_RESULTS',
+                ).length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    {issues
+                      .filter(
+                        (i) =>
+                          (i.severity === 'warning' || i.severity === 'info') &&
+                          i.code !== 'APPROXIMATE_RESULTS',
+                      )
+                      .map((issue, i) => (
+                        <div
+                          key={`q-issue-${i}`}
+                          className={`flex items-start gap-2 rounded-lg p-3 ${
+                            issue.severity === 'warning'
+                              ? 'bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800'
+                              : 'bg-sky-50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800'
+                          }`}
+                        >
+                          {issue.severity === 'warning' ? (
+                            <AlertTriangle
+                              className="h-4 w-4 text-amber-600 mt-0.5 shrink-0"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <AlertCircle
+                              className="h-4 w-4 text-sky-600 mt-0.5 shrink-0"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <p
+                            className={`text-sm ${
+                              issue.severity === 'warning'
+                                ? 'text-amber-800 dark:text-amber-200'
+                                : 'text-sky-800 dark:text-sky-200'
+                            }`}
+                          >
+                            {issue.message}
+                          </p>
+                        </div>
+                      ))}
+                  </div>
+                )}
                 <HouseholdQuestionnaire
                   household={questionnaireHousehold ?? primaryHousehold}
                   onComplete={handleQuestionnaireComplete}

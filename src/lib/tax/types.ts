@@ -127,6 +127,8 @@ export interface Household {
   projected?: boolean
   /** True when spouse declaration was not uploaded — joint filing cannot be recommended */
   spouse_data_incomplete?: boolean
+  /** True when applyDefaultDeductions added the €250 general fallback (no real deductions provided) */
+  using_default_deductions?: boolean
 }
 
 // ─── Tax Bracket Definition ───────────────────────────────────

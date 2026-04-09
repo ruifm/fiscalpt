@@ -154,14 +154,16 @@ describe('TaxResults', () => {
   it('renders back button that calls onBack', async () => {
     const user = userEvent.setup()
     render(<TaxResults results={[makeResult()]} onBack={onBack} onReset={onReset} />)
-    await user.click(screen.getByRole('button', { name: /common\.back/ }))
+    const backButtons = screen.getAllByRole('button', { name: /common\.back/ })
+    await user.click(backButtons[0])
     expect(onBack).toHaveBeenCalledOnce()
   })
 
   it('renders new analysis button that calls onReset', async () => {
     const user = userEvent.setup()
     render(<TaxResults results={[makeResult()]} onBack={onBack} onReset={onReset} />)
-    await user.click(screen.getByRole('button', { name: /common\.newAnalysis/ }))
+    const resetButtons = screen.getAllByRole('button', { name: /common\.newAnalysis/ })
+    await user.click(resetButtons[0])
     expect(onReset).toHaveBeenCalledOnce()
   })
 

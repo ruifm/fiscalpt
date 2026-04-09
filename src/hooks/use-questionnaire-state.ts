@@ -154,12 +154,6 @@ export function useQuestionnaireState({
     return () => clearTimeout(timer)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ─── Computed values ───────────────────────────────────────
-  const answeredCount = Object.keys(answers).filter(
-    (k) => answers[k] !== '' && answers[k] !== undefined,
-  ).length
-  const totalCount = questions.length
-
   // ─── Handlers ──────────────────────────────────────────────
   const setAnswer = useCallback(
     (id: string, value: string | number | boolean) => {
@@ -217,8 +211,14 @@ export function useQuestionnaireState({
 
   const handleSubmit = useCallback(() => {
     const updated = applyAnswers(household, answers)
-    return { updated, projected: buildProjection(updated) }
-  }, [household, answers, buildProjection])
+    // Detect if any question with isDefault was left at its default value
+    const hasUnconfirmedDefaults = initialQuestions.some((q) => {
+      if (!q.isDefault) return false
+      const answer = answers[q.id]
+      return answer === q.currentValue
+    })
+    return { updated, projected: buildProjection(updated), hasUnconfirmedDefaults }
+  }, [household, answers, buildProjection, initialQuestions])
 
   return {
     // State
@@ -228,10 +228,6 @@ export function useQuestionnaireState({
     fieldErrors,
     containerRef,
     history,
-
-    // Computed
-    answeredCount,
-    totalCount,
 
     // Projection
     projectionEnabled,

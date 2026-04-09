@@ -466,9 +466,11 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
  * inject a conservative default (€250 — the per-person general cap).
  */
 function applyDefaultDeductions(h: Household): Household {
+  let usedDefault = false
   const members = h.members.map((m) => {
     const hasGeneral = m.deductions.some((d) => d.category === 'general')
     if (hasGeneral) return m
+    usedDefault = true
     return {
       ...m,
       deductions: [
@@ -477,5 +479,9 @@ function applyDefaultDeductions(h: Household): Household {
       ],
     }
   })
-  return { ...h, members }
+  return {
+    ...h,
+    members,
+    using_default_deductions: h.using_default_deductions || usedDefault,
+  }
 }

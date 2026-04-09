@@ -286,6 +286,12 @@ const en: DictShape<PtDict> = {
     skipToResultsDesc: 'Use conservative default values',
     defaultsUsedWarning:
       'Using default values — customize the questionnaire for more precise results',
+    spouseIncompleteWarning:
+      "Spouse's declaration not uploaded — joint vs separate filing comparison is unavailable. Upload your spouse's declaration for a complete analysis.",
+    approximateResultsWarning:
+      'Based on the information provided, results are indicative only. For a more precise analysis, fill in the questionnaire and provide as much documentation as possible.',
+    missingDeductionsWarning:
+      'Deductions not provided — using default value of €250 (general expenses). Upload your tax assessment or fill in deductions for more precise results.',
   },
 
   upload: {

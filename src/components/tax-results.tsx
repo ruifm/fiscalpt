@@ -132,6 +132,17 @@ export function TaxResults({
         </div>
       )}
 
+      {/* Top navigation */}
+      <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 print:hidden">
+        <Button variant="outline" onClick={onBack} className="w-full sm:w-auto gap-1.5">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {t('common.back')}
+        </Button>
+        <Button variant="outline" onClick={onReset} className="w-full sm:w-auto gap-1.5">
+          {t('common.newAnalysis')}
+        </Button>
+      </div>
+
       {/* Teaser CTA — visible only when there are savings and paywall is locked */}
       {totalSavings > 0 && optimizationCount > 0 && (
         <a

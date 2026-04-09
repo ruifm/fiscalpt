@@ -142,9 +142,8 @@ describe('HouseholdQuestionnaire', () => {
     render(
       <HouseholdQuestionnaire household={household} onComplete={onComplete} onBack={onBack} />,
     )
-    // Should have the progress indicator showing answered/total
-    const progressText = screen.getByText(/questionnaire\.answered/)
-    expect(progressText).toBeDefined()
+    // Should render the questionnaire title
+    expect(screen.getByText('questionnaire.title')).toBeDefined()
   })
 
   it('renders undo/redo buttons', () => {

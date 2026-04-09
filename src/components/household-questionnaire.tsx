@@ -15,7 +15,11 @@ import { useT } from '@/lib/i18n'
 
 interface HouseholdQuestionnaireProps {
   household: Household
-  onComplete: (household: Household, projectedHousehold?: Household) => void
+  onComplete: (
+    household: Household,
+    projectedHousehold?: Household,
+    hasUnconfirmedDefaults?: boolean,
+  ) => void
   onBack: () => void
   onSkip?: () => void
   /** If set, show projection section for this year */
@@ -53,8 +57,6 @@ export function HouseholdQuestionnaire({
     fieldErrors,
     containerRef,
     history,
-    answeredCount,
-    totalCount,
     projectionEnabled,
     setProjectionEnabled,
     projectedIncomes,
@@ -65,7 +67,7 @@ export function HouseholdQuestionnaire({
 
   function handleSubmit() {
     const result = getSubmitResult()
-    onComplete(result.updated, result.projected)
+    onComplete(result.updated, result.projected, result.hasUnconfirmedDefaults)
   }
 
   // No questions needed AND no projection available → data-complete view
@@ -110,40 +112,21 @@ export function HouseholdQuestionnaire({
         <p className="mt-2 text-muted-foreground">{t('questionnaire.subtitle')}</p>
       </div>
 
-      {/* Progress indicator */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">{t('questionnaire.progress')}</span>
-              <span className="font-medium">
-                {t('questionnaire.answered', { answered: answeredCount, total: totalCount })}
-              </span>
-            </div>
-          </div>
-          <div
-            className="mt-2 h-1.5 w-full rounded-full bg-muted"
-            role="progressbar"
-            aria-valuenow={answeredCount}
-            aria-valuemax={totalCount}
-          >
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-300"
-              style={{ width: `${totalCount > 0 ? (answeredCount / totalCount) * 100 : 0}%` }}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Top navigation — lets users skip/continue without scrolling */}
-      <div className="flex items-center justify-end gap-3">
-        <Button variant="ghost" onClick={handleSubmit} className="text-muted-foreground">
-          {t('common.skip')}
+      <div className="flex items-center justify-between">
+        <Button variant="outline" onClick={onBack} className="gap-1.5">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {t('common.back')}
         </Button>
-        <Button onClick={handleSubmit} className="gap-1.5">
-          {t('common.advance')}
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" onClick={handleSubmit} className="text-muted-foreground">
+            {t('common.skip')}
+          </Button>
+          <Button onClick={handleSubmit} className="gap-1.5">
+            {t('common.advance')}
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
       </div>
 
       {/* Undo / Redo */}

@@ -310,12 +310,27 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
   const handleExtracted = useCallback(
     (hs: Household[], newIssues: ValidationIssue[], liq?: LiquidacaoParsed) => {
       trackEvent('upload_complete', { householdCount: hs.length })
+      const issues = [...newIssues]
+      if (hs.some((hh) => hh.spouse_data_incomplete)) {
+        issues.push({
+          severity: 'warning',
+          code: 'SPOUSE_INCOMPLETE',
+          message: t('analyze.spouseIncompleteWarning'),
+        })
+      }
+      if (hs.some((hh) => hh.using_default_deductions)) {
+        issues.push({
+          severity: 'warning',
+          code: 'MISSING_DEDUCTIONS',
+          message: t('analyze.missingDeductionsWarning'),
+        })
+      }
       dispatch({
         type: 'SET_EXTRACTED',
-        payload: { households: hs, issues: newIssues, liquidacao: liq },
+        payload: { households: hs, issues, liquidacao: liq },
       })
     },
-    [],
+    [t],
   )
 
   const computeAndShowResults = useCallback(
@@ -404,6 +419,28 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
 
         const allNewIssues = [...validationWarnings, ...liqIssues, ...extraIssues]
 
+        // Add spouse-incomplete warning if any household has missing spouse data
+        if (allHouseholds.some((hh) => hh.spouse_data_incomplete)) {
+          allNewIssues.push({
+            severity: 'warning',
+            code: 'SPOUSE_INCOMPLETE',
+            message: t('analyze.spouseIncompleteWarning'),
+          })
+        }
+
+        // Add approximate results warning if deductions are defaulted and
+        // not already flagged by questionnaire skip/partial fill
+        if (
+          allHouseholds.some((hh) => hh.using_default_deductions) &&
+          !allNewIssues.some((i) => i.code === 'APPROXIMATE_RESULTS')
+        ) {
+          allNewIssues.push({
+            severity: 'warning',
+            code: 'APPROXIMATE_RESULTS',
+            message: t('analyze.approximateResultsWarning'),
+          })
+        }
+
         dispatch({
           type: 'CALC_SUCCESS',
           payload: {
@@ -431,7 +468,7 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
   )
 
   const handleQuestionnaireComplete = useCallback(
-    (h: Household, projectedHousehold?: Household) => {
+    (h: Household, projectedHousehold?: Household, hasUnconfirmedDefaults?: boolean) => {
       trackEvent('questionnaire_complete')
       const currentHouseholds = stateRef.current.households
       const nonProjected = currentHouseholds.filter((hh) => !hh.projected)
@@ -456,9 +493,17 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
         return applyDefaults(propagated)
       })
       if (projectedHousehold) allHouseholds.push(projectedHousehold)
-      computeAndShowResults(allHouseholds)
+      const extraIssues: ValidationIssue[] = []
+      if (hasUnconfirmedDefaults) {
+        extraIssues.push({
+          severity: 'warning',
+          code: 'APPROXIMATE_RESULTS',
+          message: t('analyze.approximateResultsWarning'),
+        })
+      }
+      computeAndShowResults(allHouseholds, extraIssues)
     },
-    [computeAndShowResults],
+    [computeAndShowResults, t],
   )
 
   const handleSkipQuestionnaire = useCallback(() => {
@@ -473,12 +518,12 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
       // any remaining gaps (e.g. dependents not matched across years)
       return applyDefaults(propagateSharedData(withDefaults, hh))
     })
-    const defaultsWarning: ValidationIssue = {
+    const approximateWarning: ValidationIssue = {
       severity: 'warning',
-      code: 'DEFAULTS_USED',
-      message: t('analyze.defaultsUsedWarning'),
+      code: 'APPROXIMATE_RESULTS',
+      message: t('analyze.approximateResultsWarning'),
     }
-    computeAndShowResults(allHouseholds, [defaultsWarning])
+    computeAndShowResults(allHouseholds, [approximateWarning])
   }, [computeAndShowResults, t])
 
   const handleClearAll = useCallback(() => {

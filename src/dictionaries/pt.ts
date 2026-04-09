@@ -288,6 +288,12 @@ const pt = {
     skipToResultsDesc: 'Usar valores predefinidos conservadores',
     defaultsUsedWarning:
       'A utilizar valores predefinidos — personalize o questionário para resultados mais precisos',
+    spouseIncompleteWarning:
+      'Declaração do cônjuge não carregada — a comparação conjunta/separada não está disponível. Carregue a declaração do cônjuge para uma análise completa.',
+    approximateResultsWarning:
+      'Com base na informação fornecida, os resultados são apenas indicativos. Para uma análise mais precisa, preencha o questionário e forneça o máximo de documentação possível.',
+    missingDeductionsWarning:
+      'Deduções não fornecidas — a utilizar o valor predefinido de €250 (despesas gerais). Carregue o documento de liquidação ou preencha as deduções para resultados mais precisos.',
   },
 
   upload: {
