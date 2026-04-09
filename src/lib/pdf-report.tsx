@@ -212,7 +212,7 @@ const s = StyleSheet.create({
 
 type DictValue = string | { [key: string]: DictValue }
 
-function resolvePath(dict: Dictionary, path: string): string | undefined {
+export function resolvePath(dict: Dictionary, path: string): string | undefined {
   const parts = path.split('.')
   let current: DictValue = dict
   for (const part of parts) {
@@ -222,13 +222,15 @@ function resolvePath(dict: Dictionary, path: string): string | undefined {
   return typeof current === 'string' ? current : undefined
 }
 
-function interpolate(template: string, params: Record<string, string | number>): string {
+export function interpolate(template: string, params: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, key: string) =>
     params[key] !== undefined ? String(params[key]) : `{${key}}`,
   )
 }
 
-function makeT(locale: Locale): (key: string, params?: Record<string, string | number>) => string {
+export function makeT(
+  locale: Locale,
+): (key: string, params?: Record<string, string | number>) => string {
   const dict = dictionaries[locale]
   return (key, params) => {
     const value = resolvePath(dict, key) ?? resolvePath(dictionaries.pt, key) ?? key
@@ -238,7 +240,7 @@ function makeT(locale: Locale): (key: string, params?: Record<string, string | n
 
 // ─── Formatting (locale-independent, same as app) ─────────────
 
-function fmtEuro(value: number): string {
+export function fmtEuro(value: number): string {
   return new Intl.NumberFormat('pt-PT', {
     style: 'currency',
     currency: 'EUR',
@@ -247,17 +249,17 @@ function fmtEuro(value: number): string {
   }).format(value)
 }
 
-function fmtPercent(value: number): string {
+export function fmtPercent(value: number): string {
   return `${(value * 100).toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
 
-function personRefund(p: PersonTaxDetail): number {
+export function personRefund(p: PersonTaxDetail): number {
   return p.withholding_total - personTotalIrs(p)
 }
 
-function filingLabel(status: string, t: (key: string) => string): string {
+export function filingLabel(status: string, t: (key: string) => string): string {
   switch (status) {
     case 'married_joint':
       return t('review.filing.joint')
