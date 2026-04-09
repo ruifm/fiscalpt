@@ -22,13 +22,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { XmlGuide, PdfGuide, LiquidacaoGuide } from '@/components/at-guide'
-import type { Household, ValidationIssue, DeductionCategory } from '@/lib/tax/types'
+import type { Household, ValidationIssue } from '@/lib/tax/types'
 import { parseModelo3Xml, type ParsedXmlResult } from '@/lib/tax/xml-parser'
 import {
   extractTextFromPdf,
   parseLiquidacaoText,
   parseComprovativoPdfText,
-  comprativoParsedToHousehold,
   detectDocumentType,
   type DocumentType,
   type LiquidacaoParsed,
@@ -38,10 +37,8 @@ import {
   validateDeclarationFiles,
   validateLiquidacaoFiles,
   validatePreviousYearsFiles,
-  validateCrossSection,
   computeDeductionSlots,
   getMandatoryUnfilledSlots,
-  mergeSpouseHouseholds,
   maxPreviousYearsFiles,
   getAmendableYears,
   getAllSupportedYears,
@@ -50,6 +47,7 @@ import {
   type DeductionSlot,
 } from '@/lib/tax/upload-validation'
 import { parseDeductionsPageText, type DeductionsParseResult } from '@/lib/tax/deductions-parser'
+import { assembleHouseholds, type AssemblyFile } from '@/lib/tax/assemble-households'
 import { useT } from '@/lib/i18n'
 
 interface DocumentUploadProps {
@@ -177,23 +175,6 @@ const SLOT_ROLE_LABELS: Record<string, { label: string; badge: string }> = {
     badge: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
   },
 }
-
-/**
- * Maps liquidação deduction fields → DeductionCategory + known rate.
- * Used to reverse-engineer expense amounts: expense = deduction / rate.
- * Since AT already applied per-person caps, even-splitting between members
- * reproduces the exact same totals when our engine recomputes.
- */
-const LIQUIDACAO_DEDUCTION_MAP: {
-  field: keyof LiquidacaoParsed
-  category: DeductionCategory
-  rate: number
-}[] = [
-  { field: 'deducoesGerais', category: 'general', rate: 0.35 },
-  { field: 'deducoesSaude', category: 'health', rate: 0.15 },
-  { field: 'deducoesEducacao', category: 'education', rate: 0.3 },
-  { field: 'deducoesExigenciaFatura', category: 'fatura', rate: 0.15 },
-]
 
 // ─── Helper Components ──────────────────────────────────────
 
@@ -875,6 +856,19 @@ function toFileInfo(uf: UploadedFile): FileInfo {
   }
 }
 
+function toAssemblyFile(uf: UploadedFile): AssemblyFile {
+  return {
+    fileName: uf.file.name,
+    status: uf.status,
+    nif: uf.meta?.nif,
+    year: uf.meta?.year,
+    nifConjuge: uf.meta?.nifConjuge,
+    parsedXml: uf.parsedXml,
+    parsedComprovativo: uf.parsedComprovativo,
+    parsedLiquidacao: uf.parsedLiquidacao,
+  }
+}
+
 function runSectionValidation(
   section: Section,
   files: UploadedFile[],
@@ -1320,300 +1314,50 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
   }
 
   function processFiles() {
-    if (sectionFiles.declaration.length === 0) {
-      setValidationError(t('upload.needDeclaration'))
-      return
-    }
-
-    if (anyFileProcessing) {
-      setValidationError(t('upload.waitProcessing'))
-      return
-    }
-
-    setProcessing(true)
-    setValidationError(null)
-
-    // Final cross-file validation before assembly
-    const declInfos = sectionFiles.declaration.filter((f) => f.status === 'done').map(toFileInfo)
-    const liqInfos = sectionFiles.liquidacao.filter((f) => f.status === 'done').map(toFileInfo)
-    const prevInfos = sectionFiles.previousYears.filter((f) => f.status === 'done').map(toFileInfo)
-
-    const preErrors = [
-      ...validateDeclarationFiles(declInfos),
-      ...validateLiquidacaoFiles(liqInfos, declInfos),
-      ...validatePreviousYearsFiles(prevInfos),
-      ...validateCrossSection(declInfos, prevInfos),
-    ].filter((e) => e.severity !== 'warning')
-
-    if (preErrors.length > 0) {
-      setProcessing(false)
-      setValidationError(preErrors.map((e) => e.message).join(' '))
-      return
-    }
-
-    // Check mandatory deduction slots (taxpayers WITHOUT liquidação must have pasted deductions)
+    // Mandatory deduction slot check (UI concern — not in assembly)
     const pastedKeys = new Set(
       [...pastedDeductions.entries()].filter(([_, v]) => v.result.ok).map(([k]) => k),
     )
     const unfilledMandatory = getMandatoryUnfilledSlots(deductionSlots, pastedKeys)
     if (unfilledMandatory.length > 0) {
-      setProcessing(false)
       setDeductionsPasteOpen(true)
       const nifs = unfilledMandatory.map((s) => `NIF ${s.nif} (${s.year})`).join(', ')
       setValidationError(t('upload.deductionExpensesRequired', { names: nifs }))
       return
     }
 
-    let household: Household | null = null
-    const allIssues: ValidationIssue[] = []
-    let liquidacaoResult: LiquidacaoParsed | undefined
-    let declarationYear: number | undefined
+    setProcessing(true)
+    setValidationError(null)
 
-    // Assemble from declaration (XML priority, then PDF fallback)
-    const parsedDeclarations: Array<{
-      household: Household
-      nif: string
-      nifConjuge?: string
-      issues: ValidationIssue[]
-    }> = []
-
-    for (const uf of sectionFiles.declaration) {
-      if (uf.status !== 'done') continue
-
-      if (uf.parsedXml) {
-        parsedDeclarations.push({
-          household: uf.parsedXml.household,
-          nif: uf.meta?.nif ?? uf.parsedXml.raw.subjectA_nif,
-          nifConjuge: uf.meta?.nifConjuge ?? uf.parsedXml.raw.subjectB_nif,
-          issues: uf.parsedXml.issues,
-        })
-      } else if (uf.parsedComprovativo && parsedDeclarations.length === 0) {
-        const converted = comprativoParsedToHousehold(uf.parsedComprovativo)
-        if (converted.household.members && converted.household.members.length > 0) {
-          parsedDeclarations.push({
-            household: converted.household as Household,
-            nif: uf.meta?.nif ?? '',
-            nifConjuge: uf.meta?.nifConjuge,
-            issues: [
-              ...converted.issues,
-              {
-                severity: 'warning',
-                code: 'PDF_FALLBACK',
-                message: t('upload.pdfFallbackNote'),
-              },
-            ],
-          })
-        }
-      }
-    }
-
-    // Try to merge spouse declarations; fall back to first
-    const merged = mergeSpouseHouseholds(parsedDeclarations)
-    if (merged) {
-      household = merged.household
-      declarationYear = merged.household.year
-      allIssues.push(...merged.issues)
-    } else if (parsedDeclarations.length > 0) {
-      const first = parsedDeclarations[0]
-      household = first.household
-      declarationYear = first.household.year
-      allIssues.push(...first.issues)
-    }
-
-    // Assemble liquidação — collect ALL results (one per person)
-    const allLiquidacaoResults: LiquidacaoParsed[] = []
-    for (const uf of sectionFiles.liquidacao) {
-      if (uf.status !== 'done') continue
-
-      if (uf.parsedLiquidacao) {
-        const liq = uf.parsedLiquidacao
-        allLiquidacaoResults.push(liq)
-        liquidacaoResult = liq // keep last for validation backward compat
-
-        if (liq.year && declarationYear && liq.year !== declarationYear) {
-          allIssues.push({
-            severity: 'error',
-            code: 'YEAR_MISMATCH',
-            message: t('upload.liquidacaoYearMismatch', {
-              liqYear: liq.year,
-              declYear: declarationYear,
-            }),
-          })
-        }
-
-        // Taxa efetiva is used by validateAgainstLiquidacao for
-        // threshold-based cross-validation — no standalone message needed.
-      }
-    }
-
-    // Cross-file: previous years — build households per year
-    const previousYearsParsed = new Map<
-      number,
-      Array<{
-        household: Household
-        nif: string
-        nifConjuge?: string
-        issues: ValidationIssue[]
-      }>
-    >()
-
-    for (const uf of sectionFiles.previousYears) {
-      if (uf.status !== 'done' || !uf.parsedXml) continue
-
-      const year = uf.meta?.year ?? uf.parsedXml.household.year
-      if (declarationYear && year === declarationYear) {
-        allIssues.push({
-          severity: 'warning',
-          code: 'YEAR_OVERLAP',
-          message: t('upload.duplicateYearWarning', { year }),
-        })
-        continue
-      }
-
-      if (!previousYearsParsed.has(year)) previousYearsParsed.set(year, [])
-      previousYearsParsed.get(year)!.push({
-        household: uf.parsedXml.household,
-        nif: uf.meta?.nif ?? uf.parsedXml.raw.subjectA_nif,
-        nifConjuge: uf.meta?.nifConjuge ?? uf.parsedXml.raw.subjectB_nif,
-        issues: uf.parsedXml.issues,
-      })
-    }
-
-    // Merge spouse pairs for each previous year
-    const previousHouseholds: Household[] = []
-    for (const [, yearDecls] of previousYearsParsed) {
-      const merged = mergeSpouseHouseholds(yearDecls)
-      if (merged) {
-        previousHouseholds.push(merged.household)
-        allIssues.push(...merged.issues)
-      } else if (yearDecls.length > 0) {
-        previousHouseholds.push(yearDecls[0].household)
-        allIssues.push(...yearDecls[0].issues)
-      }
-    }
-
-    // Merge pasted deductions into household members
-    if (household) {
-      // Track which members already received pasted deductions (by NIF)
-      const pastedNifs = new Set<string>()
-
-      for (const [slotKey, entry] of pastedDeductions) {
-        if (!entry.result.ok) continue
-        const parsed = entry.result.data
-
-        // Only merge deductions matching the household year
-        if (parsed.year !== household.year) continue
-
-        // Find the slot to determine role
-        const slot = deductionSlots.find((s) => s.key === slotKey)
-        if (!slot) continue
-
-        if (slot.role === 'taxpayer') {
-          // Find the matching member by NIF
-          const member =
-            household.members.find((m) => m.incomes.length > 0 && m.name === parsed.name) ??
-            household.members.find((_, i) => {
-              const declFile = sectionFiles.declaration.find(
-                (f) => f.status === 'done' && f.meta?.nif === parsed.nif,
-              )
-              if (!declFile) return false
-              const isSubjectA = declFile.meta?.nif === parsed.nif && !declFile.meta?.nifConjuge
-              const isSubjectB = declFile.meta?.nifConjuge === parsed.nif
-              return (
-                (i === 0 && isSubjectA) ||
-                (i === 1 && isSubjectB) ||
-                (i === 0 && !isSubjectA && !isSubjectB)
-              )
-            })
-
-          if (member) {
-            pastedNifs.add(slot.nif)
-            const atCategories = new Set(parsed.expenses.map((e) => e.category))
-            member.deductions = member.deductions.filter((d) => !atCategories.has(d.category))
-            for (const exp of parsed.expenses) {
-              if (exp.expenseAmount > 0) {
-                member.deductions.push({ category: exp.category, amount: exp.expenseAmount })
-              }
-            }
-          }
-        } else {
-          // Dependent/ascendant: add expenses to first member's deductions
-          // (the engine handles the split based on filing status)
-          const firstMember = household.members[0]
-          if (firstMember) {
-            for (const exp of parsed.expenses) {
-              if (exp.expenseAmount > 0) {
-                const existing = firstMember.deductions.find((d) => d.category === exp.category)
-                if (existing) {
-                  existing.amount += exp.expenseAmount
-                } else {
-                  firstMember.deductions.push({
-                    category: exp.category,
-                    amount: exp.expenseAmount,
-                  })
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // Fallback: derive deductions from liquidação for members without pasted data
-      if (allLiquidacaoResults.length > 0 && household.year === (liquidacaoResult?.year ?? 0)) {
-        // Build NIF → LiquidacaoParsed lookup for per-person matching
-        const liqByNif = new Map<string, LiquidacaoParsed>()
-        for (const liq of allLiquidacaoResults) {
-          if (liq.nif) liqByNif.set(liq.nif, liq)
-        }
-
-        household = {
-          ...household,
-          members: household.members.map((member, mi) => {
-            // Find the NIF for this member index
-            const declFile = sectionFiles.declaration.find(
-              (f) => f.status === 'done' && f.meta?.nif,
-            )
-            const memberNif = mi === 0 ? declFile?.meta?.nif : declFile?.meta?.nifConjuge
-            if (memberNif && pastedNifs.has(memberNif)) return member // already has AT paste data
-
-            // Match this member's liquidação by NIF, or fall back to single liquidação
-            const memberLiq =
-              (memberNif ? liqByNif.get(memberNif) : undefined) ??
-              (allLiquidacaoResults.length === 1 ? allLiquidacaoResults[0] : undefined)
-
-            if (!memberLiq) return member
-
-            // Reverse-engineer expense amounts from this member's liquidação deductions
-            const newDeductions = [...member.deductions]
-            for (const mapping of LIQUIDACAO_DEDUCTION_MAP) {
-              const deductionAmount = memberLiq[mapping.field] as number | undefined
-              if (!deductionAmount || deductionAmount <= 0) continue
-              // Use the full amount — it's already per-person from AT
-              const expenseAmount = deductionAmount / mapping.rate
-
-              const existing = newDeductions.findIndex((d) => d.category === mapping.category)
-              if (existing >= 0) {
-                newDeductions[existing] = { ...newDeductions[existing], amount: expenseAmount }
-              } else {
-                newDeductions.push({ category: mapping.category, amount: expenseAmount })
-              }
-            }
-            return { ...member, deductions: newDeductions }
-          }),
-        }
-      }
-    }
+    const result = assembleHouseholds({
+      sectionFiles: {
+        declaration: sectionFiles.declaration.map(toAssemblyFile),
+        liquidacao: sectionFiles.liquidacao.map(toAssemblyFile),
+        previousYears: sectionFiles.previousYears.map(toAssemblyFile),
+      },
+      pastedDeductions,
+      deductionSlots,
+    })
 
     setProcessing(false)
 
-    if (household) {
-      const allHouseholds = [household, ...previousHouseholds].sort((a, b) => b.year - a.year)
-      onExtracted(allHouseholds, allIssues, liquidacaoResult)
-    } else if (previousHouseholds.length > 0) {
-      const allHouseholds = previousHouseholds.sort((a, b) => b.year - a.year)
-      onExtracted(allHouseholds, allIssues, liquidacaoResult)
+    if (result.ok) {
+      onExtracted(result.households, result.issues, result.liquidacao)
     } else {
-      setValidationError(t('upload.extractionFailed'))
+      switch (result.code) {
+        case 'NEED_DECLARATION':
+          setValidationError(t('upload.needDeclaration'))
+          break
+        case 'STILL_PROCESSING':
+          setValidationError(t('upload.waitProcessing'))
+          break
+        case 'VALIDATION_FAILED':
+          setValidationError(result.validationMessages?.join(' ') ?? t('upload.extractionFailed'))
+          break
+        case 'EXTRACTION_FAILED':
+          setValidationError(t('upload.extractionFailed'))
+          break
+      }
     }
   }
 
