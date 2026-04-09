@@ -976,6 +976,7 @@ const en: DictShape<PtDict> = {
     aiConsultCta: 'AI tax consultation',
     aiConsultDesc:
       'Talk to our AI tax consultant for personalized recommendations specific to your situation.',
+    comingSoon: 'Coming soon',
     switchToFull: 'Personalized Analysis',
     switchToSim: 'Quick Simulation',
     birthYearError: 'Invalid birth year',

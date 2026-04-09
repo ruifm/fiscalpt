@@ -991,6 +991,7 @@ const pt = {
     aiConsultCta: 'Consulta fiscal com IA',
     aiConsultDesc:
       'Fale com o nosso consultor fiscal AI para recomendações personalizadas à sua situação específica.',
+    comingSoon: 'Em breve',
     switchToFull: 'Análise Personalizada',
     switchToSim: 'Simulação Rápida',
     birthYearError: 'Ano de nascimento inválido',

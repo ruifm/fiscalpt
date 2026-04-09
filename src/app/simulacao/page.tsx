@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { Calculator, ArrowLeft, FileText, Sparkles, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { SimulationForm } from '@/components/simulation-form'
 import { ResultsSkeleton } from '@/components/results-skeleton'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -135,10 +136,20 @@ export default function SimulacaoPage() {
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-amber-500" aria-hidden="true" />
                       <h3 className="font-semibold">{t('simulation.aiConsultCta')}</h3>
+                      <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
+                        {t('simulation.comingSoon')}
+                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{t('simulation.aiConsultDesc')}</p>
-                    <Button variant="outline" size="sm" className="w-full gap-1.5" disabled>
-                      {t('simulation.aiConsultCta')}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-1.5 opacity-60 cursor-not-allowed"
+                      aria-disabled="true"
+                      tabIndex={-1}
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      {t('simulation.comingSoon')}
                       <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </CardContent>

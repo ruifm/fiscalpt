@@ -229,11 +229,11 @@ function Metric({
     : 'text-red-600 dark:text-red-400'
 
   return (
-    <div className="min-w-0">
-      <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
-      <div className="flex items-center gap-1">
+    <div className="min-w-0 overflow-hidden">
+      <p className="text-xs text-muted-foreground mb-0.5 truncate">{label}</p>
+      <div className="flex items-center gap-1 min-w-0">
         <p
-          className={`font-bold whitespace-nowrap ${small ? 'text-base' : 'text-lg sm:text-xl'} ${colorClass}`}
+          className={`font-bold truncate ${small ? 'text-sm sm:text-base' : 'text-lg sm:text-xl'} ${colorClass}`}
         >
           {value}
         </p>
