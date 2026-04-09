@@ -445,6 +445,9 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
             nhr_confirmed: m.nhr_confirmed,
             nhr_start_year: m.nhr_start_year,
             irs_jovem_first_work_year: m.irs_jovem_first_work_year,
+            irs_jovem_year: m.irs_jovem_year,
+            irs_jovem_is_phd: m.irs_jovem_is_phd,
+            birth_year: m.birth_year,
           })),
         })
         return propagated

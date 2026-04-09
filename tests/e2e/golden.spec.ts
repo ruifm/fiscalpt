@@ -50,16 +50,22 @@ interface GoldenYear {
   savings?: string
 }
 
+// Golden values computed with PhD=false (E2E default Switch state).
+// Unit tests (golden-pipeline.test.ts) use PhD=true — different values for pre-2025.
+// Non-PhD golden values: irs_jovem_is_phd=false (default Switch off)
+// Member 0 (birth 1994): age 27-30 in 2021-2024 > maxAge=26 → no pre-2025 IRS Jovem
+// Post-2025: first_work_year=2021, maxAge=35, age 31-32 ≤ 35 → IRS Jovem applies
+// Dependents: born 2019 + 2022 (matching E2E questionnaire answers)
 const ALL_YEARS_GOLDEN: GoldenYear[] = [
   {
     year: 2021,
     amendable: false,
     current: {
       gross: '41 507,33',
-      irs: '6458,61',
-      rate: '15,6%',
-      refundOrPay: '2192,37',
-      holderA: { irs: '959,22', rate: '6,9%' },
+      irs: '7173,33',
+      rate: '17,3%',
+      refundOrPay: '1477,65',
+      holderA: { irs: '1673,94', rate: '12,0%' },
       holderB: { irs: '5499,39', rate: '20,0%' },
     },
   },
@@ -68,10 +74,10 @@ const ALL_YEARS_GOLDEN: GoldenYear[] = [
     amendable: false,
     current: {
       gross: '44 826,12',
-      irs: '7357,20',
-      rate: '16,4%',
-      refundOrPay: '2663,37',
-      holderA: { irs: '4135,65', rate: '14,4%' },
+      irs: '8908,40',
+      rate: '19,9%',
+      refundOrPay: '1112,17',
+      holderA: { irs: '5686,85', rate: '19,8%' },
       holderB: { irs: '3221,55', rate: '20,0%' },
     },
   },
@@ -80,19 +86,19 @@ const ALL_YEARS_GOLDEN: GoldenYear[] = [
     amendable: true,
     current: {
       gross: '111 281,17',
-      irs: '15 824,25',
-      rate: '14,2%',
-      refundOrPay: '844,59',
-      holderA: { irs: '5155,54', rate: '8,9%' },
+      irs: '17 104,09',
+      rate: '15,4%',
+      refundOrPay: '2124,43',
+      holderA: { irs: '6435,38', rate: '11,1%' },
       holderB: { irs: '10 668,71', rate: '20,0%' },
     },
-    savings: '1892,95',
+    savings: '2217,93',
     optimized: {
       gross: '111 281,17',
-      irs: '13 931,30',
-      rate: '12,5%',
-      refundOrPay: '1048,36',
-      holderA: { irs: '3262,59', rate: '5,6%' },
+      irs: '14 886,16',
+      rate: '13,4%',
+      refundOrPay: '93,50',
+      holderA: { irs: '4217,45', rate: '7,3%' },
       holderB: { irs: '10 668,71', rate: '20,0%' },
     },
   },
@@ -101,19 +107,19 @@ const ALL_YEARS_GOLDEN: GoldenYear[] = [
     amendable: true,
     current: {
       gross: '76 615,12',
-      irs: '10 515,47',
-      rate: '13,7%',
-      refundOrPay: '5589,32',
-      holderA: { irs: '5658,29', rate: '10,8%' },
+      irs: '10 648,06',
+      rate: '13,9%',
+      refundOrPay: '5721,91',
+      holderA: { irs: '5790,88', rate: '11,1%' },
       holderB: { irs: '4857,18', rate: '20,0%' },
     },
-    savings: '3154,93',
+    savings: '3205,36',
     optimized: {
       gross: '76 615,12',
-      irs: '7360,54',
-      rate: '9,6%',
-      refundOrPay: '2434,39',
-      holderA: { irs: '2503,36', rate: '4,8%' },
+      irs: '7442,70',
+      rate: '9,7%',
+      refundOrPay: '2516,55',
+      holderA: { irs: '2585,52', rate: '4,9%' },
       holderB: { irs: '4857,18', rate: '20,0%' },
     },
   },
@@ -173,19 +179,19 @@ const YEAR_2024_PRIMARY_GOLDEN: GoldenYear[] = [
     amendable: true,
     current: {
       gross: '76 615,12',
-      irs: '7193,64',
-      rate: '9,4%',
-      refundOrPay: '2267,49',
-      holderA: { irs: '2336,46', rate: '4,5%' },
+      irs: '10 388,06',
+      rate: '13,6%',
+      refundOrPay: '5461,91',
+      holderA: { irs: '5530,88', rate: '10,6%' },
       holderB: { irs: '4857,18', rate: '20,0%' },
     },
-    savings: '2031,90',
+    savings: '3205,36',
     optimized: {
       gross: '76 615,12',
-      irs: '5161,74',
-      rate: '6,7%',
-      refundOrPay: '235,59',
-      holderA: { irs: '304,56', rate: '0,6%' },
+      irs: '7182,70',
+      rate: '9,4%',
+      refundOrPay: '2256,55',
+      holderA: { irs: '2325,52', rate: '4,4%' },
       holderB: { irs: '4857,18', rate: '20,0%' },
     },
   },
@@ -296,6 +302,7 @@ async function fillStrictQuestionnaire(
   page: Page,
   textAnswers: Record<string, string>,
   selectAnswers: Record<string, string> = {},
+  booleanAnswers: Record<string, boolean> = {},
 ) {
   const questionnaire = page.locator('[data-testid="step-questionnaire"]')
   const results = page.locator('[data-testid="step-results"]')
@@ -345,9 +352,20 @@ async function fillStrictQuestionnaire(
     await select.selectOption(value)
   }
 
+  // Phase 4: Boolean switches (e.g., irs_jovem_is_phd)
+  for (const [qid, targetValue] of Object.entries(booleanAnswers)) {
+    const switchEl = page.locator('#q-' + qid.replace(/\./g, '-'))
+    await expect(switchEl, 'Boolean field ' + qid).toBeVisible({ timeout: 5_000 })
+    const isChecked = await switchEl.getAttribute('aria-checked')
+    const currentlyOn = isChecked === 'true'
+    if (currentlyOn !== targetValue) {
+      await switchEl.click()
+    }
+  }
+
   await page.waitForTimeout(500)
 
-  // Phase 4: Assert no unfilled inputs remain
+  // Phase 5: Assert no unfilled inputs remain
   const allInputs = questionnaire.locator('input[type="number"]')
   for (let i = 0; i < (await allInputs.count()); i++) {
     const input = allInputs.nth(i)
@@ -485,6 +503,7 @@ test.describe('Golden canary: all years (2021-2025)', () => {
   test('uploads all years, fills questionnaire, asserts golden values', async ({ page }) => {
     test.setTimeout(180_000)
     checkAmendableBoundary()
+
     await dismissOnboarding(page)
     await page.goto('/analyze')
     await waitForStep(page, 'upload')
@@ -510,6 +529,9 @@ test.describe('Golden canary: all years (2021-2025)', () => {
     // Strict questionnaire -- Cat B NOT asked (inferred from multi-year XML)
     // 2 dependents (from 2024/2025 XMLs): born 2019 + 2022
     // degree_year explicit to avoid hidden dependency on XML fixture
+    // irs_jovem_is_phd defaults to false (Switch off) → member 0 (birth 1994,
+    // age 27-30 in 2021-2024) exceeds non-PhD maxAge=26 → no IRS Jovem pre-2025.
+    // Post-2025 uses first_work_year with maxAge=35, so 2025+ IRS Jovem applies.
     await fillStrictQuestionnaire(page, {
       'member.0.birth_year': '1994',
       'member.1.birth_year': '1989',
@@ -525,7 +547,6 @@ test.describe('Golden canary: all years (2021-2025)', () => {
       timeout: 30_000,
     })
 
-    // Assert each year's golden values via scoped tab reads
     for (const golden of ALL_YEARS_GOLDEN) {
       const text = await getVisibleYearText(page, golden.year, true)
       assertGoldenYear(text, golden)
@@ -607,13 +628,13 @@ test.describe('Golden canary: 2024 primary with liquidacao', () => {
 
     // 2024 asks degree_year (not first_work_year), Cat B start year = 2023
     // 2 dependents: born 2019 + 2022
+    // member.1 (birth 1989, age 35 in 2024) exceeds pre-2025 maxAge 30 → no degree_year
     await fillStrictQuestionnaire(page, {
       'member.0.birth_year': '1994',
       'member.1.birth_year': '1989',
       'dependent.0.birth_year': '2019',
       'dependent.1.birth_year': '2022',
       'member.0.degree_year': '2020',
-      'member.1.degree_year': '2012',
       'member.1.nhr_start_year': '2021',
       'member.0.cat_b_start_year': '2023',
     })
@@ -673,14 +694,13 @@ test.describe('Golden canary: all years PDF comprovativos (2021-2024)', () => {
 
     // Questionnaire — with assembly fix, both holders' data is now present.
     // PDF comprovativos extract IRS Jovem from Anexo A (so no first_work_year needed)
-    // and NHR from Anexo L. Both members get degree_year (proactive IRS Jovem check).
+    // and NHR from Anexo L. member.1 (birth 1989, age 35) exceeds pre-2025 maxAge 30.
     await fillStrictQuestionnaire(page, {
       'member.0.birth_year': '1994',
       'member.1.birth_year': '1989',
       'dependent.0.birth_year': '2019',
       'dependent.1.birth_year': '2022',
       'member.0.degree_year': '2020',
-      'member.1.degree_year': '2012',
       'member.1.nhr_start_year': '2021',
       'member.0.cat_b_start_year': '2023',
     })
@@ -743,13 +763,13 @@ test.describe('Golden canary: 2024 primary PDF with liquidacao', () => {
     await clickAdvance(page)
 
     // Questionnaire — PDF extracts IRS Jovem from Anexo A, NHR from Anexo L
+    // member.1 (birth 1989, age 35) exceeds pre-2025 maxAge 30 → no degree_year
     await fillStrictQuestionnaire(page, {
       'member.0.birth_year': '1994',
       'member.1.birth_year': '1989',
       'dependent.0.birth_year': '2019',
       'dependent.1.birth_year': '2022',
       'member.0.degree_year': '2020',
-      'member.1.degree_year': '2012',
       'member.1.nhr_start_year': '2021',
       'member.0.cat_b_start_year': '2023',
     })
