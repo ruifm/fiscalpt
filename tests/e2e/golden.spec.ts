@@ -639,3 +639,123 @@ test.describe('Golden canary: 2024 primary with liquidacao', () => {
     }
   })
 })
+
+// -- PDF Comprovativo Variants -----------------------------------------------
+// Same household, same fuzz factors, but input via comprovativo PDFs instead of
+// XML Modelo 3. Covers 2021-2024 (no 2025 comprovativo exists).
+// Primary year is 2024 → projection is 2025.
+
+test.describe('Golden canary: all years PDF comprovativos (2021-2024)', () => {
+  test('uploads comprovativo PDFs for 2021-2024, fills questionnaire, captures golden values', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000)
+    checkAmendableBoundary()
+    await dismissOnboarding(page)
+    await page.goto('/analyze')
+    await waitForStep(page, 'upload')
+
+    // Upload primary year (2024) comprovativos
+    await uploadXml(page, 'comprovativo-2024-holder-a.pdf')
+    await uploadXml(page, 'comprovativo-2024-holder-b.pdf')
+    await expect(page.locator('[data-testid="upload-slot"]')).toHaveCount(2, { timeout: 10_000 })
+
+    // Upload previous years (2021-2023) comprovativos
+    const prevFiles = [2021, 2022, 2023].flatMap((y) => [
+      'comprovativo-' + y + '-holder-a.pdf',
+      'comprovativo-' + y + '-holder-b.pdf',
+    ])
+    await uploadPreviousYearXmls(page, prevFiles)
+    await expect(page.locator('[data-testid="upload-slot"]')).toHaveCount(8, { timeout: 15_000 })
+
+    // Fill deductions for years 2021-2024
+    await fillGoldenDeductionSlots(page, [2021, 2022, 2023, 2024])
+
+    await clickAdvance(page)
+
+    // Questionnaire — birth years + degree year + Cat B activity year
+    // PDF comprovativos don't trigger IRS Jovem first_work_year or NHR questions
+    await fillStrictQuestionnaire(
+      page,
+      {
+        'member.0.birth_year': '1994',
+        'member.1.birth_year': '1989',
+        'dependent.0.birth_year': '2019',
+        'dependent.1.birth_year': '2022',
+        'dependent.2.birth_year': '2016',
+        'member.0.degree_year': '2020',
+      },
+      { cat_b_activity_year: '2' },
+    )
+
+    await waitForStep(page, 'results')
+    await expect(page.locator('[data-testid="results-container"]')).toBeVisible({
+      timeout: 30_000,
+    })
+
+    // PDF comprovativos lack Cat A/E/F/G/H data — only Cat B is extracted.
+    // The system produces a single-year result (most recent year with data).
+    const text = await getVisibleYearText(page, 2024, false)
+    console.log('=== PDF_ALL_YEARS: 2024 ===')
+    console.log(text.substring(0, 3000))
+    console.log('=== END 2024 ===')
+  })
+})
+
+test.describe('Golden canary: 2024 primary PDF with liquidacao', () => {
+  test('uploads 2024 comprovativo PDFs with liquidacao, captures golden values', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000)
+    checkAmendableBoundary()
+    await dismissOnboarding(page)
+    await page.goto('/analyze')
+    await waitForStep(page, 'upload')
+
+    // Upload 2024 comprovativos as primary
+    await uploadXml(page, 'comprovativo-2024-holder-a.pdf')
+    await uploadXml(page, 'comprovativo-2024-holder-b.pdf')
+    await expect(page.locator('[data-testid="upload-slot"]')).toHaveCount(2, { timeout: 10_000 })
+
+    // Expand liquidacao section and upload PDF
+    const liqToggle = page.locator('button[aria-expanded]', {
+      has: page.locator('text=Demonstra'),
+    })
+    await liqToggle.click()
+    await page.waitForTimeout(500)
+
+    const liqDropzone = page.locator('[data-testid="upload-dropzone"]').last()
+    const fc = page.waitForEvent('filechooser')
+    await liqDropzone.click()
+    const chooser = await fc
+    await chooser.setFiles(path.join(FIXTURES_DIR, 'liquidacao-2024-holder-a.pdf'))
+    await page.waitForTimeout(3_000)
+
+    // PDF comprovativos don't extract deduction data — skip fillGoldenDeductionSlots
+    await clickAdvance(page)
+
+    // Questionnaire — PDF inputs produce fewer questions than XML
+    await fillStrictQuestionnaire(
+      page,
+      {
+        'member.0.birth_year': '1994',
+        'member.1.birth_year': '1989',
+        'dependent.0.birth_year': '2019',
+        'dependent.1.birth_year': '2022',
+        'dependent.2.birth_year': '2016',
+        'member.0.degree_year': '2020',
+      },
+      { cat_b_activity_year: '2' },
+    )
+
+    await waitForStep(page, 'results')
+    const container = page.locator('[data-testid="results-container"]')
+    await expect(container).toBeVisible({ timeout: 30_000 })
+
+    // Capture golden values (single year — no tabs)
+    const text = await getVisibleYearText(page, 2024, false)
+    console.log('=== PDF_2024_PRIMARY ===')
+    console.log(text.substring(0, 3000))
+    console.log('=== END PDF_2024_PRIMARY ===')
+  })
+})
