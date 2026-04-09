@@ -283,6 +283,8 @@ const en: DictShape<PtDict> = {
     reportSent: 'Reported ✓',
     skipToResults: 'Analyze now',
     skipToResultsDesc: 'Use conservative default values',
+    defaultsUsedWarning:
+      'Using default values — customize the questionnaire for more precise results',
   },
 
   upload: {

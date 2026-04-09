@@ -319,7 +319,7 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
   )
 
   const computeAndShowResults = useCallback(
-    (allHouseholds: Household[]) => {
+    (allHouseholds: Household[], extraIssues: ValidationIssue[] = []) => {
       // Validate but never block — surface issues as warnings alongside results
       const freshErrors = allHouseholds.flatMap((hh) => validateHousehold(hh))
       const validationWarnings: ValidationIssue[] = freshErrors
@@ -402,7 +402,7 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
           }
         }
 
-        const allNewIssues = [...validationWarnings, ...liqIssues]
+        const allNewIssues = [...validationWarnings, ...liqIssues, ...extraIssues]
 
         dispatch({
           type: 'CALC_SUCCESS',
@@ -469,8 +469,13 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
       if (idx === 0) return withDefaults
       return propagateSharedData(withDefaults, hh)
     })
-    computeAndShowResults(allHouseholds)
-  }, [computeAndShowResults])
+    const defaultsWarning: ValidationIssue = {
+      severity: 'warning',
+      code: 'DEFAULTS_USED',
+      message: t('analyze.defaultsUsedWarning'),
+    }
+    computeAndShowResults(allHouseholds, [defaultsWarning])
+  }, [computeAndShowResults, t])
 
   const handleClearAll = useCallback(() => {
     clearingRef.current = true

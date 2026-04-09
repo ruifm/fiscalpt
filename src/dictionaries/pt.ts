@@ -285,6 +285,8 @@ const pt = {
     reportSent: 'Reportado ✓',
     skipToResults: 'Analisar agora',
     skipToResultsDesc: 'Usar valores predefinidos conservadores',
+    defaultsUsedWarning:
+      'A utilizar valores predefinidos — personalize o questionário para resultados mais precisos',
   },
 
   upload: {
