@@ -363,12 +363,18 @@ export function identifyMissingInputs(
     const anyHasIrsJovem =
       hasSpecialRegime(member, 'irs_jovem') ||
       otherMembers.some((m) => hasSpecialRegime(m, 'irs_jovem'))
-    // New applicants: must be ≤ 35 at start of benefit
-    // Unconfirmed XML: could have started at ≤ 35, benefit up to 10 years → max age 44
-    const regime = getIrsJovemRegime(year)
-    const maxAge =
-      hasUnconfirmedIrsJovem || anyHasIrsJovem ? 35 + (regime?.maxBenefitYears ?? 10) - 1 : 35
-    if (age > maxAge) continue
+
+    // Determine max age across all submitted years to decide whether to ask.
+    // Pre-2025: max is 30 (generous — covers PhD). Post-2025: max is 35.
+    // For existing beneficiaries, extend by maxBenefitYears (they may have started young).
+    const pre2025MaxAge = hasPre2025 ? 30 : 0
+    const post2025MaxAge = hasPost2025 ? 35 : 0
+    let effectiveMaxAge = Math.max(pre2025MaxAge, post2025MaxAge)
+    if (hasUnconfirmedIrsJovem || anyHasIrsJovem) {
+      const regime = getIrsJovemRegime(year)
+      effectiveMaxAge += (regime?.maxBenefitYears ?? 10) - 1
+    }
+    if (age > effectiveMaxAge) continue
 
     const hasCatAOrB =
       member.incomes.some((inc) => inc.category === 'A' || inc.category === 'B') ||
@@ -417,6 +423,30 @@ export function identifyMissingInputs(
           return n >= MIN_BIRTH_YEAR && n <= currentYear ? null : 'Ano inválido'
         },
       })
+
+      // PhD question: only ask if person is aged 27-30 in any pre-2025 year
+      // (if ≤26 they qualify regardless; if >30 PhD doesn't help)
+      if (member.irs_jovem_is_phd === undefined) {
+        const pre2025Years = allYears.filter((y) => y < 2025)
+        const needsPhd = pre2025Years.some((y) => {
+          const ageInYear = y - member.birth_year!
+          return ageInYear >= 27 && ageInYear <= 30
+        })
+        if (needsPhd) {
+          questions.push({
+            id: `member.${i}.irs_jovem_is_phd`,
+            section: 'irs_jovem',
+            label: `O grau mais elevado de ${member.name} é doutoramento?`,
+            reason:
+              `${member.name} tem entre 27 e 30 anos num ano anterior a 2025. ` +
+              'Com doutoramento, o limite de idade do IRS Jovem sobe de 26 para 30 anos.',
+            type: 'boolean',
+            currentValue: undefined,
+            priority: 'important',
+            path: `members.${i}.irs_jovem_is_phd`,
+          })
+        }
+      }
     }
   }
 
@@ -528,6 +558,9 @@ export function applyAnswers(
           }
         }
       }
+    } else if (parts[0] === 'member' && parts[2] === 'irs_jovem_is_phd') {
+      const idx = parseInt(parts[1])
+      if (h.members[idx]) h.members[idx].irs_jovem_is_phd = value === true || value === 'true'
     } else if (parts[0] === 'member' && parts[2] === 'cat_b_start_year') {
       const mIdx = parseInt(parts[1])
       if (h.members[mIdx]) h.members[mIdx].cat_b_start_year = toNumber(value)
