@@ -31,6 +31,9 @@ interface TaxResultsProps {
   onReset: () => void
   checkoutSessionId?: string | null
   sessionHash?: string
+  simulationMode?: boolean
+  simulationSavings?: number
+  currentResult?: AnalysisResult
 }
 
 export function TaxResults({
@@ -40,6 +43,9 @@ export function TaxResults({
   onReset,
   checkoutSessionId,
   sessionHash,
+  simulationMode = false,
+  simulationSavings,
+  currentResult: _currentResult,
 }: TaxResultsProps) {
   const t = useT()
   const amendableYears = new Set(getAmendableYears())
@@ -51,7 +57,10 @@ export function TaxResults({
     }),
   }))
   const sorted = [...views].sort((a, b) => a.result.year - b.result.year)
-  const totalSavings = sorted.reduce((sum, { view }) => sum + view.totalSavings, 0)
+  const totalSavings =
+    simulationMode && simulationSavings != null
+      ? simulationSavings
+      : sorted.reduce((sum, { view }) => sum + view.totalSavings, 0)
   const hasProactiveSavings = sorted.some(({ view }) => view.proactiveSavings > 0)
   const optimizationCount = results.reduce((sum, r) => sum + r.optimizations.length, 0)
   const hasMultipleYears = sorted.length > 1
@@ -71,23 +80,27 @@ export function TaxResults({
       <div className="text-center">
         <div className="flex justify-center items-center gap-3">
           <h1 tabIndex={-1} className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
-            {t('results.title')}
+            {simulationMode ? t('simulation.resultsTitle') : t('results.title')}
           </h1>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => window.print()}
-            className="print:hidden"
-            aria-label={t('common.print')}
-          >
-            <Printer className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <PdfExportButton results={results} unlockedReports={unlockedReports} />
-          <ShareResults
-            savings={totalSavings}
-            optimizationCount={optimizationCount}
-            years={sorted.map(({ result }) => result.year)}
-          />
+          {!simulationMode && (
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => window.print()}
+                className="print:hidden"
+                aria-label={t('common.print')}
+              >
+                <Printer className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <PdfExportButton results={results} unlockedReports={unlockedReports} />
+              <ShareResults
+                savings={totalSavings}
+                optimizationCount={optimizationCount}
+                years={sorted.map(({ result }) => result.year)}
+              />
+            </>
+          )}
         </div>
         {totalSavings > 0 && (
           <p
@@ -106,37 +119,41 @@ export function TaxResults({
         )}
       </div>
 
-      {/* Data quality warnings */}
-      {issues.filter((i) => i.severity === 'warning' || i.severity === 'error').length > 0 && (
-        <div
-          className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4 print:hidden"
-          role="status"
-        >
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                {t('results.dataWarningTitle')}
-              </p>
-              <ul className="text-sm text-amber-700 dark:text-amber-300 list-disc list-inside space-y-0.5">
-                {issues
-                  .filter((i) => i.severity === 'warning' || i.severity === 'error')
-                  .map((issue, i) => (
-                    <li key={i}>
-                      {issue.message}
-                      {issue.details && (
-                        <span className="text-amber-600/70 dark:text-amber-400/70">
-                          {' '}
-                          ({issue.details})
-                        </span>
-                      )}
-                    </li>
-                  ))}
-              </ul>
+      {/* Data quality warnings — hidden in simulation mode */}
+      {!simulationMode &&
+        issues.filter((i) => i.severity === 'warning' || i.severity === 'error').length > 0 && (
+          <div
+            className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4 print:hidden"
+            role="status"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle
+                className="h-4 w-4 text-amber-600 mt-0.5 shrink-0"
+                aria-hidden="true"
+              />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  {t('results.dataWarningTitle')}
+                </p>
+                <ul className="text-sm text-amber-700 dark:text-amber-300 list-disc list-inside space-y-0.5">
+                  {issues
+                    .filter((i) => i.severity === 'warning' || i.severity === 'error')
+                    .map((issue, i) => (
+                      <li key={i}>
+                        {issue.message}
+                        {issue.details && (
+                          <span className="text-amber-600/70 dark:text-amber-400/70">
+                            {' '}
+                            ({issue.details})
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Top navigation */}
       <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 print:hidden">
@@ -149,8 +166,8 @@ export function TaxResults({
         </Button>
       </div>
 
-      {/* Teaser CTA — visible only when there are savings and paywall is locked */}
-      {totalSavings > 0 && optimizationCount > 0 && (
+      {/* Teaser CTA — visible only when there are savings and paywall is locked (not in simulation) */}
+      {!simulationMode && totalSavings > 0 && optimizationCount > 0 && (
         <a
           href="#recommendations-paywall"
           className="block print:hidden"
@@ -262,29 +279,31 @@ export function TaxResults({
         </div>
       )}
 
-      {/* Historical comparison (only when multiple years) */}
-      {hasMultipleYears && (
+      {/* Historical comparison (only when multiple years, not in simulation) */}
+      {!simulationMode && hasMultipleYears && (
         <HistoricalComparison
           views={sorted}
           amendableYears={new Set([...amendableYears, ...projectedYears])}
         />
       )}
 
-      {/* Paywall — unlockable recommendations */}
-      <div id="recommendations-paywall">
-        <RecommendationsPaywall
-          results={results}
-          totalSavings={totalSavings}
-          onUnlock={setUnlockedReports}
-          checkoutSessionId={checkoutSessionId}
-          sessionHash={sessionHash}
-          chatSlot={
-            unlockedReports ? (
-              <TaxChat results={results} recommendations={unlockedReports} />
-            ) : undefined
-          }
-        />
-      </div>
+      {/* Paywall — unlockable recommendations (not in simulation) */}
+      {!simulationMode && (
+        <div id="recommendations-paywall">
+          <RecommendationsPaywall
+            results={results}
+            totalSavings={totalSavings}
+            onUnlock={setUnlockedReports}
+            checkoutSessionId={checkoutSessionId}
+            sessionHash={sessionHash}
+            chatSlot={
+              unlockedReports ? (
+                <TaxChat results={results} recommendations={unlockedReports} />
+              ) : undefined
+            }
+          />
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 print:hidden">
