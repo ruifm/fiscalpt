@@ -49,7 +49,9 @@ describe('FeedbackButton', () => {
     await user.click(screen.getByRole('button', { name: 'Enviar feedback' }))
 
     const submitBtn = screen.getByRole('button', { name: /Enviar/ })
-    expect(submitBtn.hasAttribute('disabled') || submitBtn.getAttribute('aria-disabled')).toBeTruthy()
+    expect(
+      submitBtn.hasAttribute('disabled') || submitBtn.getAttribute('aria-disabled') === 'true',
+    ).toBe(true)
   })
 
   it('submits feedback and shows success state', async () => {

@@ -1,26 +1,57 @@
 // @vitest-environment jsdom
+import { createContext, useContext } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
+const DialogCtx = createContext<{ open: boolean; onOpenChange: (v: boolean) => void }>({
+  open: false,
+  onOpenChange: () => {},
+})
+
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
-    open ? <div data-testid="dialog">{children}</div> : <div>{children}</div>,
-  DialogTrigger: ({ children, ...props }: { children: React.ReactNode; className?: string }) => (
-    <button data-testid="dialog-trigger" {...props}>
-      {children}
-    </button>
+  Dialog: ({
+    children,
+    open,
+    onOpenChange,
+  }: {
+    children: React.ReactNode
+    open: boolean
+    onOpenChange?: (v: boolean) => void
+  }) => (
+    <DialogCtx.Provider value={{ open, onOpenChange: onOpenChange ?? (() => {}) }}>
+      <div data-testid="dialog">{children}</div>
+    </DialogCtx.Provider>
   ),
-  DialogContent: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="dialog-content">{children}</div>
-  ),
+  DialogTrigger: ({ children, ...props }: { children: React.ReactNode; className?: string }) => {
+    const { onOpenChange } = useContext(DialogCtx)
+    return (
+      <button data-testid="dialog-trigger" onClick={() => onOpenChange(true)} {...props}>
+        {children}
+      </button>
+    )
+  },
+  DialogContent: ({ children }: { children: React.ReactNode }) => {
+    const { open } = useContext(DialogCtx)
+    return open ? <div data-testid="dialog-content">{children}</div> : null
+  },
   DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
   DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
-  DialogClose: ({ children, ...props }: { children: React.ReactNode; className?: string; disabled?: boolean }) => (
-    <button data-testid="dialog-close" {...props}>
-      {children}
-    </button>
-  ),
+  DialogClose: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode
+    className?: string
+    disabled?: boolean
+  }) => {
+    const { onOpenChange } = useContext(DialogCtx)
+    return (
+      <button data-testid="dialog-close" onClick={() => onOpenChange(false)} {...props}>
+        {children}
+      </button>
+    )
+  },
 }))
 
 import { ApplyForm } from '@/components/apply-form'
@@ -33,31 +64,40 @@ describe('ApplyForm', () => {
     expect(screen.getByText('Candidatar-me')).toBeDefined()
   })
 
-  it('shows role title in dialog', () => {
+  it('shows role title in dialog', async () => {
+    const user = userEvent.setup()
     render(<ApplyForm roleTitle="Tax Advisor" />)
+    await user.click(screen.getByText('Candidatar-me'))
     expect(screen.getByText(/Tax Advisor/)).toBeDefined()
   })
 
-  it('renders required form fields', () => {
+  it('renders required form fields', async () => {
+    const user = userEvent.setup()
     render(<ApplyForm roleTitle="Developer" />)
+    await user.click(screen.getByText('Candidatar-me'))
     expect(screen.getByLabelText('Nome *')).toBeDefined()
     expect(screen.getByLabelText('Email *')).toBeDefined()
     expect(screen.getByLabelText('Carta de motivação *')).toBeDefined()
   })
 
-  it('renders file upload button for CV', () => {
+  it('renders file upload button for CV', async () => {
+    const user = userEvent.setup()
     render(<ApplyForm roleTitle="Developer" />)
+    await user.click(screen.getByText('Candidatar-me'))
     expect(screen.getByText('Escolher ficheiro')).toBeDefined()
   })
 
-  it('shows submit button', () => {
+  it('shows submit button', async () => {
+    const user = userEvent.setup()
     render(<ApplyForm roleTitle="Developer" />)
+    await user.click(screen.getByText('Candidatar-me'))
     expect(screen.getByText('Enviar candidatura')).toBeDefined()
   })
 
   it('shows file size error for oversized files', async () => {
     const user = userEvent.setup()
     render(<ApplyForm roleTitle="Developer" />)
+    await user.click(screen.getByText('Candidatar-me'))
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
     const largeFile = new File(['x'.repeat(6 * 1024 * 1024)], 'huge.pdf', {
