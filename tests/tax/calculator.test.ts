@@ -2224,3 +2224,37 @@ describe('Single filer scenario', () => {
     })
   })
 })
+
+// ─── deriveCatBActivityYear ──────────────────────────────────
+
+import { deriveCatBActivityYear } from '@/lib/tax/types'
+
+describe('deriveCatBActivityYear', () => {
+  it('returns 1 for first year of activity', () => {
+    expect(deriveCatBActivityYear(2024, 2024)).toBe(1)
+  })
+
+  it('returns 2 for second year of activity', () => {
+    expect(deriveCatBActivityYear(2023, 2024)).toBe(2)
+  })
+
+  it('returns undefined for third year onwards', () => {
+    expect(deriveCatBActivityYear(2022, 2024)).toBeUndefined()
+    expect(deriveCatBActivityYear(2020, 2024)).toBeUndefined()
+  })
+
+  it('returns undefined when catBStartYear is undefined', () => {
+    expect(deriveCatBActivityYear(undefined, 2024)).toBeUndefined()
+  })
+
+  it('returns undefined when start year is after tax year (future)', () => {
+    expect(deriveCatBActivityYear(2025, 2024)).toBeUndefined()
+  })
+
+  it('handles boundary between year 2 and year 3', () => {
+    // Start year 2022, tax year 2024: year = 2024 - 2022 + 1 = 3 → undefined
+    expect(deriveCatBActivityYear(2022, 2024)).toBeUndefined()
+    // Start year 2023, tax year 2024: year = 2024 - 2023 + 1 = 2 → 2
+    expect(deriveCatBActivityYear(2023, 2024)).toBe(2)
+  })
+})
