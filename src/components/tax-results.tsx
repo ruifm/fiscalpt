@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { ArrowLeft, Sparkles, Printer, Lock, ArrowRight, AlertTriangle } from 'lucide-react'
 import { PdfExportButton } from '@/components/pdf-export-button'
@@ -32,6 +32,7 @@ interface TaxResultsProps {
   checkoutSessionId?: string | null
   sessionHash?: string
   returnPath?: string
+  onPaywallUnlock?: () => void
   simulationMode?: boolean
   simulationSavings?: number
   currentResult?: AnalysisResult
@@ -45,6 +46,7 @@ export function TaxResults({
   checkoutSessionId,
   sessionHash,
   returnPath,
+  onPaywallUnlock,
   simulationMode = false,
   simulationSavings,
   currentResult,
@@ -83,6 +85,14 @@ export function TaxResults({
       : sorted[0].result.year
   const [activeYear, setActiveYear] = useState(primaryYear)
   const [unlockedReports, setUnlockedReports] = useState<ActionableReport[] | null>(null)
+
+  const handleUnlock = useCallback(
+    (reports: ActionableReport[]) => {
+      setUnlockedReports(reports)
+      onPaywallUnlock?.()
+    },
+    [onPaywallUnlock],
+  )
 
   return (
     <div className="space-y-8" data-testid="results-container">
@@ -305,7 +315,7 @@ export function TaxResults({
         <RecommendationsPaywall
           results={results}
           totalSavings={totalSavings}
-          onUnlock={setUnlockedReports}
+          onUnlock={handleUnlock}
           checkoutSessionId={checkoutSessionId}
           sessionHash={sessionHash}
           returnPath={returnPath}

@@ -3,10 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { Calculator, ArrowLeft, FileText, Sparkles, ArrowRight } from 'lucide-react'
+import { Calculator, ArrowLeft, FileText, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { SimulationForm } from '@/components/simulation-form'
 import type { SimulationFormState } from '@/components/simulation-form'
 import { ResultsSkeleton } from '@/components/results-skeleton'
@@ -30,6 +29,7 @@ interface SimulationStorage {
   formState: SimulationFormState
   results?: SimulationResults | null
   inputs?: SimulationInputs | null
+  pendingCheckoutSessionId?: string | null
 }
 
 function readStorage(): SimulationStorage | null {
@@ -70,6 +70,25 @@ export default function SimulacaoPage() {
   const [stored] = useState<SimulationStorage | null>(() => {
     if (typeof window === 'undefined') return null
     return readStorage()
+  })
+
+  // Capture checkout session_id from URL (Stripe redirect) or pending storage
+  const [checkoutSessionId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    const params = new URLSearchParams(window.location.search)
+    const fromUrl = params.get('session_id')
+    if (fromUrl) {
+      // Persist as pending token so it survives further refreshes
+      const current = readStorage()
+      if (current) {
+        writeStorage({ ...current, pendingCheckoutSessionId: fromUrl })
+      }
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+      return fromUrl
+    }
+    // Fall back to pending token from storage
+    return readStorage()?.pendingCheckoutSessionId ?? null
   })
 
   const [results, setResults] = useState<SimulationResults | null>(
@@ -117,6 +136,14 @@ export default function SimulacaoPage() {
     setFormState(undefined)
     setFormKey((k) => k + 1)
     clearStorage()
+  }, [])
+
+  const handlePaywallUnlock = useCallback(() => {
+    // Clear pending checkout token — session consumed
+    const current = readStorage()
+    if (current) {
+      writeStorage({ ...current, pendingCheckoutSessionId: null })
+    }
   }, [])
 
   const handleFormStateChange = useCallback((state: SimulationFormState) => {
@@ -194,13 +221,16 @@ export default function SimulacaoPage() {
                 issues={[]}
                 onBack={handleBack}
                 onReset={handleReset}
+                checkoutSessionId={checkoutSessionId}
+                returnPath="/simulacao"
+                onPaywallUnlock={handlePaywallUnlock}
                 simulationMode
                 simulationSavings={results.total_savings}
                 currentResult={results.current}
               />
 
-              {/* Conversion CTAs */}
-              <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {/* Conversion CTA — full analysis */}
+              <div className="mt-8">
                 <Card className="relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10" />
                   <CardContent className="relative space-y-3 p-6">
@@ -217,31 +247,6 @@ export default function SimulacaoPage() {
                         <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                     </Link>
-                  </CardContent>
-                </Card>
-
-                <Card className="relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-amber-500/10" />
-                  <CardContent className="relative space-y-3 p-6">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-amber-500" aria-hidden="true" />
-                      <h3 className="font-semibold">{t('simulation.aiConsultCta')}</h3>
-                      <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
-                        {t('simulation.comingSoon')}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{t('simulation.aiConsultDesc')}</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-1.5 opacity-60 cursor-not-allowed"
-                      aria-disabled="true"
-                      tabIndex={-1}
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      {t('simulation.comingSoon')}
-                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                    </Button>
                   </CardContent>
                 </Card>
               </div>
