@@ -204,10 +204,8 @@ describe('PDF ↔ XML extraction parity', () => {
       })
 
       it('extracts same filing status', () => {
-        // Both should detect married status from spouse NIF presence
-        const xmlMarried = xmlHousehold.filing_status !== 'single'
-        const pdfMarried = pdfHousehold.filing_status !== 'single'
-        expect(pdfMarried).toBe(xmlMarried)
+        // Both should detect exact same filing status (single/married_joint/married_separate)
+        expect(pdfHousehold.filing_status).toBe(xmlHousehold.filing_status)
       })
 
       it('extracts same number of dependents', () => {
@@ -378,17 +376,11 @@ describe('PDF ↔ XML 2024 detailed parity', () => {
       const xmlUnion = xmlB.members[0].deductions
         .filter((d) => d.category === 'sindical')
         .reduce((s, d) => s + d.amount, 0)
-      // PDF may store as union_dues on the income or as sindical deduction
-      const pdfUnionOnIncome = incomesByCategory(pdfB.members[0], 'A').reduce(
-        (s, i) => s + (i.union_dues ?? 0),
-        0,
-      )
-      const pdfUnionDeduction = pdfB.members[0].deductions
+      // Both flows should now store union dues as sindical deductions
+      const pdfUnion = pdfB.members[0].deductions
         .filter((d) => d.category === 'sindical')
         .reduce((s, d) => s + d.amount, 0)
-      const pdfUnion = pdfUnionOnIncome + pdfUnionDeduction
 
-      // At least one path should have the union dues
       if (xmlUnion > 0) {
         expect(pdfUnion).toBeCloseTo(xmlUnion, 0)
       }

@@ -293,7 +293,7 @@ describe('parseLiquidacaoText', () => {
 // ─── Comprovativo Parser Tests ───────────────────────────────
 
 // Simplified comprovativo text based on real 2024 SP-A comprovativo
-const COMPROVATIVO_2024_SP_A = `ESTADO CIVIL DO SUJEITO PASSIVO Casado AGREGADO FAMILIAR CONTRIBUINTE EXEMPLO 100000001 X X 100000002 100000003 100000004 Comprovativo Mod.3 IRS: 100000001 / 2024 / 2847-K0392-15 Página 1 de 8
+const COMPROVATIVO_2024_SP_A = `ESTADO CIVIL DO SUJEITO PASSIVO Casado AGREGADO FAMILIAR CONTRIBUINTE EXEMPLO 100000001 X X 100000002 100000003 100000004 5 OPÇÃO PELA TRIBUTAÇÃO CONJUNTA DOS RENDIMENTOS tributação conjunta: Sim 01 X Comprovativo Mod.3 IRS: 100000001 / 2024 / 2847-K0392-15 Página 1 de 8
 ---PAGE---
 REEMBOLSO POR TRANSFERÊNCIA BANCÁRIA X PT50002300004562932157094 X X X 501597565 X X 1 1 Comprovativo Mod.3 IRS: 100000001 / 2024 / 2847-K0392-15 Página 2 de 8
 ---PAGE---
@@ -521,7 +521,7 @@ const COMPROVATIVO_CAT_A = `ESTADO CIVIL DO SUJEITO PASSIVO Solteiro AGREGADO FA
 Anexo A CATEGORIA A 111222333 35.000,00 4.200,00 3.850,00 Comprovativo Mod.3 IRS: 111222333 / 2025 / ABC-D0001-01 Página 2 de 4`
 
 // Comprovativo with both Cat A and Cat B (mixed income)
-const COMPROVATIVO_MIXED = `ESTADO CIVIL DO SUJEITO PASSIVO Casado AGREGADO FAMILIAR JOAO SANTOS 222333444 X X 333444555 Comprovativo Mod.3 IRS: 222333444 / 2025 / XYZ-A0001-01 Página 1 de 6
+const COMPROVATIVO_MIXED = `ESTADO CIVIL DO SUJEITO PASSIVO Casado AGREGADO FAMILIAR JOAO SANTOS 222333444 X X 333444555 5 OPÇÃO PELA TRIBUTAÇÃO CONJUNTA DOS RENDIMENTOS tributação conjunta: Sim 01 X Comprovativo Mod.3 IRS: 222333444 / 2025 / XYZ-A0001-01 Página 1 de 6
 ---PAGE---
 Anexo A CATEGORIA A 222333444 28.000,00 3.360,00 3.080,00 Comprovativo Mod.3 IRS: 222333444 / 2025 / XYZ-A0001-01 Página 2 de 6
 ---PAGE---
@@ -552,7 +552,7 @@ const COMPROVATIVO_ANEXO_L = `ESTADO CIVIL DO SUJEITO PASSIVO Casado AGREGADO FA
 RESIDENTE NÃO HABITUAL Anexo L ATIVIDADES DE ELEVADO VALOR ACRESCENTADO 2021 100000002 100000002 X 500000001 401 2512.0 27.496,97 Q4A 401 2512.0 A 724 10.762,50 1.005,02 Comprovativo Mod.3 IRS: 100000002 / 2021 / 4912-M2856-73 Página 9 de 10`
 
 // Married but filing separately (only 1 X between NIFs)
-const COMPROVATIVO_MARRIED_SEPARATE = `ESTADO CIVIL DO SUJEITO PASSIVO Casado AGREGADO FAMILIAR 222333444 X 333444555 Comprovativo Mod.3 IRS: 222333444 / 2024 / SEP-A0001-01 Página 1 de 2`
+const COMPROVATIVO_MARRIED_SEPARATE = `ESTADO CIVIL DO SUJEITO PASSIVO Casado AGREGADO FAMILIAR 222333444 X 333444555 5 OPÇÃO PELA TRIBUTAÇÃO CONJUNTA DOS RENDIMENTOS tributação conjunta: Não 02 X Comprovativo Mod.3 IRS: 222333444 / 2024 / SEP-A0001-01 Página 1 de 2`
 
 describe('comprativoParsedToHousehold', () => {
   it('builds household from married comprovativo with Cat B income', () => {
@@ -819,14 +819,15 @@ describe('Strict validation — sentinel birth years', () => {
 })
 
 describe('Strict validation — union dues wiring', () => {
-  it('should wire union_dues from Anexo A into income', () => {
-    // The real Cat A comprovativo has quotizacoesSindicais=0.00
+  it('should wire union_dues from Anexo A into sindical deduction', () => {
     const text = `Solteiro NIF 111222333 Comprovativo Mod.3 IRS: 111222333 / 2025 / ABC
 ---PAGE---
 Anexo A CATEGORIAS A / H 2025 111222333 111222333 500000003 401 A 35.000,00 4.200,00 3.850,00 150,00 Comprovativo Mod.3 IRS: 111222333 / 2025 / ABC`
     const parsed = parseComprovativoPdfText(text)
     const { household } = comprativoParsedToHousehold(parsed)
-    expect(household.members![0].incomes[0].union_dues).toBe(150)
+    const sindical = household.members![0].deductions.find((d) => d.category === 'sindical')
+    expect(sindical).toBeDefined()
+    expect(sindical!.amount).toBe(150)
   })
 })
 

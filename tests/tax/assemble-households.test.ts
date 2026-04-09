@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { assembleHouseholds, type AssemblyInput } from '@/lib/tax/assemble-households'
 import type { ComprovativoParsed } from '@/lib/tax/pdf-extractor'
 
-function makeComprovativo(
-  overrides: Partial<ComprovativoParsed> = {},
-): ComprovativoParsed {
+function makeComprovativo(overrides: Partial<ComprovativoParsed> = {}): ComprovativoParsed {
   return {
     nif: '111111111',
     year: 2024,
@@ -15,9 +13,7 @@ function makeComprovativo(
   }
 }
 
-function makeInput(
-  overrides: Partial<AssemblyInput['sectionFiles']> = {},
-): AssemblyInput {
+function makeInput(overrides: Partial<AssemblyInput['sectionFiles']> = {}): AssemblyInput {
   return {
     sectionFiles: {
       declaration: [],
@@ -42,9 +38,7 @@ describe('assembleHouseholds — PDF comprovativo support', () => {
       nif: '111111111',
       year: 2024,
       filingStatus: 'single',
-      anexoA: [
-        { titular: 'A', rendimentoBruto: 30000, retencoesIRS: 5000, contribuicoesSS: 3300 },
-      ],
+      anexoA: [{ titular: 'A', rendimentoBruto: 30000, retencoesIRS: 5000, contribuicoesSS: 3300 }],
     })
 
     const result = assembleHouseholds(
@@ -85,9 +79,7 @@ describe('assembleHouseholds — PDF comprovativo support', () => {
       nifConjuge: '111111111',
       year: 2024,
       filingStatus: 'married_joint',
-      anexoA: [
-        { titular: 'A', rendimentoBruto: 25000, retencoesIRS: 5000, contribuicoesSS: 2750 },
-      ],
+      anexoA: [{ titular: 'A', rendimentoBruto: 25000, retencoesIRS: 5000, contribuicoesSS: 2750 }],
     })
 
     const result = assembleHouseholds(
@@ -137,9 +129,7 @@ describe('assembleHouseholds — PDF comprovativo support', () => {
       nif: '111111111',
       year: 2024,
       filingStatus: 'single',
-      anexoA: [
-        { titular: 'A', rendimentoBruto: 30000, retencoesIRS: 5000, contribuicoesSS: 3300 },
-      ],
+      anexoA: [{ titular: 'A', rendimentoBruto: 30000, retencoesIRS: 5000, contribuicoesSS: 3300 }],
     })
 
     // Previous year as PDF comprovativo
@@ -147,9 +137,7 @@ describe('assembleHouseholds — PDF comprovativo support', () => {
       nif: '111111111',
       year: 2023,
       filingStatus: 'single',
-      anexoA: [
-        { titular: 'A', rendimentoBruto: 28000, retencoesIRS: 4500, contribuicoesSS: 3080 },
-      ],
+      anexoA: [{ titular: 'A', rendimentoBruto: 28000, retencoesIRS: 4500, contribuicoesSS: 3080 }],
     })
 
     const result = assembleHouseholds(
@@ -193,18 +181,14 @@ describe('assembleHouseholds — PDF comprovativo support', () => {
       nif: '111111111',
       year: 2024,
       filingStatus: 'single',
-      anexoA: [
-        { titular: 'A', rendimentoBruto: 30000, retencoesIRS: 5000, contribuicoesSS: 3300 },
-      ],
+      anexoA: [{ titular: 'A', rendimentoBruto: 30000, retencoesIRS: 5000, contribuicoesSS: 3300 }],
     })
 
     const prevPdfParsed = makeComprovativo({
       nif: '111111111',
       year: 2023,
       filingStatus: 'single',
-      anexoA: [
-        { titular: 'A', rendimentoBruto: 99999, retencoesIRS: 9999, contribuicoesSS: 9999 },
-      ],
+      anexoA: [{ titular: 'A', rendimentoBruto: 99999, retencoesIRS: 9999, contribuicoesSS: 9999 }],
     })
 
     const result = assembleHouseholds(
@@ -272,18 +256,14 @@ describe('assembleHouseholds — PDF comprovativo support', () => {
       nif: '111111111',
       year: 2024,
       filingStatus: 'single',
-      anexoA: [
-        { titular: 'A', rendimentoBruto: 30000, retencoesIRS: 5000, contribuicoesSS: 3300 },
-      ],
+      anexoA: [{ titular: 'A', rendimentoBruto: 30000, retencoesIRS: 5000, contribuicoesSS: 3300 }],
     })
 
     const prevParsed = makeComprovativo({
       nif: '111111111',
       year: 2024, // same as primary — should be skipped
       filingStatus: 'single',
-      anexoA: [
-        { titular: 'A', rendimentoBruto: 99999, retencoesIRS: 9999, contribuicoesSS: 9999 },
-      ],
+      anexoA: [{ titular: 'A', rendimentoBruto: 99999, retencoesIRS: 9999, contribuicoesSS: 9999 }],
     })
 
     const result = assembleHouseholds(
