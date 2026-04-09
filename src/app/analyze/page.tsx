@@ -9,8 +9,6 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowRight,
-  CheckCircle,
-  RefreshCw,
   ShieldCheck,
   Mail,
   Zap,
@@ -71,7 +69,6 @@ export default function AnalyzePage() {
     handleClearAll,
     goToStep,
     advanceStep,
-    reloadDocuments,
     dismissError,
   } = useAnalysisFlow({ sessionId, t })
 
@@ -216,151 +213,118 @@ export default function AnalyzePage() {
               </div>
             )}
 
-            {!calculating && step === 'upload' && (
-              <div data-testid="step-upload">
-                <div className="mb-8 text-center">
-                  <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                    {t('analyze.title')}
-                  </h1>
-                  <p className="mt-2 text-muted-foreground">{t('analyze.subtitle')}</p>
-                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1">
-                    <ShieldCheck
-                      className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400"
-                      aria-hidden="true"
-                    />
-                    <span className="text-xs text-emerald-700 dark:text-emerald-300">
-                      {t('privacy.badge')}
-                    </span>
-                  </div>
+            <div
+              data-testid="step-upload"
+              className={calculating || step !== 'upload' ? 'hidden' : undefined}
+            >
+              <div className="mb-8 text-center">
+                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                  {t('analyze.title')}
+                </h1>
+                <p className="mt-2 text-muted-foreground">{t('analyze.subtitle')}</p>
+                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1">
+                  <ShieldCheck
+                    className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400"
+                    aria-hidden="true"
+                  />
+                  <span className="text-xs text-emerald-700 dark:text-emerald-300">
+                    {t('privacy.badge')}
+                  </span>
                 </div>
-                {households.length > 0 ? (
-                  <div className="space-y-6">
-                    <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 p-6">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle
-                          className="h-5 w-5 text-green-600 mt-0.5 shrink-0"
-                          aria-hidden="true"
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium text-green-800 dark:text-green-200">
-                            {t('analyze.docsLoaded')}
-                          </p>
-                          <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                            {primaryHousehold!.members.map((m) => m.name).join(' e ')} —{' '}
-                            {households.length === 1
-                              ? t('analyze.fiscalYear', { year: primaryHousehold!.year })
-                              : t('analyze.fiscalYears', {
-                                  count: households.length,
-                                  years: households
-                                    .map((h) => h.year)
-                                    .sort()
-                                    .join(', '),
-                                })}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    {issues.filter((i) => i.severity === 'warning' || i.severity === 'info')
-                      .length > 0 && (
-                      <div className="space-y-2">
-                        {issues
-                          .filter((i) => i.severity === 'warning' || i.severity === 'info')
-                          .map((issue, i) => (
-                            <div
-                              key={`issue-${i}`}
-                              className={`flex items-start gap-2 rounded-lg p-3 ${
-                                issue.severity === 'warning'
-                                  ? 'bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800'
-                                  : 'bg-sky-50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800'
-                              }`}
-                            >
-                              {issue.severity === 'warning' ? (
-                                <AlertTriangle
-                                  className="h-4 w-4 text-amber-600 mt-0.5 shrink-0"
-                                  aria-hidden="true"
-                                />
-                              ) : (
-                                <AlertCircle
-                                  className="h-4 w-4 text-sky-600 mt-0.5 shrink-0"
-                                  aria-hidden="true"
-                                />
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p
-                                  className={`text-sm ${
-                                    issue.severity === 'warning'
-                                      ? 'text-amber-800 dark:text-amber-200'
-                                      : 'text-sky-800 dark:text-sky-200'
-                                  }`}
-                                >
-                                  {issue.message}
-                                </p>
-                                {issue.code === 'LIQUIDACAO_MISMATCH' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const description = `[Liquidação mismatch] ${issue.message}`
-                                      fetch('/api/report-problem', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                          description,
-                                          stage: 'results-validation',
-                                        }),
-                                      }).catch(() => {})
-                                      const btn = document.activeElement as HTMLButtonElement | null
-                                      if (btn) {
-                                        btn.textContent = t('analyze.reportSent')
-                                        btn.disabled = true
-                                      }
-                                    }}
-                                    className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-sky-700 dark:text-sky-300 hover:underline"
-                                  >
-                                    <Mail className="h-3 w-3" aria-hidden="true" />
-                                    {t('analyze.reportMismatch')}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                    <div className="flex flex-col sm:flex-row justify-center gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={reloadDocuments}
-                        className="w-full sm:w-auto gap-1.5"
-                      >
-                        <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                        {t('analyze.loadNewDocs')}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={handleSkipQuestionnaire}
-                        className="w-full sm:w-auto gap-1.5"
-                        data-testid="skip-to-results"
-                      >
-                        <Zap className="h-4 w-4" aria-hidden="true" />
-                        {t('analyze.skipToResults')}
-                      </Button>
-                      <Button
-                        onClick={() => advanceStep('questionnaire')}
-                        className="w-full sm:w-auto gap-1.5"
-                        data-testid="continue-to-questionnaire"
-                      >
-                        {t('common.continue')}
-                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    </div>
-                    <p className="mt-2 text-center text-xs text-muted-foreground">
-                      {t('analyze.skipToResultsDesc')}
-                    </p>
-                  </div>
-                ) : (
-                  <DocumentUpload onExtracted={handleExtracted} />
-                )}
               </div>
-            )}
+              {step === 'upload' && households.length > 0 && (
+                <div className="mb-6 space-y-4">
+                  {issues.filter((i) => i.severity === 'warning' || i.severity === 'info').length >
+                    0 && (
+                    <div className="space-y-2">
+                      {issues
+                        .filter((i) => i.severity === 'warning' || i.severity === 'info')
+                        .map((issue, i) => (
+                          <div
+                            key={`upload-issue-${i}`}
+                            className={`flex items-start gap-2 rounded-lg p-3 ${
+                              issue.severity === 'warning'
+                                ? 'bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800'
+                                : 'bg-sky-50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800'
+                            }`}
+                          >
+                            {issue.severity === 'warning' ? (
+                              <AlertTriangle
+                                className="h-4 w-4 text-amber-600 mt-0.5 shrink-0"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <AlertCircle
+                                className="h-4 w-4 text-sky-600 mt-0.5 shrink-0"
+                                aria-hidden="true"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className={`text-sm ${
+                                  issue.severity === 'warning'
+                                    ? 'text-amber-800 dark:text-amber-200'
+                                    : 'text-sky-800 dark:text-sky-200'
+                                }`}
+                              >
+                                {issue.message}
+                              </p>
+                              {issue.code === 'LIQUIDACAO_MISMATCH' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const description = `[Liquidação mismatch] ${issue.message}`
+                                    fetch('/api/report-problem', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        description,
+                                        stage: 'results-validation',
+                                      }),
+                                    }).catch(() => {})
+                                    const btn = document.activeElement as HTMLButtonElement | null
+                                    if (btn) {
+                                      btn.textContent = t('analyze.reportSent')
+                                      btn.disabled = true
+                                    }
+                                  }}
+                                  className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-sky-700 dark:text-sky-300 hover:underline"
+                                >
+                                  <Mail className="h-3 w-3" aria-hidden="true" />
+                                  {t('analyze.reportMismatch')}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                  <div className="flex flex-col sm:flex-row justify-center gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={handleSkipQuestionnaire}
+                      className="w-full sm:w-auto gap-1.5"
+                      data-testid="skip-to-results"
+                    >
+                      <Zap className="h-4 w-4" aria-hidden="true" />
+                      {t('analyze.skipToResults')}
+                    </Button>
+                    <Button
+                      onClick={() => advanceStep('questionnaire')}
+                      className="w-full sm:w-auto gap-1.5"
+                      data-testid="continue-to-questionnaire"
+                    >
+                      {t('common.continue')}
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                  <p className="text-center text-xs text-muted-foreground">
+                    {t('analyze.skipToResultsDesc')}
+                  </p>
+                </div>
+              )}
+              <DocumentUpload onExtracted={handleExtracted} />
+            </div>
 
             {!calculating && step === 'questionnaire' && primaryHousehold && (
               <div data-testid="step-questionnaire">
