@@ -340,9 +340,7 @@ export default function AnalyzePage() {
                   className="mt-6 rounded-lg border border-dashed border-muted-foreground/25 bg-muted/30 p-4 text-center"
                   data-testid="no-documents-callout"
                 >
-                  <p className="text-sm text-muted-foreground">
-                    {t('analyze.noDocuments')}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t('analyze.noDocuments')}</p>
                   <Link href="/simulacao">
                     <Button variant="outline" size="sm" className="mt-3 gap-1.5">
                       <Zap className="h-3.5 w-3.5" aria-hidden="true" />

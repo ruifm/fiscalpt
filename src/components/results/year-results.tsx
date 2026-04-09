@@ -43,9 +43,7 @@ export function YearResults({
   const effectiveSavings = simulationBaseline
     ? Math.max(0, simulationBaseline.total_tax_burden - effectiveOptimal.total_tax_burden)
     : view.savings
-  const effectiveIsOptimal = simulationBaseline
-    ? effectiveSavings <= 0
-    : view.isAlreadyOptimal
+  const effectiveIsOptimal = simulationBaseline ? effectiveSavings <= 0 : view.isAlreadyOptimal
 
   const isMulti = effectiveCurrent.persons.length > 1
   const sortedPersonNames = isMulti
@@ -158,9 +156,7 @@ function ScenarioSummary({
         </div>
         <div
           className={
-            hideWithholdings
-              ? 'grid grid-cols-3 gap-4'
-              : 'grid grid-cols-2 sm:grid-cols-4 gap-4'
+            hideWithholdings ? 'grid grid-cols-3 gap-4' : 'grid grid-cols-2 sm:grid-cols-4 gap-4'
           }
         >
           <Metric label={t('results.income')} value={formatEuro(scenario.total_gross)} />
@@ -191,10 +187,7 @@ function ScenarioSummary({
       </div>
 
       {isMulti && usePersonTabs && (
-        <Tabs
-          value={activePerson}
-          onValueChange={onActivePersonChange}
-        >
+        <Tabs value={activePerson} onValueChange={onActivePersonChange}>
           <TabsList className="w-full justify-center">
             {sortedPersons.map((person) => (
               <TabsTrigger key={person.name} value={person.name} className="flex-1">
@@ -252,7 +245,11 @@ function PersonCard({
           <User className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <span className="font-semibold">{person.name}</span>
         </div>
-        <div className={hideWithholdings ? 'grid grid-cols-3 gap-3' : 'grid grid-cols-2 sm:grid-cols-4 gap-3'}>
+        <div
+          className={
+            hideWithholdings ? 'grid grid-cols-3 gap-3' : 'grid grid-cols-2 sm:grid-cols-4 gap-3'
+          }
+        >
           <Metric label={t('results.income')} value={formatEuro(person.gross_income)} small />
           <Metric
             label={t('results.irs')}

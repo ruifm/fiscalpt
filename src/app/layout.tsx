@@ -108,6 +108,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <JsonLd data={webApplicationJsonLd} />
         {process.env.VERCEL && (
           <>
             <Script
@@ -124,7 +125,6 @@ gtag('config', 'AW-18070272762');`}
         )}
       </head>
       <body className="min-h-full flex flex-col">
-        <JsonLd data={webApplicationJsonLd} />
         <ThemeProvider>
           <LocaleWrapper>{children}</LocaleWrapper>
         </ThemeProvider>

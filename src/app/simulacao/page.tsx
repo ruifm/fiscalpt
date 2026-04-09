@@ -91,21 +91,24 @@ export default function SimulacaoPage() {
     return readStorage()?.pendingCheckoutSessionId ?? null
   })
 
-  // Results and inputs start null to match server render (avoids hydration mismatch).
-  // Restored from localStorage in useEffect below after hydration.
+  // All client-only state starts at defaults to match the server render
+  // (avoids hydration mismatch). Restored from localStorage after mount.
   const [results, setResults] = useState<SimulationResults | null>(null)
   const [_inputs, setInputs] = useState<SimulationInputs | null>(null)
-  const [formState, setFormState] = useState<SimulationFormState | undefined>(
-    () => stored?.formState,
-  )
+  const [formState, setFormState] = useState<SimulationFormState | undefined>(undefined)
   const [formKey, setFormKey] = useState(0)
   const resultsRef = useRef<HTMLDivElement>(null)
 
-  // Restore results from localStorage after hydration
+  // Restore state from localStorage after hydration
   useEffect(() => {
     if (stored?.results) {
       setResults(stored.results)
       setInputs(stored.inputs ?? null)
+    }
+    if (stored?.formState) {
+      setFormState(stored.formState)
+      // Force form remount with restored state
+      setFormKey((k) => k + 1)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
   }, [])

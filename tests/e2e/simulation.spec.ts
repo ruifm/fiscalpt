@@ -205,7 +205,10 @@ test.describe('Simulação Rápida — localStorage persistence', () => {
 
     // Click "Voltar" (back) button — use data-testid area for results navigation
     const resultsContainer = page.locator('[data-testid="results-container"]')
-    await resultsContainer.getByRole('button', { name: /^voltar$/i }).first().click()
+    await resultsContainer
+      .getByRole('button', { name: /^voltar$/i })
+      .first()
+      .click()
 
     // Form should be visible with data preserved
     await expect(page.locator('[data-testid="simulation-form"]')).toBeVisible({ timeout: 15_000 })
