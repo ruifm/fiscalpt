@@ -396,9 +396,6 @@ export function identifyMissingInputs(
 
     if (hasPre2025) {
       // Pre-2025: requires degree completion
-      const degreeYear = member.irs_jovem_first_work_year
-        ? member.irs_jovem_first_work_year - 1
-        : undefined
       questions.push({
         id: `member.${i}.degree_year`,
         section: 'irs_jovem',
@@ -408,7 +405,7 @@ export function identifyMissingInputs(
           : 'Até 2024, o IRS Jovem (Art. 12-F) aplica-se nos 5 anos após conclusão do ' +
             'ensino superior. Se elegível, pode isentar 25%-100% do rendimento.',
         type: 'year',
-        currentValue: degreeYear,
+        currentValue: member.irs_jovem_degree_year,
         priority: hasUnconfirmedIrsJovem ? 'critical' : 'important',
         path: `members.${i}.degree_year`,
         validate: (value: string | number | boolean): string | null => {
@@ -506,9 +503,10 @@ export function applyAnswers(
       if (member) {
         const degreeYear = toNumber(value)
         if (degreeYear >= MIN_BIRTH_YEAR) {
-          // Pre-2025: benefit starts the year after degree completion
-          // Store as first_work_year equivalent: degree_year + 1
-          member.irs_jovem_first_work_year = degreeYear + 1
+          member.irs_jovem_degree_year = degreeYear
+          // Also derive first_work_year if not already set (degree + 1 is the
+          // default assumption, but an explicit first_work_year answer takes priority)
+          member.irs_jovem_first_work_year ??= degreeYear + 1
           const benefitYear = h.year - degreeYear
           const regime = getIrsJovemRegime(h.year)
           const maxYears = regime?.maxBenefitYears ?? 5

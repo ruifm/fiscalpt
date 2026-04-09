@@ -41,9 +41,11 @@ function findMatchingDependent(dep: Dependent, others: Dependent[]): Dependent |
  * This correctly handles households where composition changes across years
  * (single→married, divorce, different spouse).
  *
- * Propagated fields: name, nif, birth_year, nhr_start_year, irs_jovem_first_work_year.
+ * Propagated fields: name, nif, birth_year, nhr_start_year,
+ *   irs_jovem_first_work_year, irs_jovem_degree_year.
  * Derived fields: irs_jovem_year, special_regimes['irs_jovem'] — computed from
- * irs_jovem_first_work_year for the target year when the member is eligible.
+ *   eligibility data for the target year. Pre-2025 requires degree_year (different
+ *   law than post-2025 which only needs first_work_year).
  * NOT propagated: nhr_confirmed — year-specific, comes from each year's XML data.
  */
 export function propagateSharedData(primary: Household, target: Household): Household {
@@ -59,6 +61,7 @@ export function propagateSharedData(primary: Household, target: Household): Hous
       if (!match) return member
 
       const firstWorkYear = match.irs_jovem_first_work_year ?? member.irs_jovem_first_work_year
+      const degreeYear = match.irs_jovem_degree_year ?? member.irs_jovem_degree_year
       const result: Person = {
         ...member,
         name: match.name,
@@ -66,14 +69,24 @@ export function propagateSharedData(primary: Household, target: Household): Hous
         birth_year: match.birth_year ?? member.birth_year,
         nhr_start_year: match.nhr_start_year ?? member.nhr_start_year,
         irs_jovem_first_work_year: firstWorkYear,
+        irs_jovem_degree_year: degreeYear,
       }
 
       // Derive IRS Jovem eligibility for the target year.
+      // Pre-2025 and post-2025 are different laws with different requirements:
+      //   Pre-2025: requires a completed degree (irs_jovem_degree_year must be set)
+      //     Benefit year = target.year - degreeYear (year 1 = year after degree)
+      //   Post-2025: requires only first_work_year (no degree needed)
+      //     Benefit year = target.year - firstWorkYear + 1 (year 1 = first work year)
       // Only backfill — never overwrite XML-provided target-year data.
-      if (firstWorkYear !== undefined) {
+      const isPre2025 = target.year < 2025
+      const canDerive = isPre2025 ? degreeYear !== undefined : firstWorkYear !== undefined
+      if (canDerive) {
         const regime = getIrsJovemRegime(target.year)
         if (regime) {
-          const benefitYear = target.year - firstWorkYear + 1
+          const benefitYear = isPre2025
+            ? target.year - degreeYear!
+            : target.year - firstWorkYear! + 1
           if (benefitYear >= 1 && benefitYear <= regime.maxBenefitYears) {
             if (!result.special_regimes.includes('irs_jovem')) {
               result.special_regimes = [...result.special_regimes, 'irs_jovem']
