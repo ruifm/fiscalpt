@@ -512,4 +512,50 @@ describe('analysisFlowReducer', () => {
       expect(next.issues).toHaveLength(1)
     })
   })
+
+  describe('DEFAULTS_USED warning via CALC_SUCCESS', () => {
+    it('carries DEFAULTS_USED warning from extraIssues through to state.issues', () => {
+      const defaultsWarning = makeIssue('DEFAULTS_USED', 'Using defaults')
+      const prev: AnalysisFlowState = {
+        ...INITIAL_STATE,
+        calculating: true,
+      }
+
+      const next = analysisFlowReducer(prev, {
+        type: 'CALC_SUCCESS',
+        payload: {
+          results: [makeResult()],
+          households: [makeHousehold()],
+          newIssues: [defaultsWarning],
+        },
+      })
+
+      expect(next.issues).toHaveLength(1)
+      expect(next.issues[0].code).toBe('DEFAULTS_USED')
+      expect(next.issues[0].severity).toBe('warning')
+    })
+
+    it('preserves DEFAULTS_USED alongside spouse-missing warning', () => {
+      const spouseWarning = makeIssue('SPOUSE_MISSING', 'Spouse docs missing')
+      const defaultsWarning = makeIssue('DEFAULTS_USED', 'Using defaults')
+      const prev: AnalysisFlowState = {
+        ...INITIAL_STATE,
+        issues: [spouseWarning],
+        calculating: true,
+      }
+
+      const next = analysisFlowReducer(prev, {
+        type: 'CALC_SUCCESS',
+        payload: {
+          results: [makeResult()],
+          households: [makeHousehold()],
+          newIssues: [defaultsWarning],
+        },
+      })
+
+      expect(next.issues).toHaveLength(2)
+      expect(next.issues.map((i) => i.code)).toContain('SPOUSE_MISSING')
+      expect(next.issues.map((i) => i.code)).toContain('DEFAULTS_USED')
+    })
+  })
 })
