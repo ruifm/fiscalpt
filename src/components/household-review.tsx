@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,18 +21,15 @@ import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type {
   Household,
-  Person,
-  Income,
-  Dependent,
   FilingStatus,
   IncomeCategory,
   DeductionCategory,
-  SpecialRegime,
   ValidationIssue,
 } from '@/lib/tax/types'
 import { sanitizeNumber } from '@/lib/tax/input-validation'
 import { formatEuro } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
+import { useHouseholdMutations } from '@/hooks/use-household-mutations'
 
 interface HouseholdReviewProps {
   household: Household
@@ -65,84 +62,23 @@ export function HouseholdReview({
   onBack,
 }: HouseholdReviewProps) {
   const t = useT()
-  const [household, setHousehold] = useState<Household>({ ...initial })
+  const defaultDependentName = useCallback((n: number) => t('review.defaultDependent', { n }), [t])
+  const {
+    household,
+    updateMember,
+    addIncome,
+    removeIncome,
+    updateIncome,
+    addDeduction,
+    removeDeduction,
+    toggleRegime,
+    addDependent,
+    removeDependent,
+    updateDependent,
+    updateYear,
+    updateFilingStatus,
+  } = useHouseholdMutations(initial, defaultDependentName)
   const [editing, setEditing] = useState(false)
-
-  function updateMember(index: number, updated: Person) {
-    const members = [...household.members]
-    members[index] = updated
-    setHousehold({ ...household, members })
-  }
-
-  function addIncome(memberIdx: number) {
-    const member = { ...household.members[memberIdx] }
-    member.incomes = [...member.incomes, { category: 'A' as IncomeCategory, gross: 0 }]
-    updateMember(memberIdx, member)
-  }
-
-  function removeIncome(memberIdx: number, incomeIdx: number) {
-    const member = { ...household.members[memberIdx] }
-    member.incomes = member.incomes.filter((_, i) => i !== incomeIdx)
-    updateMember(memberIdx, member)
-  }
-
-  function updateIncome(memberIdx: number, incomeIdx: number, updated: Income) {
-    const member = { ...household.members[memberIdx] }
-    const incomes = [...member.incomes]
-    incomes[incomeIdx] = updated
-    member.incomes = incomes
-    updateMember(memberIdx, member)
-  }
-
-  function addDeduction(memberIdx: number) {
-    const member = { ...household.members[memberIdx] }
-    member.deductions = [
-      ...member.deductions,
-      { category: 'general' as DeductionCategory, amount: 0 },
-    ]
-    updateMember(memberIdx, member)
-  }
-
-  function removeDeduction(memberIdx: number, dedIdx: number) {
-    const member = { ...household.members[memberIdx] }
-    member.deductions = member.deductions.filter((_, i) => i !== dedIdx)
-    updateMember(memberIdx, member)
-  }
-
-  function toggleRegime(memberIdx: number, regime: SpecialRegime) {
-    const member = { ...household.members[memberIdx] }
-    const has = member.special_regimes.includes(regime)
-    member.special_regimes = has
-      ? member.special_regimes.filter((r) => r !== regime)
-      : [...member.special_regimes, regime]
-    updateMember(memberIdx, member)
-  }
-
-  function addDependent() {
-    setHousehold({
-      ...household,
-      dependents: [
-        ...household.dependents,
-        {
-          name: t('review.defaultDependent', { n: household.dependents.length + 1 }),
-          birth_year: 2020,
-        },
-      ],
-    })
-  }
-
-  function removeDependent(index: number) {
-    setHousehold({
-      ...household,
-      dependents: household.dependents.filter((_, i) => i !== index),
-    })
-  }
-
-  function updateDependent(index: number, updated: Dependent) {
-    const dependents = [...household.dependents]
-    dependents[index] = updated
-    setHousehold({ ...household, dependents })
-  }
 
   const totalGross = household.members.reduce(
     (sum, m) => sum + m.incomes.reduce((s, i) => s + i.gross, 0),
@@ -244,12 +180,7 @@ export function HouseholdReview({
                     min={2021}
                     max={2025}
                     value={household.year}
-                    onChange={(e) =>
-                      setHousehold({
-                        ...household,
-                        year: parseInt(e.target.value) || household.year,
-                      })
-                    }
+                    onChange={(e) => updateYear(parseInt(e.target.value) || household.year)}
                     className="h-8"
                   />
                 </div>
@@ -260,12 +191,7 @@ export function HouseholdReview({
                   <select
                     id="edit-filing"
                     value={household.filing_status}
-                    onChange={(e) =>
-                      setHousehold({
-                        ...household,
-                        filing_status: e.target.value as FilingStatus,
-                      })
-                    }
+                    onChange={(e) => updateFilingStatus(e.target.value as FilingStatus)}
                     className="flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
                   >
                     <option value="single">{t('review.filing.single')}</option>
