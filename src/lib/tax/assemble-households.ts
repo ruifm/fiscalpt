@@ -152,6 +152,7 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
     household: Household
     nif: string
     nifConjuge?: string
+    isJointDeclaration?: boolean
     issues: ValidationIssue[]
   }> = []
 
@@ -164,6 +165,7 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
         household: uf.parsedXml.household,
         nif: uf.nif ?? uf.parsedXml.raw.subjectA_nif,
         nifConjuge: uf.nifConjuge ?? uf.parsedXml.raw.subjectB_nif,
+        isJointDeclaration: uf.parsedXml.raw.isJointDeclaration,
         issues: uf.parsedXml.issues,
       })
     }
@@ -209,7 +211,8 @@ export function assembleHouseholds(input: AssemblyInput): AssemblyResult {
     // When only one declaration uploaded for a married household,
     // strip the empty spouse placeholder — we can't compute joint filing
     // or show aggregate results without real spouse data.
-    if (first.nifConjuge && household.members.length >= 2) {
+    // Joint declarations (Q05B01=S) have both spouses' data in one XML — keep both.
+    if (first.nifConjuge && household.members.length >= 2 && !first.isJointDeclaration) {
       household.spouse_data_incomplete = true
       household.members = [household.members[0]]
     }

@@ -88,6 +88,7 @@ export interface ParsedXmlResult {
     // Anexos present in declaration
     anexosPresent: string[]
     iban?: string // Q09C01
+    isJointDeclaration?: boolean // Q05B01=S: Subject B present in the same XML
   }
   issues: ValidationIssue[]
 }
@@ -172,6 +173,7 @@ interface RostoData {
   sharedCustodyDependents: ParsedDependentRaw[]
   godchildren: ParsedDependentRaw[]
   ascendants: ParsedAscendantRaw[]
+  isJointDeclaration: boolean
 }
 
 function parseRosto(doc: Document, _issues: ValidationIssue[]): RostoData {
@@ -184,6 +186,7 @@ function parseRosto(doc: Document, _issues: ValidationIssue[]): RostoData {
   // Q05B01 = "Existe Sujeito Passivo B?" (S/N) — NOT a disability flag
   // Q05C03 = Subject B NIF (present when Q05B01=S in joint declarations)
   // Q05C01 = SP A disability degree (0 or absent = no disability)
+  const hasSubjectB = getText(doc, 'Q05B01') === 'S'
   const disabilitySPA = getInt(doc, 'Q05C01') || 0
 
   // Q05SPB sub-section for SP B disability
@@ -271,6 +274,7 @@ function parseRosto(doc: Document, _issues: ValidationIssue[]): RostoData {
     sharedCustodyDependents,
     godchildren,
     ascendants,
+    isJointDeclaration: hasSubjectB,
   }
 }
 
@@ -1114,6 +1118,7 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
       catAIncomeCodes,
       anexosPresent,
       iban,
+      isJointDeclaration: rosto.isJointDeclaration,
     },
     issues,
   }

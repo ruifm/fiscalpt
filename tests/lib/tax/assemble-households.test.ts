@@ -1278,6 +1278,101 @@ describe('assembleHouseholds', () => {
         expect(hh.members).toHaveLength(2)
       }
     })
+
+    it('preserves both members from a single joint declaration XML', () => {
+      const h = makeHousehold({
+        year: 2023,
+        members: [
+          makePerson({
+            name: 'Alice',
+            nif: '111222333',
+            incomes: [{ category: 'A', gross: 40000 }],
+          }),
+          makePerson({
+            name: 'Bob',
+            nif: '444555666',
+            incomes: [
+              { category: 'A', gross: 30000 },
+              { category: 'A', gross: 5000 },
+            ],
+          }),
+        ],
+        filing_status: 'married_separate',
+        dependents: [{ name: 'Charlie', birth_year: 2018 }],
+      })
+      const parsedXml = makeParsedXml(h, '111222333', '444555666')
+      parsedXml.raw.isJointDeclaration = true
+      const declFile: AssemblyFile = {
+        fileName: 'joint-decl.xml',
+        status: 'done',
+        nif: '111222333',
+        nifConjuge: '444555666',
+        year: 2023,
+        parsedXml,
+      }
+      const sections: AssemblySectionFiles = {
+        declaration: [declFile],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const hh = result.households[0]
+        // Joint declaration: both members must be preserved
+        expect(hh.members).toHaveLength(2)
+        expect(hh.members[0].name).toBe('Alice')
+        expect(hh.members[1].name).toBe('Bob')
+        expect(hh.spouse_data_incomplete).toBeUndefined()
+        expect(hh.dependents).toHaveLength(1)
+      }
+    })
+
+    it('preserves zero-income spouse from joint declaration', () => {
+      const h = makeHousehold({
+        year: 2023,
+        members: [
+          makePerson({
+            name: 'Alice',
+            nif: '111222333',
+            incomes: [{ category: 'A', gross: 40000 }],
+          }),
+          makePerson({
+            name: 'Bob',
+            nif: '444555666',
+            incomes: [],
+            deductions: [],
+          }),
+        ],
+        filing_status: 'married_joint',
+      })
+      const parsedXml = makeParsedXml(h, '111222333', '444555666')
+      parsedXml.raw.isJointDeclaration = true
+      const declFile: AssemblyFile = {
+        fileName: 'joint-decl.xml',
+        status: 'done',
+        nif: '111222333',
+        nifConjuge: '444555666',
+        year: 2023,
+        parsedXml,
+      }
+      const sections: AssemblySectionFiles = {
+        declaration: [declFile],
+        liquidacao: [],
+        previousYears: [],
+      }
+      const result = assembleHouseholds(baseInput(sections))
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const hh = result.households[0]
+        // Even zero-income spouse from joint declaration must be preserved
+        expect(hh.members).toHaveLength(2)
+        expect(hh.members[1].name).toBe('Bob')
+        expect(hh.spouse_data_incomplete).toBeUndefined()
+      }
+    })
   })
 
   describe('comprovativo and deduction year mismatch', () => {
