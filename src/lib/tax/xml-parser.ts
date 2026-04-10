@@ -180,19 +180,21 @@ function parseRosto(doc: Document, _issues: ValidationIssue[]): RostoData {
   const subjectA_name = getText(doc, 'Q03SPA') || `Titular ${subjectA_nif}`
   const civilStatus = getInt(doc, 'Q04B01') || 3
 
-  // Q05: Disability — Q05B01 = SP A has disability (S/N), Q05C01 = degree
-  const hasDisabilitySPA = getBool(doc, 'Q05B01')
-  const disabilityDegreeSPA = getInt(doc, 'Q05C01')
-  // When disability is indicated but no degree, assume minimum qualifying (60%)
-  const disabilitySPA = hasDisabilitySPA ? disabilityDegreeSPA || 60 : 0
+  // Q05: Subject B and Disability
+  // Q05B01 = "Existe Sujeito Passivo B?" (S/N) — NOT a disability flag
+  // Q05C03 = Subject B NIF (present when Q05B01=S in joint declarations)
+  // Q05C01 = SP A disability degree (0 or absent = no disability)
+  const disabilitySPA = getInt(doc, 'Q05C01') || 0
 
-  // Q05SPB sub-section for SP B
+  // Q05SPB sub-section for SP B disability
   const q05spb = findElement(doc, 'Q05SPB')
-  const hasDisabilitySPB = q05spb ? getBool(q05spb, 'Q05B02') : undefined
   const disabilityDegreeSPB = q05spb ? getInt(q05spb, 'Q05C02') : undefined
-  const disabilitySPB = hasDisabilitySPB ? disabilityDegreeSPB || 60 : 0
+  const disabilitySPB = disabilityDegreeSPB || 0
 
-  const subjectB_nif = getText(doc, 'Q06C01') || undefined
+  // Subject B NIF: Q05C03 (correct, from Quadro 05) with Q06C01 fallback
+  // Q06C01 is "NIF do outro sujeito passivo do agregado" in Quadro 06 — used by
+  // some older single-filer XMLs that reference the other household member.
+  const subjectB_nif = getText(doc, 'Q05C03') || getText(doc, 'Q06C01') || undefined
   const filingOption = getInt(doc, 'Q08B01') || undefined
   const iban = getText(doc, 'Q09C01') || undefined
 

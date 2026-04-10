@@ -22,9 +22,12 @@ const XML_MARRIED_SEPARATE = `<?xml version="1.0" encoding="UTF-8"?>
       <Q03C01>123456789</Q03C01>
     </Quadro03>
     <Quadro04><Q04B01>1</Q04B01></Quadro04>
-    <Quadro05><Q05B01>N</Q05B01></Quadro05>
+    <Quadro05>
+      <Q05B01>S</Q05B01>
+      <Q05C03>987654321</Q05C03>
+      <Q05SPB></Q05SPB>
+    </Quadro05>
     <Quadro06>
-      <Q06C01>987654321</Q06C01>
       <Rostoq06BT01>
         <Rostoq06BT01-Linha numero="1"><NIF>111222333</NIF></Rostoq06BT01-Linha>
         <Rostoq06BT01-Linha numero="2"><NIF>444555666</NIF></Rostoq06BT01-Linha>
@@ -80,10 +83,11 @@ const XML_MARRIED_JOINT = `<?xml version="1.0" encoding="UTF-8"?>
       <Q03C01>111111111</Q03C01>
     </Quadro03>
     <Quadro04><Q04B01>1</Q04B01></Quadro04>
-    <Quadro05><Q05B01>N</Q05B01></Quadro05>
-    <Quadro06>
-      <Q06C01>222222222</Q06C01>
-    </Quadro06>
+    <Quadro05>
+      <Q05B01>S</Q05B01>
+      <Q05C03>222222222</Q05C03>
+      <Q05SPB></Q05SPB>
+    </Quadro05>
     <Quadro08><Q08B01>2</Q08B01></Quadro08>
   </Rosto>
   <AnexoA>
@@ -501,7 +505,8 @@ describe('XML Parser — Modelo 3 IRS', () => {
       expect(result.household.members).toHaveLength(1)
     })
 
-    it('should parse disability as 0 when Q05B01 is N', () => {
+    it('should parse disability as 0 when no Q05C01 degree present', () => {
+      // XML_MARRIED_SEPARATE has Q05B01=S (has Subject B) but no Q05C01 → no disability
       const result = parseModelo3Xml(XML_MARRIED_SEPARATE)
       expect(result.raw.disabilitySPA).toBe(0)
       expect(result.raw.disabilitySPB).toBe(0)
@@ -523,7 +528,9 @@ describe('XML Parser — Modelo 3 IRS', () => {
       expect(result.household.members[0].disability_degree).toBe(75)
     })
 
-    it('should default SP A disability to 60 when S but no degree', () => {
+    it('should NOT infer disability from Q05B01=S alone (Q05B01 means has Subject B)', () => {
+      // Q05B01=S means "Existe Sujeito Passivo B?" not "has disability"
+      // Without Q05C01 degree, disability is 0
       const xml = `<?xml version="1.0" encoding="UTF-8"?>
       <Modelo3IRSv2026 xmlns="http://www.dgci.gov.pt/2009/Modelo3IRSv2026">
         <Rosto>
@@ -534,8 +541,8 @@ describe('XML Parser — Modelo 3 IRS', () => {
         </Rosto>
       </Modelo3IRSv2026>`
       const result = parseModelo3Xml(xml)
-      expect(result.raw.disabilitySPA).toBe(60)
-      expect(result.household.members[0].disability_degree).toBe(60)
+      expect(result.raw.disabilitySPA).toBe(0)
+      expect(result.household.members[0].disability_degree).toBeUndefined()
     })
 
     it('should parse filing option (Q08B01)', () => {
@@ -546,6 +553,86 @@ describe('XML Parser — Modelo 3 IRS', () => {
     it('should parse IBAN (Q09C01)', () => {
       const result = parseModelo3Xml(XML_MARRIED_SEPARATE)
       expect(result.raw.iban).toBe('PT50002300004562932157094')
+    })
+
+    // ─── Q05C03 Subject B NIF Detection ──────────────────────
+    it('should detect Subject B NIF from Q05C03 in joint declarations', () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Modelo3IRSv2026 xmlns="http://www.dgci.gov.pt/2009/Modelo3IRSv2026">
+        <Rosto>
+          <Quadro02><Q02C01>2023</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>ANA TESTE</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro05>
+            <Q05B01>S</Q05B01>
+            <Q05C03>444555666</Q05C03>
+            <Q05SPB></Q05SPB>
+          </Quadro05>
+          <Quadro08><Q08B01>2</Q08B01></Quadro08>
+        </Rosto>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.raw.subjectB_nif).toBe('444555666')
+      expect(result.household.members).toHaveLength(2)
+      expect(result.household.members[1].nif).toBe('444555666')
+    })
+
+    it('should NOT produce false disability when Q05B01=S in joint declaration', () => {
+      // Q05B01=S means "has Subject B" — must NOT set disability on SP A
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Modelo3IRSv2026 xmlns="http://www.dgci.gov.pt/2009/Modelo3IRSv2026">
+        <Rosto>
+          <Quadro02><Q02C01>2023</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>ANA TESTE</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro05>
+            <Q05B01>S</Q05B01>
+            <Q05C03>444555666</Q05C03>
+            <Q05SPB></Q05SPB>
+          </Quadro05>
+          <Quadro08><Q08B01>1</Q08B01></Quadro08>
+        </Rosto>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.raw.disabilitySPA).toBe(0)
+      expect(result.household.members[0].disability_degree).toBeUndefined()
+    })
+
+    it('should prefer Q05C03 over Q06C01 when both present', () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Modelo3IRSv2026 xmlns="http://www.dgci.gov.pt/2009/Modelo3IRSv2026">
+        <Rosto>
+          <Quadro02><Q02C01>2023</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>ANA TESTE</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro05>
+            <Q05B01>S</Q05B01>
+            <Q05C03>444555666</Q05C03>
+            <Q05SPB></Q05SPB>
+          </Quadro05>
+          <Quadro06><Q06C01>777888999</Q06C01></Quadro06>
+          <Quadro08><Q08B01>1</Q08B01></Quadro08>
+        </Rosto>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.raw.subjectB_nif).toBe('444555666')
+    })
+
+    it('should fall back to Q06C01 when Q05C03 is absent', () => {
+      // Older XMLs or single-filer XMLs may only have Q06C01
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Modelo3IRSv2026 xmlns="http://www.dgci.gov.pt/2009/Modelo3IRSv2026">
+        <Rosto>
+          <Quadro02><Q02C01>2023</Q02C01></Quadro02>
+          <Quadro03><Q03SPA>ANA TESTE</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
+          <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro05><Q05B01>N</Q05B01></Quadro05>
+          <Quadro06><Q06C01>777888999</Q06C01></Quadro06>
+          <Quadro08><Q08B01>1</Q08B01></Quadro08>
+        </Rosto>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.raw.subjectB_nif).toBe('777888999')
     })
 
     it('should parse regular dependents (BT01)', () => {
@@ -1581,17 +1668,17 @@ describe('XML Parser — Modelo 3 IRS', () => {
       expect(result.household.members[0].disability_degree).toBeUndefined()
     })
 
-    it('handles SP B disability = S but no degree (defaults to 60)', () => {
+    it('handles SP B disability flag without degree → no disability', () => {
       const xml = `<Modelo3IRSv2026>
         <Rosto>
           <Quadro02><Q02C01>2025</Q02C01></Quadro02>
           <Quadro03><Q03SPA>PERSON A</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
           <Quadro04><Q04B01>1</Q04B01></Quadro04>
           <Quadro05>
-            <Q05B01>N</Q05B01>
+            <Q05B01>S</Q05B01>
+            <Q05C03>999888777</Q05C03>
             <Q05SPB><Q05B02>S</Q05B02></Q05SPB>
           </Quadro05>
-          <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
           <Quadro08><Q08B01>2</Q08B01></Quadro08>
         </Rosto>
         <AnexoA><Quadro04><AnexoAq04AT01>
@@ -1603,8 +1690,8 @@ describe('XML Parser — Modelo 3 IRS', () => {
       </Modelo3IRSv2026>`
       const result = parseModelo3Xml(xml)
       expect(result.household.members).toHaveLength(2)
-      // SP B has disability S but no degree → defaults to 60
-      expect(result.household.members[1].disability_degree).toBe(60)
+      // Q05B02=S without Q05C02 degree → no disability (AT requires degree)
+      expect(result.household.members[1].disability_degree).toBeUndefined()
     })
 
     it('handles SP B disability = N → 0', () => {
@@ -2431,6 +2518,7 @@ describe('XML Parser — Modelo 3 IRS', () => {
     // Anonymized joint XML based on real AT structure:
     // Subject A (NIF 111222333): Cat A employee + Cat B self-employed + SS
     // Subject B (NIF 999888777): Cat A employee + NHR (Anexo L)
+    // Uses correct Q05C03 for Subject B NIF (real AT joint declarations)
     const jointXml = `<Modelo3IRSv2023>
       <Rosto>
         <Quadro02><Q02C01>2023</Q02C01></Quadro02>
@@ -2439,7 +2527,11 @@ describe('XML Parser — Modelo 3 IRS', () => {
           <Q03C01>111222333</Q03C01>
         </Quadro03>
         <Quadro04><Q04B01>1</Q04B01></Quadro04>
-        <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
+        <Quadro05>
+          <Q05B01>S</Q05B01>
+          <Q05C03>999888777</Q05C03>
+          <Q05SPB></Q05SPB>
+        </Quadro05>
         <Quadro08><Q08B01>2</Q08B01></Quadro08>
       </Rosto>
       <AnexoA>
