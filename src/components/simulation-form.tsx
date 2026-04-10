@@ -13,18 +13,7 @@ import type {
   SimulationPersonInput,
   SimulationResults,
 } from '@/lib/tax/simulation'
-import {
-  Calculator,
-  Minus,
-  Plus,
-  Users,
-  User,
-  Baby,
-  Briefcase,
-  HelpCircle,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react'
+import { Calculator, Minus, Plus, Users, User, Baby, HelpCircle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
@@ -33,7 +22,6 @@ import { cn } from '@/lib/utils'
 export interface PersonFormState {
   birth_year: string
   gross_cat_a: string
-  has_cat_b: boolean
   gross_cat_b: string
   nhr: boolean
 }
@@ -64,7 +52,6 @@ interface SimulationFormProps {
 export const DEFAULT_PERSON: PersonFormState = {
   birth_year: '',
   gross_cat_a: '',
-  has_cat_b: false,
   gross_cat_b: '',
   nhr: false,
 }
@@ -78,10 +65,11 @@ export const DEFAULT_FORM_STATE: SimulationFormState = {
 }
 
 function toPersonInput(state: PersonFormState): SimulationPersonInput {
+  const catB = parseFloat(state.gross_cat_b) || 0
   return {
     birth_year: parseInt(state.birth_year, 10),
     gross_cat_a: parseFloat(state.gross_cat_a) || 0,
-    gross_cat_b: state.has_cat_b ? parseFloat(state.gross_cat_b) || 0 : undefined,
+    gross_cat_b: catB > 0 ? catB : undefined,
     nhr: state.nhr,
   }
 }
@@ -161,16 +149,6 @@ function PersonCard({
   errors: FormErrors['persons'][number]
   t: ReturnType<typeof useT>
 }) {
-  const [catBExpanded, setCatBExpanded] = useState(state.has_cat_b)
-
-  const handleCatBToggle = useCallback(
-    (checked: boolean) => {
-      setCatBExpanded(checked)
-      onChange({ ...state, has_cat_b: checked, gross_cat_b: checked ? state.gross_cat_b : '' })
-    },
-    [state, onChange],
-  )
-
   return (
     <Card size="sm">
       <CardHeader className="pb-3">
@@ -201,77 +179,59 @@ function PersonCard({
           )}
         </div>
 
-        {/* Gross Cat A */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Label htmlFor={`gross-a-${label}`}>{t('simulation.grossCatA')}</Label>
-            <HelpTip text={t('simulation.grossCatAHelp')} />
-          </div>
-          <div className="relative max-w-[200px]">
-            <Input
-              id={`gross-a-${label}`}
-              type="number"
-              inputMode="decimal"
-              placeholder="25000"
-              value={state.gross_cat_a}
-              onChange={(e) => onChange({ ...state, gross_cat_a: e.target.value })}
-              aria-invalid={!!errors.income}
-              aria-describedby={errors.income ? `income-error-${label}` : undefined}
-              className="pr-8"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-              €
-            </span>
-          </div>
-          {errors.income && (
-            <p id={`income-error-${label}`} className="text-xs text-destructive">
-              {errors.income}
-            </p>
-          )}
-        </div>
-
-        {/* Cat B toggle */}
-        <div className="space-y-3">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-sm transition-colors hover:bg-muted/50"
-            onClick={() => handleCatBToggle(!catBExpanded)}
-            aria-expanded={catBExpanded}
-          >
-            <div className="flex items-center gap-2">
-              <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
-              {t('simulation.hasCatB')}
+        {/* Income fields */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* Gross Cat A */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor={`gross-a-${label}`}>{t('simulation.grossCatA')}</Label>
+              <HelpTip text={t('simulation.grossCatAHelp')} />
             </div>
-            {catBExpanded ? (
-              <ChevronUp className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <ChevronDown className="h-4 w-4" aria-hidden="true" />
-            )}
-          </button>
-
-          {catBExpanded && (
-            <div className="space-y-1.5 pl-4 border-l-2 border-primary/20">
-              <div className="flex items-center gap-1.5">
-                <Label htmlFor={`gross-b-${label}`}>{t('simulation.grossCatB')}</Label>
-                <HelpTip text={t('simulation.grossCatBHelp')} />
-              </div>
-              <div className="relative max-w-[200px]">
-                <Input
-                  id={`gross-b-${label}`}
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="10000"
-                  value={state.gross_cat_b}
-                  onChange={(e) => onChange({ ...state, gross_cat_b: e.target.value })}
-                  className="pr-8"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  €
-                </span>
-              </div>
+            <div className="relative">
+              <Input
+                id={`gross-a-${label}`}
+                type="number"
+                inputMode="decimal"
+                placeholder="25000"
+                value={state.gross_cat_a}
+                onChange={(e) => onChange({ ...state, gross_cat_a: e.target.value })}
+                aria-invalid={!!errors.income}
+                aria-describedby={errors.income ? `income-error-${label}` : undefined}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                €
+              </span>
             </div>
-          )}
+          </div>
+
+          {/* Gross Cat B */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor={`gross-b-${label}`}>{t('simulation.grossCatB')}</Label>
+              <HelpTip text={t('simulation.grossCatBHelp')} />
+            </div>
+            <div className="relative">
+              <Input
+                id={`gross-b-${label}`}
+                type="number"
+                inputMode="decimal"
+                placeholder="10000"
+                value={state.gross_cat_b}
+                onChange={(e) => onChange({ ...state, gross_cat_b: e.target.value })}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                €
+              </span>
+            </div>
+          </div>
         </div>
+        {errors.income && (
+          <p id={`income-error-${label}`} className="text-xs text-destructive">
+            {errors.income}
+          </p>
+        )}
 
         {/* NHR toggle */}
         <div className="flex items-center justify-between">
@@ -359,7 +319,7 @@ export function SimulationForm({ onResults, initialState, onStateChange }: Simul
       }
 
       const catA = parseFloat(p.gross_cat_a) || 0
-      const catB = p.has_cat_b ? parseFloat(p.gross_cat_b) || 0 : 0
+      const catB = parseFloat(p.gross_cat_b) || 0
       if (catA <= 0 && catB <= 0) {
         newErrors.persons[i].income = t('simulation.incomeError')
         valid = false
