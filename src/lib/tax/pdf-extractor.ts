@@ -832,7 +832,7 @@ export function comprativoParsedToHousehold(parsed: ComprovativoParsed): {
   }
 
   const members: Person[] = [buildMember('A', 'Sujeito Passivo A')]
-  if (parsed.nifConjuge) {
+  if (parsed.nifConjuge && parsed.tributacaoConjunta) {
     members.push(buildMember('B', 'Sujeito Passivo B'))
   }
 

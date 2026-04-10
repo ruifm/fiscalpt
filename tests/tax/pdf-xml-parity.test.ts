@@ -412,11 +412,11 @@ describe('PDF ↔ XML 2024 detailed parity', () => {
       expect(pdfB.filing_status).not.toBe('single')
     })
 
-    it('both holders create 2 members (holder + spouse placeholder)', () => {
-      expect(xmlA.members).toHaveLength(2)
-      expect(pdfA.members).toHaveLength(2)
-      expect(xmlB.members).toHaveLength(2)
-      expect(pdfB.members).toHaveLength(2)
+    it('separate declarations create 1 member each (no spouse placeholder)', () => {
+      expect(xmlA.members).toHaveLength(1)
+      expect(pdfA.members).toHaveLength(1)
+      expect(xmlB.members).toHaveLength(1)
+      expect(pdfB.members).toHaveLength(1)
     })
   })
 })

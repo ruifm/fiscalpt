@@ -6,6 +6,7 @@ import type {
   ScenarioResult,
   AnalysisResult,
   Optimization,
+  FilingStatus,
 } from './types'
 import { validateHousehold } from './input-validation'
 import {
@@ -750,10 +751,13 @@ function buildScenarioResult(
 
 // ─── Optimization Suggestions ────────────────────────────────
 
-function generateFilingOptimization(scenarios: ScenarioResult[]): Optimization | undefined {
+function generateFilingOptimization(
+  scenarios: ScenarioResult[],
+  currentFilingStatus: FilingStatus,
+): Optimization | undefined {
   if (scenarios.length < 2) return undefined
   const jointVsSeparateDiff = scenarios[1].total_irs - scenarios[0].total_irs
-  if (jointVsSeparateDiff > SCENARIO_DIFF_THRESHOLD) {
+  if (jointVsSeparateDiff > SCENARIO_DIFF_THRESHOLD && currentFilingStatus !== 'married_joint') {
     return {
       id: 'joint-filing',
       title: 'Tributação Conjunta',
@@ -761,7 +765,10 @@ function generateFilingOptimization(scenarios: ScenarioResult[]): Optimization |
       estimated_savings: round2(jointVsSeparateDiff),
     }
   }
-  if (jointVsSeparateDiff < -SCENARIO_DIFF_THRESHOLD) {
+  if (
+    jointVsSeparateDiff < -SCENARIO_DIFF_THRESHOLD &&
+    currentFilingStatus !== 'married_separate'
+  ) {
     return {
       id: 'separate-filing',
       title: 'Tributação Separada',
@@ -940,7 +947,7 @@ export function analyzeHousehold(household: Household, options?: AnalyzeOptions)
   // Generate all optimization suggestions
   const optimizations: Optimization[] = []
 
-  const filingOpt = generateFilingOptimization(scenarios)
+  const filingOpt = generateFilingOptimization(scenarios, household.filing_status)
   if (filingOpt) optimizations.push(filingOpt)
 
   const irsJovem = generateIrsJovemOptimizations(household)

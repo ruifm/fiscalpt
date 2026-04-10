@@ -17,10 +17,12 @@ import type {
 //   3 = não casado(a)    — single/divorced/widowed
 export type CivilStatus = 1 | 2 | 3 | 4 | 5 | 6
 
-// ─── Filing Option (Q08B01) ────────────────────────────────
-//   1 = tributação separada  — separate filing
-//   2 = tributação conjunta  — joint filing
-export type FilingOption = 1 | 2
+// ─── Declaration Nature (Q08B01) ────────────────────────────
+//   1 = primeira declaração    — first declaration for this tax year
+//   2 = declaração de substituição — replacement/amendment declaration
+// NOTE: Q08B01 does NOT control joint vs separate taxation.
+// Filing mode is determined by Q05B01: S = joint (has Subject B), absent/N = separate.
+export type DeclarationNature = 1 | 2
 
 // ─── Parsed raw data ───────────────────────────────────────
 
@@ -77,7 +79,7 @@ export interface ParsedXmlResult {
     englobamento?: boolean // Q05B01: S/N (deprecated — was mislabeled, now disability)
     disabilitySPA?: number // Q05: SP A disability degree (0 = none)
     disabilitySPB?: number // Q05: SP B disability degree (0 = none)
-    filingOption?: number // Q08B01: 1=separate, 2=joint
+    filingOption?: number // Q08B01: 1=primeira declaração, 2=substituição
     dependents: ParsedDependentRaw[]
     godchildren: ParsedDependentRaw[] // BT03
     ascendants: ParsedAscendantRaw[]
@@ -734,16 +736,20 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
     subjectB_nif,
     filingOption,
     iban,
+    isJointDeclaration,
   } = rosto
 
-  // Filing status: use Q08B01 if available, else infer from civil status
+  // Filing status: determined by declaration structure, NOT Q08B01.
+  // Joint declaration (Q05B01=S → isJointDeclaration) means both spouses
+  // filed together → married_joint. A single-filer XML with spouse NIF
+  // (Q06C01) but no Subject B means married_separate.
   const isMarriedOrUnion = civilStatus === 1 || civilStatus === 2
   let filingStatus: FilingStatus = 'single'
-  if (isMarriedOrUnion && subjectB_nif) {
-    if (filingOption === 2) {
+  if (isMarriedOrUnion) {
+    if (isJointDeclaration) {
       filingStatus = 'married_joint'
-    } else {
-      // Q08B01=1 or absent → default to separate for married
+    } else if (subjectB_nif) {
+      // Has spouse NIF but not a joint declaration → separate filing
       filingStatus = 'married_separate'
     }
   }
@@ -758,8 +764,10 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
     disability_degree: disabilitySPA || undefined,
   }
 
+  // Only create personB for joint declarations where both spouses' data is present.
+  // In married_separate, the spouse filed their own declaration — Q06C01 is just a reference.
   const personB: Person | null =
-    isMarriedOrUnion && subjectB_nif
+    isMarriedOrUnion && isJointDeclaration && subjectB_nif
       ? {
           name: `Titular B (${subjectB_nif})`,
           nif: subjectB_nif,

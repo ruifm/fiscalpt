@@ -1881,10 +1881,10 @@ describe('Joint filing — Art. 81 Double Taxation Credit', () => {
 // ─── Optimization suggestions (coverage L806, englobamento, NHR revocation) ─
 
 describe('Optimization suggestions', () => {
-  it('suggests joint filing when it saves money', () => {
+  it('suggests joint filing when filing separately and joint saves money', () => {
     const household: Household = {
       year: 2025,
-      filing_status: 'married_joint',
+      filing_status: 'married_separate',
       members: [
         {
           name: 'High',
@@ -1911,22 +1911,20 @@ describe('Optimization suggestions', () => {
     expect(filingOpt!.estimated_savings).toBeGreaterThan(0)
   })
 
-  it('suggests separate filing when incomes are very unequal', () => {
-    // When one spouse earns very little and the other very high,
-    // separate can be better (mínimo de existência for low earner)
+  it('does NOT suggest joint filing when household already married_joint', () => {
     const household: Household = {
       year: 2025,
       filing_status: 'married_joint',
       members: [
         {
-          name: 'VeryHigh',
-          incomes: [{ category: 'A', gross: 120000, ss_paid: 13200 }],
+          name: 'High',
+          incomes: [{ category: 'A', gross: 60000, ss_paid: 6600 }],
           deductions: [],
           special_regimes: [],
         },
         {
-          name: 'VeryLow',
-          incomes: [{ category: 'A', gross: 5000, ss_paid: 550 }],
+          name: 'Low',
+          incomes: [{ category: 'A', gross: 10000, ss_paid: 1100 }],
           deductions: [],
           special_regimes: [],
         },
@@ -1934,11 +1932,38 @@ describe('Optimization suggestions', () => {
       dependents: [],
     }
     const result = analyzeHousehold(household)
-    // One of the filing optimizations should appear
+    // Joint IS better here, but we're already filing jointly → no suggestion
+    const jointOpt = result.optimizations.find((o) => o.id === 'joint-filing')
+    expect(jointOpt).toBeUndefined()
+  })
+
+  it('does NOT suggest filing change when incomes are equal (negligible difference)', () => {
+    const household: Household = {
+      year: 2025,
+      filing_status: 'married_separate',
+      members: [
+        {
+          name: 'Person1',
+          incomes: [{ category: 'A', gross: 30000, ss_paid: 3300 }],
+          deductions: [],
+          special_regimes: [],
+        },
+        {
+          name: 'Person2',
+          incomes: [{ category: 'A', gross: 30000, ss_paid: 3300 }],
+          deductions: [],
+          special_regimes: [],
+        },
+      ],
+      dependents: [],
+    }
+    const result = analyzeHousehold(household)
+    // With equal incomes, joint and separate produce the same IRS,
+    // so no filing optimization should appear
     const filingOpt = result.optimizations.find(
       (o) => o.id === 'joint-filing' || o.id === 'separate-filing',
     )
-    expect(filingOpt).toBeDefined()
+    expect(filingOpt).toBeUndefined()
   })
 
   it('suggests englobamento when marginal rate < 28%', () => {

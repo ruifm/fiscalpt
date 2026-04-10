@@ -488,15 +488,54 @@ describe('XML Parser — Modelo 3 IRS', () => {
       expect(result.raw.civilStatus).toBe(1)
     })
 
-    it('Q08B01=1 → married_separate filing', () => {
+    it('joint declaration (Q05B01=S) → married_joint regardless of Q08B01', () => {
+      // XML_MARRIED_SEPARATE has Q05B01=S (has Subject B) + Q08B01=1
+      // Q08B01 is declaration nature (1=primeira, 2=substituição), NOT filing mode
       const result = parseModelo3Xml(XML_MARRIED_SEPARATE)
-      expect(result.household.filing_status).toBe('married_separate')
+      expect(result.household.filing_status).toBe('married_joint')
     })
 
-    it('Q08B01=2 → married_joint filing', () => {
+    it('joint declaration with Q08B01=2 → still married_joint', () => {
       const result = parseModelo3Xml(XML_MARRIED_JOINT)
       expect(result.household.filing_status).toBe('married_joint')
       expect(result.household.members).toHaveLength(2)
+    })
+
+    it('single-filer married (Q05B01 absent, Q06C01 spouse NIF) → married_separate', () => {
+      // A married person filing separately: no Q05B01=S, but Q06C01 references spouse
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Modelo3IRSv2026 xmlns="http://www.dgci.gov.pt/2009/Modelo3IRSv2026">
+        <Rosto>
+          <Quadro02><Q02C01>2025</Q02C01></Quadro02>
+          <Quadro03>
+            <Q03SPA>JOAO SILVA</Q03SPA>
+            <Q03C01>123456789</Q03C01>
+          </Quadro03>
+          <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro06>
+            <Q06C01>987654321</Q06C01>
+          </Quadro06>
+          <Quadro08><Q08B01>1</Q08B01></Quadro08>
+        </Rosto>
+        <AnexoA>
+          <Quadro04>
+            <AnexoAq04AT01>
+              <AnexoAq04AT01-Linha numero="1">
+                <NIF>500100200</NIF>
+                <CodRendimentos>401</CodRendimentos>
+                <Titular>A</Titular>
+                <Rendimentos>35000.00</Rendimentos>
+                <Retencoes>7000.00</Retencoes>
+                <Contribuicoes>3850.00</Contribuicoes>
+                <Quotizacoes>0.00</Quotizacoes>
+              </AnexoAq04AT01-Linha>
+            </AnexoAq04AT01>
+          </Quadro04>
+        </AnexoA>
+      </Modelo3IRSv2026>`
+      const result = parseModelo3Xml(xml)
+      expect(result.household.filing_status).toBe('married_separate')
+      expect(result.household.members).toHaveLength(1)
     })
 
     it('Q04B01=3 → single filing', () => {
@@ -1557,6 +1596,7 @@ describe('XML Parser — Modelo 3 IRS', () => {
           <Rostoq02><AnoIRS>2024</AnoIRS></Rostoq02>
           <Rostoq03><NIF>111222333</NIF><Nome>PersonA</Nome></Rostoq03>
           <Rostoq04><Q04B01>1</Q04B01></Rostoq04>
+          <Quadro05><Q05B01>S</Q05B01><Q05C03>222333444</Q05C03></Quadro05>
           <Quadro06>
             <Q06C01>222333444</Q06C01>
           </Quadro06>
@@ -1695,13 +1735,15 @@ describe('XML Parser — Modelo 3 IRS', () => {
     })
 
     it('handles SP B disability = N → 0', () => {
+      // Joint declaration with Q05B01=S so personB is created
       const xml = `<Modelo3IRSv2026>
         <Rosto>
           <Quadro02><Q02C01>2025</Q02C01></Quadro02>
           <Quadro03><Q03SPA>PERSON A</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
           <Quadro04><Q04B01>1</Q04B01></Quadro04>
           <Quadro05>
-            <Q05B01>N</Q05B01>
+            <Q05B01>S</Q05B01>
+            <Q05C03>999888777</Q05C03>
             <Q05SPB><Q05B02>N</Q05B02></Q05SPB>
           </Quadro05>
           <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
@@ -1909,11 +1951,13 @@ describe('XML Parser — Modelo 3 IRS', () => {
   describe('Anexo B — person B assignment and activity year', () => {
     it('assigns Anexo B to person B when titular NIF (Q03C05) matches', () => {
       // Real AT XML: Q03C01 = Subject A NIF (always), Q03C05 = titular NIF
+      // Joint declarations always have Q05B01=S with Subject B data
       const xml = `<Modelo3IRSv2026>
         <Rosto>
           <Quadro02><Q02C01>2025</Q02C01></Quadro02>
           <Quadro03><Q03SPA>PERSON A</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
           <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro05><Q05B01>S</Q05B01><Q05C03>999888777</Q05C03></Quadro05>
           <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
           <Quadro08><Q08B01>2</Q08B01></Quadro08>
         </Rosto>
@@ -2387,11 +2431,13 @@ describe('XML Parser — Modelo 3 IRS', () => {
 
     it('sets NHR on person B when Anexo L titular NIF (Q03C03) matches SP B', () => {
       // Real AT XML: Q03C01 = Subject A NIF (always), Q03C03 = NHR titular NIF
+      // Joint declarations always have Q05B01=S with Subject B data
       const xml = `<Modelo3IRSv2026>
         <Rosto>
           <Quadro02><Q02C01>2025</Q02C01></Quadro02>
           <Quadro03><Q03SPA>PERSON A</Q03SPA><Q03C01>111222333</Q03C01></Quadro03>
           <Quadro04><Q04B01>1</Q04B01></Quadro04>
+          <Quadro05><Q05B01>S</Q05B01><Q05C03>999888777</Q05C03></Quadro05>
           <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
           <Quadro08><Q08B01>2</Q08B01></Quadro08>
         </Rosto>
@@ -2795,11 +2841,13 @@ describe('XML Parser — Modelo 3 IRS', () => {
       expect(result.raw.dependents[1].nif).toBe('777888999')
     })
 
-    it('married_separate filing with Q08B01=1', () => {
-      const xmlSeparate = jointXml.replace('<Q08B01>2</Q08B01>', '<Q08B01>1</Q08B01>')
-      const result = parseModelo3Xml(xmlSeparate)
-      expect(result.household.filing_status).toBe('married_separate')
-      // Still detects both members even with separate filing
+    it('Q08B01 does not affect filing status — joint declaration stays married_joint', () => {
+      // Q08B01 is declaration nature (1=primeira, 2=substituição), NOT filing mode
+      // Changing Q08B01 from 2 to 1 should NOT change filing_status
+      const xmlFirstDecl = jointXml.replace('<Q08B01>2</Q08B01>', '<Q08B01>1</Q08B01>')
+      const result = parseModelo3Xml(xmlFirstDecl)
+      // Still married_joint because Q05B01=S (isJointDeclaration)
+      expect(result.household.filing_status).toBe('married_joint')
       expect(result.household.members).toHaveLength(2)
     })
   })
