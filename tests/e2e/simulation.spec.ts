@@ -76,12 +76,10 @@ test.describe('Simulação Rápida', () => {
     await expect(results.getByText(/poupança/i).first()).toBeVisible()
   })
 
-  test('Cat B expansion — fill freelance income', async ({ page }) => {
+  test('Cat B — fill freelance income', async ({ page }) => {
     await fillBirthYear(page, 'Contribuinte', '1985')
     await fillGrossCatA(page, 'Contribuinte', '20000')
 
-    // Expand Cat B section
-    await page.getByRole('button', { name: /independente/i }).click()
     await fillGrossCatB(page, 'Contribuinte', '15000')
 
     await clickCalculate(page)
