@@ -925,6 +925,17 @@ const en: DictShape<PtDict> = {
 
     checkoutTitle: 'Unlock Recommendations',
     checkoutCancel: 'Cancel',
+    stripeEmailNote:
+      'The email requested next is required by Stripe, our payment processor. FiscalPT does not store or need your email.',
+
+    // No-optimizations state
+    noOptTitle: 'Optimized Declaration',
+    noOptDescription:
+      'We did not identify additional optimizations. Your tax situation is already well configured.',
+    aiAssistantTitle: 'AI Tax Assistant',
+    chatQuestion: 'Have questions about your declaration or want to explore alternative scenarios?',
+    chatCta: 'Consult AI tax assistant · €9.99',
+    unlockFree: 'Unlock for free',
 
     unlockedTitle: 'Personalized Recommendations',
     yearLabel: 'Year {year}',

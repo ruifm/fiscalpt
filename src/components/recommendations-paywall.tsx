@@ -22,6 +22,7 @@ import type {
   ActionableRecommendation,
 } from '@/lib/tax/actionable-recommendations'
 import { getAmendableYears } from '@/lib/tax/upload-validation'
+import { useT } from '@/lib/i18n'
 
 const CheckoutForm = dynamic(
   () => import('@/components/checkout-form').then((mod) => mod.CheckoutForm),
@@ -66,6 +67,7 @@ export function RecommendationsPaywall({
   baselineResults,
   chatSlot,
 }: RecommendationsPaywallProps) {
+  const t = useT()
   // Only show recommendations for amendable + projected years
   // For recommendations: use baselineResults (current/un-optimized) when provided
   // so the engine generates correct IRS Jovem / filing recommendations
@@ -114,25 +116,25 @@ export function RecommendationsPaywall({
 
       try {
         const verifyRes = await fetch(`/api/checkout/verify?session_id=${sessionId}`)
-        if (!verifyRes.ok) throw new Error('Pagamento não verificado')
+        if (!verifyRes.ok) throw new Error(t('paywall.paymentNotVerified'))
 
         const recRes = await fetch('/api/recommendations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId, results: actionableResults }),
         })
-        if (!recRes.ok) throw new Error('Erro ao gerar recomendações')
+        if (!recRes.ok) throw new Error(t('paywall.recommendationsError'))
 
         const data = (await recRes.json()) as { recommendations: ActionableReport[] }
         setRecommendations(data.recommendations)
         onUnlock?.(data.recommendations)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro desconhecido')
+        setError(err instanceof Error ? err.message : t('paywall.unknownError'))
       } finally {
         setLoading(false)
       }
     },
-    [actionableResults, onUnlock],
+    [actionableResults, onUnlock, t],
   )
 
   const validateDiscount = useCallback(async () => {
@@ -151,7 +153,11 @@ export function RecommendationsPaywall({
       const data = (await res.json()) as DiscountValidation & { error?: string }
 
       if (!res.ok) {
-        setDiscountStatus({ checking: false, result: null, error: data.error ?? 'Erro' })
+        setDiscountStatus({
+          checking: false,
+          result: null,
+          error: data.error ?? t('paywall.discountError'),
+        })
         return
       }
 
@@ -162,9 +168,13 @@ export function RecommendationsPaywall({
         setShowCheckout(true)
       }
     } catch {
-      setDiscountStatus({ checking: false, result: null, error: 'Erro ao validar código' })
+      setDiscountStatus({
+        checking: false,
+        result: null,
+        error: t('paywall.discountValidationError'),
+      })
     }
-  }, [discountCode])
+  }, [discountCode, t])
 
   // No actionable optimizations — show congrats + chat-only checkout
   if (totalSavings <= 0 || actionableResults.length === 0) {
@@ -181,10 +191,9 @@ export function RecommendationsPaywall({
                 />
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold">Declaração otimizada</h3>
+                <h3 className="text-xl font-bold">{t('paywall.noOptTitle')}</h3>
                 <p className="text-muted-foreground max-w-md mx-auto">
-                  Não identificámos otimizações adicionais. A sua situação fiscal já está bem
-                  configurada.
+                  {t('paywall.noOptDescription')}
                 </p>
               </div>
               {chatSlot}
@@ -202,16 +211,13 @@ export function RecommendationsPaywall({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />
-                  <h3 className="font-semibold">Assistente Fiscal AI</h3>
+                  <h3 className="font-semibold">{t('paywall.aiAssistantTitle')}</h3>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setShowCheckout(false)}>
-                  Cancelar
+                  {t('paywall.checkoutCancel')}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                O email pedido a seguir é exigido pelo Stripe, o nosso processador de pagamentos. O
-                FiscalPT não armazena nem necessita do seu email.
-              </p>
+              <p className="text-xs text-muted-foreground">{t('paywall.stripeEmailNote')}</p>
               <CheckoutForm
                 analysisId={analysisId}
                 sessionHash={sessionHash}
@@ -236,19 +242,16 @@ export function RecommendationsPaywall({
               />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-bold">Declaração otimizada</h3>
+              <h3 className="text-xl font-bold">{t('paywall.noOptTitle')}</h3>
               <p className="text-muted-foreground max-w-md mx-auto">
-                Não identificámos otimizações adicionais. A sua situação fiscal já está bem
-                configurada.
+                {t('paywall.noOptDescription')}
               </p>
             </div>
             <div className="border-t pt-5 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Tem dúvidas sobre a sua declaração ou quer explorar cenários alternativos?
-              </p>
+              <p className="text-sm text-muted-foreground">{t('paywall.chatQuestion')}</p>
               <Button variant="outline" className="gap-2" onClick={() => setShowCheckout(true)}>
                 <Sparkles className="h-4 w-4" aria-hidden="true" />
-                Consultar assistente fiscal AI · €9,99
+                {t('paywall.chatCta')}
               </Button>
             </div>
           </CardContent>
@@ -275,7 +278,7 @@ export function RecommendationsPaywall({
               aria-hidden="true"
             />
             <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-              A gerar as suas recomendações...
+              {t('paywall.generating')}
             </p>
           </CardContent>
         </Card>
@@ -292,7 +295,7 @@ export function RecommendationsPaywall({
               {error}
             </p>
             <Button variant="outline" size="sm" className="mt-3" onClick={() => setError(null)}>
-              Tentar novamente
+              {t('paywall.tryAgain')}
             </Button>
           </CardContent>
         </Card>
@@ -308,16 +311,13 @@ export function RecommendationsPaywall({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Unlock className="h-5 w-5 text-primary" aria-hidden="true" />
-                <h3 className="font-semibold">Desbloquear Recomendações</h3>
+                <h3 className="font-semibold">{t('paywall.checkoutTitle')}</h3>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setShowCheckout(false)}>
-                Cancelar
+                {t('paywall.checkoutCancel')}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              O email pedido a seguir é exigido pelo Stripe, o nosso processador de pagamentos. O
-              FiscalPT não armazena nem necessita do seu email.
-            </p>
+            <p className="text-xs text-muted-foreground">{t('paywall.stripeEmailNote')}</p>
             <CheckoutForm
               analysisId={analysisId}
               sessionHash={sessionHash}
@@ -339,10 +339,10 @@ export function RecommendationsPaywall({
   const optimizationCount = actionableResults.reduce((sum, r) => sum + r.optimizations.length, 0)
 
   const buttonLabel = hasFullDiscount
-    ? 'Desbloquear gratuitamente'
+    ? t('paywall.unlockFree')
     : hasValidPartialDiscount
-      ? `Desbloquear com desconto de ${discountPercent}%`
-      : 'Desbloquear por €9,99'
+      ? t('paywall.unlockWithDiscount', { percent: String(discountPercent) })
+      : t('paywall.unlockPrice')
 
   return (
     <div ref={containerRef}>
@@ -353,32 +353,34 @@ export function RecommendationsPaywall({
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-xl font-bold">Recomendações Personalizadas</h3>
+            <h3 className="text-xl font-bold">{t('paywall.title')}</h3>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Identificámos{' '}
-              <span className="font-semibold text-foreground">
-                {optimizationCount} {optimizationCount === 1 ? 'otimização' : 'otimizações'}
-              </span>{' '}
-              para o seu agregado. Desbloqueie o guia passo-a-passo para implementar cada uma.
+              {t('paywall.description', {
+                count: String(optimizationCount),
+                label:
+                  optimizationCount === 1
+                    ? t('paywall.optimizationSingular')
+                    : t('paywall.optimizationPlural'),
+              })}
             </p>
           </div>
 
           <ul className="text-sm text-muted-foreground space-y-1.5 max-w-xs mx-auto text-left">
             <li className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
-              Instruções passo-a-passo no Portal das Finanças
+              {t('paywall.featureSteps')}
             </li>
             <li className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
-              Impacto estimado de cada alteração
+              {t('paywall.featureImpact')}
             </li>
             <li className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
-              Links diretos para os formulários relevantes
+              {t('paywall.featureLinks')}
             </li>
             <li className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
-              Consultor fiscal AI para tirar dúvidas
+              {t('paywall.featureChat')}
             </li>
           </ul>
 
@@ -397,12 +399,12 @@ export function RecommendationsPaywall({
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
               >
                 <Tag className="inline h-3 w-3 mr-1" aria-hidden="true" />
-                Tem um código de desconto?
+                {t('paywall.hasDiscount')}
               </button>
             ) : (
               <div className="flex items-center justify-center gap-2 max-w-xs mx-auto">
                 <label htmlFor="discount-code" className="sr-only">
-                  Código de desconto
+                  {t('paywall.discountLabel')}
                 </label>
                 <input
                   ref={discountInputRef}
@@ -416,7 +418,7 @@ export function RecommendationsPaywall({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') validateDiscount()
                   }}
-                  placeholder="Código de desconto"
+                  placeholder={t('paywall.discountPlaceholder')}
                   className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary/50"
                 />
                 <Button
@@ -425,7 +427,7 @@ export function RecommendationsPaywall({
                   onClick={validateDiscount}
                   disabled={discountStatus.checking || !discountCode.trim()}
                 >
-                  {discountStatus.checking ? '...' : 'Aplicar'}
+                  {discountStatus.checking ? '...' : t('paywall.discountApply')}
                 </Button>
               </div>
             )}
@@ -451,10 +453,8 @@ export function RecommendationsPaywall({
             )}
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            Pagamento único · Sem subscrição · Reembolso garantido se insatisfeito
-          </p>
-          <p className="text-[10px] text-muted-foreground/70">Powered by Stripe</p>
+          <p className="text-xs text-muted-foreground">{t('paywall.footer')}</p>
+          <p className="text-[10px] text-muted-foreground/70">{t('paywall.poweredBy')}</p>
         </CardContent>
       </Card>
     </div>
@@ -470,13 +470,14 @@ function RecommendationsDisplay({
   reports: ActionableReport[]
   chatSlot?: React.ReactNode
 }) {
+  const t = useT()
   const nonEmptyReports = reports.filter((r) => r.recommendations.length > 0)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Unlock className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-        <h2 className="text-lg font-bold">Recomendações Personalizadas</h2>
+        <h2 className="text-lg font-bold">{t('paywall.unlockedTitle')}</h2>
       </div>
 
       {chatSlot}
@@ -485,7 +486,7 @@ function RecommendationsDisplay({
         <div key={report.year} className="space-y-4">
           {nonEmptyReports.length > 1 && (
             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Ano {report.year}
+              {t('paywall.yearLabel', { year: String(report.year) })}
             </h3>
           )}
 
@@ -507,6 +508,7 @@ function RecommendationCard({
   recommendation: ActionableRecommendation
   index: number
 }) {
+  const t = useT()
   const priorityColor = {
     high: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
     medium: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
@@ -514,9 +516,9 @@ function RecommendationCard({
   }
 
   const priorityLabel = {
-    high: 'Alta',
-    medium: 'Média',
-    low: 'Baixa',
+    high: t('paywall.priorityHigh'),
+    medium: t('paywall.priorityMedium'),
+    low: t('paywall.priorityLow'),
   }
 
   const formatEuro = (n: number) =>
@@ -567,7 +569,7 @@ function RecommendationCard({
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                   >
-                    Abrir no Portal
+                    {t('paywall.openPortal')}
                     <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 )}
@@ -583,6 +585,7 @@ function RecommendationCard({
 // ─── Report a Problem / Refund Request ───────────────────────
 
 function ReportProblemForm() {
+  const t = useT()
   const [expanded, setExpanded] = useState(false)
   const [email, setEmail] = useState('')
   const [description, setDescription] = useState('')
@@ -615,10 +618,8 @@ function ReportProblemForm() {
       <Card className="border-muted">
         <CardContent className="py-5 text-center space-y-2">
           <CheckCircle className="h-6 w-6 text-emerald-500 mx-auto" aria-hidden="true" />
-          <p className="text-sm font-medium">Mensagem enviada</p>
-          <p className="text-xs text-muted-foreground">
-            Iremos analisar a sua situação e responder por email em breve.
-          </p>
+          <p className="text-sm font-medium">{t('paywall.reportSentTitle')}</p>
+          <p className="text-xs text-muted-foreground">{t('paywall.reportSentDescription')}</p>
         </CardContent>
       </Card>
     )
@@ -633,7 +634,7 @@ function ReportProblemForm() {
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
         >
           <MessageSquareWarning className="h-3.5 w-3.5" aria-hidden="true" />
-          As recomendações não são aplicáveis? Reportar um problema
+          {t('paywall.reportLink')}
         </button>
       </div>
     )
@@ -644,16 +645,13 @@ function ReportProblemForm() {
       <CardContent className="py-5 space-y-4">
         <div className="flex items-center gap-2">
           <MessageSquareWarning className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h4 className="text-sm font-semibold">Reportar um problema</h4>
+          <h4 className="text-sm font-semibold">{t('paywall.reportTitle')}</h4>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Se as recomendações não são aplicáveis à sua situação ou contêm erros, descreva o problema
-          abaixo. Analisaremos o caso e, se justificado, processaremos o reembolso.
-        </p>
+        <p className="text-xs text-muted-foreground">{t('paywall.reportDescription')}</p>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label htmlFor="report-email" className="text-xs font-medium">
-              Email de contacto
+              {t('paywall.reportEmailLabel')}
             </label>
             <input
               id="report-email"
@@ -661,20 +659,20 @@ function ReportProblemForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu@email.com"
+              placeholder={t('paywall.reportEmailPlaceholder')}
               className="mt-1 w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary/50"
             />
           </div>
           <div>
             <label htmlFor="report-description" className="text-xs font-medium">
-              Descrição do problema
+              {t('paywall.reportDescriptionLabel')}
             </label>
             <textarea
               id="report-description"
               required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descreva porque as recomendações não são aplicáveis à sua situação..."
+              placeholder={t('paywall.reportDescriptionPlaceholder')}
               rows={3}
               className="mt-1 w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 resize-none"
             />
@@ -685,7 +683,7 @@ function ReportProblemForm() {
               onClick={() => setExpanded(false)}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              Cancelar
+              {t('paywall.reportCancel')}
             </button>
             <Button
               type="submit"
@@ -694,7 +692,7 @@ function ReportProblemForm() {
               className="gap-1.5"
             >
               <Send className="h-3.5 w-3.5" aria-hidden="true" />
-              {sending ? 'A enviar...' : 'Enviar'}
+              {sending ? t('paywall.reportSending') : t('paywall.reportSend')}
             </Button>
           </div>
         </form>

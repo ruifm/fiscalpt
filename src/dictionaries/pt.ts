@@ -937,6 +937,17 @@ const pt = {
     // Checkout state
     checkoutTitle: 'Desbloquear Recomendações',
     checkoutCancel: 'Cancelar',
+    stripeEmailNote:
+      'O email pedido a seguir é exigido pelo Stripe, o nosso processador de pagamentos. O FiscalPT não armazena nem necessita do seu email.',
+
+    // No-optimizations state
+    noOptTitle: 'Declaração otimizada',
+    noOptDescription:
+      'Não identificámos otimizações adicionais. A sua situação fiscal já está bem configurada.',
+    aiAssistantTitle: 'Assistente Fiscal AI',
+    chatQuestion: 'Tem dúvidas sobre a sua declaração ou quer explorar cenários alternativos?',
+    chatCta: 'Consultar assistente fiscal AI · €9,99',
+    unlockFree: 'Desbloquear gratuitamente',
 
     // Unlocked display
     unlockedTitle: 'Recomendações Personalizadas',

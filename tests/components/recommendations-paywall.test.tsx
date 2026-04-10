@@ -4,12 +4,10 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('@/lib/i18n', () => ({
-  useT:
-    () =>
-    (key: string, params?: Record<string, unknown>) => {
-      if (params) return `${key}:${JSON.stringify(params)}`
-      return key
-    },
+  useT: () => (key: string, params?: Record<string, unknown>) => {
+    if (params) return `${key}:${JSON.stringify(params)}`
+    return key
+  },
 }))
 
 vi.mock('next/dynamic', () => ({
@@ -95,30 +93,24 @@ describe('RecommendationsPaywall', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('shows locked state with paywall heading when savings > 0', () => {
-    render(
-      <RecommendationsPaywall results={[makeResult()]} totalSavings={500} />,
-    )
-    expect(screen.getByText('Recomendações Personalizadas')).toBeDefined()
-    expect(screen.getByText(/Desbloquear por €9,99/)).toBeDefined()
+    render(<RecommendationsPaywall results={[makeResult()]} totalSavings={500} />)
+    expect(screen.getByText('paywall.title')).toBeDefined()
+    expect(screen.getByText('paywall.unlockPrice')).toBeDefined()
   })
 
   it('shows optimized state when no savings', () => {
     const result = makeResult()
     result.optimizations = []
-    render(
-      <RecommendationsPaywall results={[result]} totalSavings={0} />,
-    )
-    expect(screen.getByText('Declaração otimizada')).toBeDefined()
+    render(<RecommendationsPaywall results={[result]} totalSavings={0} />)
+    expect(screen.getByText('paywall.noOptTitle')).toBeDefined()
   })
 
   it('shows discount code toggle', async () => {
     const user = userEvent.setup()
-    render(
-      <RecommendationsPaywall results={[makeResult()]} totalSavings={500} />,
-    )
-    const discountBtn = screen.getByRole('button', { name: /código de desconto/i })
+    render(<RecommendationsPaywall results={[makeResult()]} totalSavings={500} />)
+    const discountBtn = screen.getByRole('button', { name: /paywall\.hasDiscount/i })
     expect(discountBtn).toBeDefined()
     await user.click(discountBtn)
-    expect(screen.getByPlaceholderText(/código/i)).toBeDefined()
+    expect(screen.getByPlaceholderText(/paywall\.discountPlaceholder/i)).toBeDefined()
   })
 })
