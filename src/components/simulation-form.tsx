@@ -357,6 +357,12 @@ export function SimulationForm({ onResults, initialState, onStateChange }: Simul
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6" data-testid="simulation-form">
+      {/* Top submit */}
+      <Button type="submit" size="lg" className="w-full gap-2 text-base" disabled={calculating}>
+        <Calculator className="h-4 w-4" aria-hidden="true" />
+        {calculating ? t('simulation.calculating') : t('simulation.calculate')}
+      </Button>
+
       {/* Filing Status */}
       <Card size="sm">
         <CardHeader className="pb-3">

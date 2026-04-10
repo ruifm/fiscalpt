@@ -987,6 +987,7 @@ const en: DictShape<PtDict> = {
     share: 'Share',
     shareCopied: 'Link copied!',
     shareNote: 'The link contains only the entered values, no personal data.',
+    savingsFound: 'Savings identified',
     examplesLabel: 'Or try an example:',
     example_employee: 'Employee',
     example_employee_desc: 'Single, €25k Cat A',

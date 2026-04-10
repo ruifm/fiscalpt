@@ -1002,6 +1002,7 @@ const pt = {
     share: 'Partilhar',
     shareCopied: 'Link copiado!',
     shareNote: 'O link contém apenas os valores inseridos, sem dados pessoais.',
+    savingsFound: 'Poupança identificada',
     examplesLabel: 'Ou experimente com um exemplo:',
     example_employee: 'Trabalhador',
     example_employee_desc: 'Solteiro, €25k Cat A',

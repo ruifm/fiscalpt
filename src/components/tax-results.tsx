@@ -213,8 +213,8 @@ export function TaxResults({
         )}
       </div>
 
-      {/* Teaser CTA — visible only when there are savings and paywall is locked */}
-      {totalSavings > 0 && optimizationCount > 0 && (
+      {/* Teaser CTA — visible when there are savings (paywall locked) */}
+      {totalSavings > 0 && (optimizationCount > 0 || simulationMode) && (
         <a
           href="#recommendations-paywall"
           className="block print:hidden"
@@ -233,12 +233,14 @@ export function TaxResults({
                 </div>
                 <div>
                   <p className="text-sm font-semibold">
-                    {t(
-                      optimizationCount === 1
-                        ? 'paywall.teaserOptimization'
-                        : 'paywall.teaserOptimizations',
-                      { count: optimizationCount },
-                    )}
+                    {simulationMode && optimizationCount === 0
+                      ? t('simulation.savingsFound')
+                      : t(
+                          optimizationCount === 1
+                            ? 'paywall.teaserOptimization'
+                            : 'paywall.teaserOptimizations',
+                          { count: optimizationCount },
+                        )}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {t('paywall.teaserUnlockPrefix')}{' '}
