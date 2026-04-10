@@ -90,7 +90,7 @@ export function SimulationExamples({ onSelect }: SimulationExamplesProps) {
       <p className="mb-3 text-center text-sm text-muted-foreground">
         {t('simulation.examplesLabel')}
       </p>
-      <div className="flex gap-2 overflow-x-auto px-1 pb-2 sm:justify-center">
+      <div className="flex gap-2 overflow-x-auto px-4 pb-2 sm:justify-center">
         {EXAMPLES.map((ex) => {
           const Icon = ex.icon
           return (
