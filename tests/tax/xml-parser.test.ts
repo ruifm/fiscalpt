@@ -2707,5 +2707,100 @@ describe('XML Parser — Modelo 3 IRS', () => {
       // Should still detect NHR on person B via id attribute
       expect(personB.special_regimes).toContain('nhr')
     })
+
+    it('routes Cat E income to correct member via Titular tag', () => {
+      // Add Anexo E with dividends for both members
+      const xmlWithCatE = jointXml.replace(
+        '</Modelo3IRSv2023>',
+        `<AnexoE>
+          <Quadro04>
+            <AnexoEq04AT01>
+              <AnexoEq04AT01-Linha numero="1">
+                <Titular>A</Titular>
+                <NIF>500100200</NIF>
+                <CodRendimentos>E10</CodRendimentos>
+                <Rendimentos>5000</Rendimentos>
+                <Retencoes>1400</Retencoes>
+              </AnexoEq04AT01-Linha>
+              <AnexoEq04AT01-Linha numero="2">
+                <Titular>B</Titular>
+                <NIF>500100200</NIF>
+                <CodRendimentos>E10</CodRendimentos>
+                <Rendimentos>3000</Rendimentos>
+                <Retencoes>840</Retencoes>
+              </AnexoEq04AT01-Linha>
+            </AnexoEq04AT01>
+          </Quadro04>
+        </AnexoE>
+        </Modelo3IRSv2023>`,
+      )
+      const result = parseModelo3Xml(xmlWithCatE)
+      const [personA, personB] = result.household.members
+      const aCatE = personA.incomes.filter((i) => i.category === 'E')
+      const bCatE = personB.incomes.filter((i) => i.category === 'E')
+      expect(aCatE).toHaveLength(1)
+      expect(aCatE[0].gross).toBe(5000)
+      expect(bCatE).toHaveLength(1)
+      expect(bCatE[0].gross).toBe(3000)
+    })
+
+    it('routes Anexo H deductions to correct member via Titular tag', () => {
+      const xmlWithH = jointXml.replace(
+        '</Modelo3IRSv2023>',
+        `<AnexoH>
+          <Quadro06>
+            <AnexoHq06AAT01>
+              <AnexoHq06AAT01-Linha numero="1">
+                <Titular>A</Titular>
+                <Montante>2000</Montante>
+              </AnexoHq06AAT01-Linha>
+            </AnexoHq06AAT01>
+            <AnexoHq06BAT01>
+              <AnexoHq06BAT01-Linha numero="1">
+                <Titular>B</Titular>
+                <Montante>1500</Montante>
+              </AnexoHq06BAT01-Linha>
+            </AnexoHq06BAT01>
+          </Quadro06>
+        </AnexoH>
+        </Modelo3IRSv2023>`,
+      )
+      const result = parseModelo3Xml(xmlWithH)
+      const [personA, personB] = result.household.members
+      // Person A should have alimony deduction
+      expect(personA.deductions.some((d) => d.category === 'alimony')).toBe(true)
+      // Person B should have PPR deduction
+      expect(personB.deductions.some((d) => d.category === 'ppr')).toBe(true)
+    })
+
+    it('parses dependents correctly in joint declaration', () => {
+      // Add dependents using real AT XML element names
+      const xmlWithDependents = jointXml.replace(
+        '<Quadro08>',
+        `<Quadro06>
+          <Rostoq06BT01>
+            <Rostoq06BT01-Linha numero="1">
+              <NIF>444555666</NIF>
+            </Rostoq06BT01-Linha>
+            <Rostoq06BT01-Linha numero="2">
+              <NIF>777888999</NIF>
+            </Rostoq06BT01-Linha>
+          </Rostoq06BT01>
+        </Quadro06>
+        <Quadro08>`,
+      )
+      const result = parseModelo3Xml(xmlWithDependents)
+      expect(result.raw.dependents).toHaveLength(2)
+      expect(result.raw.dependents[0].nif).toBe('444555666')
+      expect(result.raw.dependents[1].nif).toBe('777888999')
+    })
+
+    it('married_separate filing with Q08B01=1', () => {
+      const xmlSeparate = jointXml.replace('<Q08B01>2</Q08B01>', '<Q08B01>1</Q08B01>')
+      const result = parseModelo3Xml(xmlSeparate)
+      expect(result.household.filing_status).toBe('married_separate')
+      // Still detects both members even with separate filing
+      expect(result.household.members).toHaveLength(2)
+    })
   })
 })
