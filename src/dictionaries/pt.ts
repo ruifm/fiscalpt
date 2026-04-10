@@ -1002,6 +1002,17 @@ const pt = {
     share: 'Partilhar',
     shareCopied: 'Link copiado!',
     shareNote: 'O link contém apenas os valores inseridos, sem dados pessoais.',
+    examplesLabel: 'Ou experimente com um exemplo:',
+    example_employee: 'Trabalhador',
+    example_employee_desc: 'Solteiro, €25k Cat A',
+    example_coupleKids: 'Casal com filhos',
+    example_coupleKids_desc: '€30k + €22k, 2 filhos',
+    example_irsJovem: 'IRS Jovem',
+    example_irsJovem_desc: '26 anos, €20k Cat A',
+    example_selfEmployed: 'Recibo verde',
+    example_selfEmployed_desc: 'Solteiro, €35k Cat B',
+    example_mixedCouple: 'Casal misto',
+    example_mixedCouple_desc: '€28k Cat A + €18k Cat B',
   },
 } as const satisfies Dictionary
 

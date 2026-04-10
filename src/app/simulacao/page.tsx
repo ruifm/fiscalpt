@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { SimulationForm } from '@/components/simulation-form'
 import type { SimulationFormState } from '@/components/simulation-form'
+import { SimulationExamples } from '@/components/simulation-examples'
 import { ResultsSkeleton } from '@/components/results-skeleton'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LocaleToggle } from '@/components/locale-toggle'
@@ -205,6 +206,15 @@ export default function SimulacaoPage() {
     })
   }, [_inputs])
 
+  const handleExampleSelect = useCallback((state: SimulationFormState) => {
+    setFormState(state)
+    setFormKey((k) => k + 1)
+    setResults(null)
+    setInputs(null)
+    // Persist the example as form state
+    writeStorage({ version: STORAGE_VERSION, formState: state })
+  }, [])
+
   const handleFormStateChange = useCallback((state: SimulationFormState) => {
     setFormState(state)
     // Preserve existing results when only form state changes
@@ -259,6 +269,9 @@ export default function SimulacaoPage() {
                 </h1>
                 <p className="mt-2 text-muted-foreground">{t('simulation.subtitle')}</p>
               </div>
+
+              {/* Examples */}
+              <SimulationExamples onSelect={handleExampleSelect} />
 
               {/* Form */}
               <SimulationForm

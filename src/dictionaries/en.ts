@@ -987,6 +987,17 @@ const en: DictShape<PtDict> = {
     share: 'Share',
     shareCopied: 'Link copied!',
     shareNote: 'The link contains only the entered values, no personal data.',
+    examplesLabel: 'Or try an example:',
+    example_employee: 'Employee',
+    example_employee_desc: 'Single, €25k Cat A',
+    example_coupleKids: 'Couple with kids',
+    example_coupleKids_desc: '€30k + €22k, 2 kids',
+    example_irsJovem: 'IRS Jovem',
+    example_irsJovem_desc: '26 years old, €20k Cat A',
+    example_selfEmployed: 'Self-employed',
+    example_selfEmployed_desc: 'Single, €35k Cat B',
+    example_mixedCouple: 'Mixed couple',
+    example_mixedCouple_desc: '€28k Cat A + €18k Cat B',
   },
 }
 
