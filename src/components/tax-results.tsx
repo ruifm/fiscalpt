@@ -237,8 +237,15 @@ export function TaxResults({
                 </div>
                 <div>
                   <p className="text-sm font-semibold">
-                    {simulationMode && optimizationCount === 0
-                      ? t('simulation.savingsFound')
+                    {simulationMode
+                      ? optimizationCount === 0
+                        ? t('simulation.savingsFound')
+                        : t(
+                            optimizationCount === 1
+                              ? 'simulation.teaserOptimization'
+                              : 'simulation.teaserOptimizations',
+                            { count: optimizationCount },
+                          )
                       : t(
                           optimizationCount === 1
                             ? 'paywall.teaserOptimization'
@@ -247,16 +254,25 @@ export function TaxResults({
                         )}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {t('paywall.teaserUnlockPrefix')}{' '}
+                    {t(
+                      simulationMode
+                        ? 'simulation.teaserSavingsPrefix'
+                        : 'paywall.teaserUnlockPrefix',
+                    )}{' '}
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                       {formatEuro(totalSavings)}
                     </span>{' '}
-                    <span className="text-primary/70">{t('paywall.teaserChatHint')}</span>
+                    {!simulationMode && (
+                      <span className="text-primary/70">{t('paywall.teaserChatHint')}</span>
+                    )}
+                    {simulationMode && (
+                      <span className="text-primary/70">{t('simulation.teaserSavingsSuffix')}</span>
+                    )}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-1 text-primary text-sm font-medium shrink-0">
-                {t('paywall.teaserCta')}
+                {t(simulationMode ? 'simulation.teaserCta' : 'paywall.teaserCta')}
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </div>
             </CardContent>
