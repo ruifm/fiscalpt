@@ -314,8 +314,15 @@ function parseAnexoB(doc: Document, issues: ValidationIssue[]): ParsedAnexoBRaw[
   const anexoBs = findAllElements(doc, 'AnexoB')
 
   for (const anexoB of anexoBs) {
-    // NIF: from AnexoBq03C01 or the element id
-    const nif = getText(anexoB, 'AnexoBq03C01') || anexoB.getAttribute('id') || ''
+    // AT XML Quadro03 field pattern:
+    // - AnexoBq03C01 = Subject A NIF (ALWAYS, same across all annexes)
+    // - AnexoBq03C05 = titular NIF (the actual owner of this Anexo B)
+    // Priority: C05 (titular) → id attribute → C01 (fallback for single filer)
+    const nif =
+      getText(anexoB, 'AnexoBq03C05') ||
+      anexoB.getAttribute('id') ||
+      getText(anexoB, 'AnexoBq03C01') ||
+      ''
 
     // Q01B01: regime (1=simplified, 2=organized)
     const regimeCode = getInt(anexoB, 'AnexoBq01B01')
@@ -637,12 +644,22 @@ function parseAnexoL(doc: Document): AnexoLLine[] {
 }
 
 /**
- * Detect NHR status from Anexo L header (Q03), independent of income lines.
- * The person identified by AnexoLq03C01 is an NHR holder.
+ * Detect NHR status from Anexo L header (Q03).
+ * The person identified by AnexoLq03C03 is the NHR holder.
+ *
+ * AT XML field pattern in Quadro03:
+ * - AnexoLq03C01 = Subject A NIF (ALWAYS, same across all annexes)
+ * - AnexoLq03C02 = Subject B NIF
+ * - AnexoLq03C03 = NHR titular NIF (the actual owner of the annex)
+ * - <AnexoL id="nif"> = also the titular NIF
+ *
+ * Priority: C03 (titular) → id attribute → C01 (fallback for single filer)
  */
 function parseAnexoLNif(doc: Document): string | null {
-  const nif = getText(doc, 'AnexoLq03C01')
-  return nif || null
+  const anexoLs = findAllElements(doc, 'AnexoL')
+  if (anexoLs.length === 0) return null
+  const el = anexoLs[0]
+  return getText(el, 'AnexoLq03C03') || el.getAttribute('id') || getText(el, 'AnexoLq03C01') || null
 }
 
 // ─── Detect which Anexos are present ────────────────────────
@@ -953,14 +970,20 @@ export function parseModelo3Xml(xmlString: string): ParsedXmlResult {
     nhrTarget.nhr_confirmed = true
   }
 
-  // Anexo L income lines are typically the same income already declared
-  // in Anexo A. Only add them if the person has no Cat A/H income yet
-  // (e.g., when only Anexo L is present without Anexo A).
+  // Anexo L income lines belong to the NHR holder (identified by anexoLNif).
+  // Anexo L lines NEVER have <Titular> tags, so we route by the annex owner.
+  // Only add income if the person has no Cat A/H income yet (Anexo L often
+  // duplicates Anexo A).
   const anexoLLines = safeParseSection('Anexo L', issues, [] as AnexoLLine[], () =>
     parseAnexoL(doc),
   )
   for (const line of anexoLLines) {
-    const target = getTarget(line.titular)
+    // Route to NHR holder if known, otherwise fall back to line.titular
+    const target = anexoLNif
+      ? personB && anexoLNif === subjectB_nif
+        ? personB
+        : personA
+      : getTarget(line.titular)
     const hasCatAIncome = target.incomes.some((i) => i.category === 'A' || i.category === 'H')
     if (!hasCatAIncome) {
       target.incomes.push({

@@ -461,7 +461,7 @@ const XML_ZERO_GROSS_LINES = `<?xml version="1.0" encoding="UTF-8"?>
       </AnexoAq04AT01>
     </Quadro04>
   </AnexoA>
-  <AnexoL id="999888777">
+  <AnexoL>
     <AnexoLq04AT01>
       <AnexoLq04AT01-Linha numero="1"></AnexoLq04AT01-Linha>
       <AnexoLq04AT01-Linha numero="2"></AnexoLq04AT01-Linha>
@@ -1820,7 +1820,8 @@ describe('XML Parser — Modelo 3 IRS', () => {
   })
 
   describe('Anexo B — person B assignment and activity year', () => {
-    it('assigns Anexo B to person B when NIF matches', () => {
+    it('assigns Anexo B to person B when titular NIF (Q03C05) matches', () => {
+      // Real AT XML: Q03C01 = Subject A NIF (always), Q03C05 = titular NIF
       const xml = `<Modelo3IRSv2026>
         <Rosto>
           <Quadro02><Q02C01>2025</Q02C01></Quadro02>
@@ -1829,9 +1830,12 @@ describe('XML Parser — Modelo 3 IRS', () => {
           <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
           <Quadro08><Q08B01>2</Q08B01></Quadro08>
         </Rosto>
-        <AnexoB>
+        <AnexoB id="999888777">
           <Quadro01><AnexoBq01B01>1</AnexoBq01B01></Quadro01>
-          <Quadro03><AnexoBq03C01>999888777</AnexoBq03C01></Quadro03>
+          <Quadro03>
+            <AnexoBq03C01>111222333</AnexoBq03C01>
+            <AnexoBq03C05>999888777</AnexoBq03C05>
+          </Quadro03>
           <Quadro04><AnexoBq04C403>25000</AnexoBq04C403></Quadro04>
         </AnexoB>
       </Modelo3IRSv2026>`
@@ -2294,7 +2298,8 @@ describe('XML Parser — Modelo 3 IRS', () => {
       expect(person.special_regimes).toContain('nhr')
     })
 
-    it('sets NHR on person B when Anexo L NIF matches SP B', () => {
+    it('sets NHR on person B when Anexo L titular NIF (Q03C03) matches SP B', () => {
+      // Real AT XML: Q03C01 = Subject A NIF (always), Q03C03 = NHR titular NIF
       const xml = `<Modelo3IRSv2026>
         <Rosto>
           <Quadro02><Q02C01>2025</Q02C01></Quadro02>
@@ -2309,8 +2314,11 @@ describe('XML Parser — Modelo 3 IRS', () => {
             <Retencoes>0</Retencoes><Contribuicoes>0</Contribuicoes><Quotizacoes>0</Quotizacoes>
           </AnexoAq04AT01-Linha>
         </AnexoAq04AT01></Quadro04></AnexoA>
-        <AnexoL>
-          <Quadro03><AnexoLq03C01>999888777</AnexoLq03C01></Quadro03>
+        <AnexoL id="999888777">
+          <Quadro03>
+            <AnexoLq03C01>111222333</AnexoLq03C01>
+            <AnexoLq03C03>999888777</AnexoLq03C03>
+          </Quadro03>
         </AnexoL>
       </Modelo3IRSv2026>`
       const result = parseModelo3Xml(xml)
@@ -2415,6 +2423,197 @@ describe('XML Parser — Modelo 3 IRS', () => {
       // But it should produce a household with defaults
       const result = parseModelo3Xml(xml)
       expect(result.household.year).toBeDefined()
+    })
+  })
+
+  // ─── Joint Declaration End-to-End Tests ─────────────────────
+  describe('Joint declaration — full parsing', () => {
+    // Anonymized joint XML based on real AT structure:
+    // Subject A (NIF 111222333): Cat A employee + Cat B self-employed + SS
+    // Subject B (NIF 999888777): Cat A employee + NHR (Anexo L)
+    const jointXml = `<Modelo3IRSv2023>
+      <Rosto>
+        <Quadro02><Q02C01>2023</Q02C01></Quadro02>
+        <Quadro03>
+          <Q03SPA>ALICE SANTOS</Q03SPA>
+          <Q03C01>111222333</Q03C01>
+        </Quadro03>
+        <Quadro04><Q04B01>1</Q04B01></Quadro04>
+        <Quadro06><Q06C01>999888777</Q06C01></Quadro06>
+        <Quadro08><Q08B01>2</Q08B01></Quadro08>
+      </Rosto>
+      <AnexoA>
+        <Quadro04>
+          <AnexoAq04AT01>
+            <AnexoAq04AT01-Linha numero="1">
+              <NIF>501648020</NIF>
+              <CodRendimentos>401</CodRendimentos>
+              <Titular>A</Titular>
+              <Rendimentos>28000</Rendimentos>
+              <Retencoes>4500</Retencoes>
+              <Contribuicoes>3080</Contribuicoes>
+              <Quotizacoes>0</Quotizacoes>
+            </AnexoAq04AT01-Linha>
+            <AnexoAq04AT01-Linha numero="2">
+              <NIF>502237740</NIF>
+              <CodRendimentos>401</CodRendimentos>
+              <Titular>B</Titular>
+              <Rendimentos>35000</Rendimentos>
+              <Retencoes>7200</Retencoes>
+              <Contribuicoes>3850</Contribuicoes>
+              <Quotizacoes>0</Quotizacoes>
+            </AnexoAq04AT01-Linha>
+          </AnexoAq04AT01>
+        </Quadro04>
+      </AnexoA>
+      <AnexoB id="111222333">
+        <Quadro01><AnexoBq01B01>1</AnexoBq01B01></Quadro01>
+        <Quadro03>
+          <AnexoBq03C01>111222333</AnexoBq03C01>
+          <AnexoBq03C02>999888777</AnexoBq03C02>
+          <AnexoBq03C05>111222333</AnexoBq03C05>
+        </Quadro03>
+        <Quadro04>
+          <AnexoBq04C403>18000</AnexoBq04C403>
+          <AnexoBq04SomaC01>18000</AnexoBq04SomaC01>
+        </Quadro04>
+        <Quadro06><AnexoBq06C603>2700</AnexoBq06C603></Quadro06>
+      </AnexoB>
+      <AnexoL id="999888777">
+        <Quadro03>
+          <AnexoLq03C01>111222333</AnexoLq03C01>
+          <AnexoLq03C02>999888777</AnexoLq03C02>
+          <AnexoLq03C03>999888777</AnexoLq03C03>
+        </Quadro03>
+        <Quadro04>
+          <AnexoLq04AT01>
+            <AnexoLq04AT01-Linha numero="1">
+              <NIFEntidade>502237740</NIFEntidade>
+              <CodRendimento>401</CodRendimento>
+              <CodAtividadeP2019>25120</CodAtividadeP2019>
+              <Rendimento>35000</Rendimento>
+            </AnexoLq04AT01-Linha>
+          </AnexoLq04AT01>
+          <AnexoLq04BT01/>
+          <AnexoLq04CT01/>
+          <AnexoLq04DT01/>
+        </Quadro04>
+      </AnexoL>
+      <AnexoSS id="111222333">
+        <Quadro03>
+          <AnexoSSq03C06>111222333</AnexoSSq03C06>
+          <AnexoSSq03C07>11930253875</AnexoSSq03C07>
+        </Quadro03>
+        <Quadro04>
+          <AnexoSSq04C403>18000</AnexoSSq04C403>
+        </Quadro04>
+      </AnexoSS>
+    </Modelo3IRSv2023>`
+
+    it('detects both members in joint declaration', () => {
+      const result = parseModelo3Xml(jointXml)
+      expect(result.household.members).toHaveLength(2)
+      expect(result.household.members[0].nif).toBe('111222333')
+      expect(result.household.members[1].nif).toBe('999888777')
+      expect(result.household.filing_status).toBe('married_joint')
+    })
+
+    it('assigns Cat A income to correct members', () => {
+      const result = parseModelo3Xml(jointXml)
+      const [personA, personB] = result.household.members
+      const aCatA = personA.incomes.filter((i) => i.category === 'A')
+      const bCatA = personB.incomes.filter((i) => i.category === 'A')
+      expect(aCatA).toHaveLength(1)
+      expect(aCatA[0].gross).toBe(28000)
+      expect(bCatA).toHaveLength(1)
+      expect(bCatA[0].gross).toBe(35000)
+    })
+
+    it('assigns Cat B to person A (titular of Anexo B)', () => {
+      const result = parseModelo3Xml(jointXml)
+      const [personA, personB] = result.household.members
+      const aCatB = personA.incomes.filter((i) => i.category === 'B')
+      const bCatB = personB.incomes.filter((i) => i.category === 'B')
+      expect(aCatB).toHaveLength(1)
+      expect(aCatB[0].gross).toBe(18000)
+      expect(bCatB).toHaveLength(0)
+    })
+
+    it('assigns NHR to person B (titular of Anexo L)', () => {
+      const result = parseModelo3Xml(jointXml)
+      const [personA, personB] = result.household.members
+      expect(personB.special_regimes).toContain('nhr')
+      expect(personB.nhr_confirmed).toBe(true)
+      expect(personA.special_regimes).not.toContain('nhr')
+    })
+
+    it('routes Anexo L income to NHR holder (person B), not person A', () => {
+      // Anexo L income lines have no <Titular> tag. They should go to
+      // the NHR holder identified by AnexoLq03C03, not default to person A.
+      // But B already has Cat A from Anexo A, so Anexo L won't add duplicate.
+      const result = parseModelo3Xml(jointXml)
+      const [personA, personB] = result.household.members
+      // Person B: Cat A from Anexo A. Anexo L income is deduplicated.
+      expect(personB.incomes.filter((i) => i.category === 'A')).toHaveLength(1)
+      // Person A: Cat A + Cat B only
+      expect(personA.incomes.filter((i) => i.category === 'A')).toHaveLength(1)
+    })
+
+    it('routes Anexo L income to person B when no Anexo A for B', () => {
+      // Remove person B's Anexo A income to test Anexo L fallback
+      const xmlNoAnexoAForB = jointXml.replace(
+        /<AnexoAq04AT01-Linha numero="2">[\s\S]*?<\/AnexoAq04AT01-Linha>/,
+        '',
+      )
+      const result = parseModelo3Xml(xmlNoAnexoAForB)
+      const [personA, personB] = result.household.members
+      // Person B should get Cat A income from Anexo L (since no Anexo A for B)
+      const bCatA = personB.incomes.filter((i) => i.category === 'A')
+      expect(bCatA).toHaveLength(1)
+      expect(bCatA[0].gross).toBe(35000)
+      // Person A still has their Cat A
+      expect(personA.incomes.filter((i) => i.category === 'A')).toHaveLength(1)
+      expect(personA.incomes[0].gross).toBe(28000)
+    })
+
+    it('assigns SS to person A (titular of Anexo SS)', () => {
+      const result = parseModelo3Xml(jointXml)
+      // Anexo SS NIF matches person A
+      expect(result.raw.anexoSS).toHaveLength(1)
+      expect(result.raw.anexoSS[0].nif).toBe('111222333')
+    })
+
+    it('handles Anexo B for person B in joint declaration', () => {
+      // Swap: make person B the Cat B titular
+      const xmlBForPersonB = jointXml
+        .replace(/<AnexoB id="111222333">/, '<AnexoB id="999888777">')
+        .replace(
+          /<AnexoBq03C05>111222333<\/AnexoBq03C05>/,
+          '<AnexoBq03C05>999888777</AnexoBq03C05>',
+        )
+      const result = parseModelo3Xml(xmlBForPersonB)
+      const [personA, personB] = result.household.members
+      expect(personA.incomes.filter((i) => i.category === 'B')).toHaveLength(0)
+      expect(personB.incomes.filter((i) => i.category === 'B')).toHaveLength(1)
+      expect(personB.incomes.filter((i) => i.category === 'B')[0].gross).toBe(18000)
+    })
+
+    it('uses id attribute as fallback when AnexoB C05 field is missing', () => {
+      // Remove C05 field, keep id attribute on AnexoB element
+      const xmlNoC05 = jointXml.replace(/<AnexoBq03C05>111222333<\/AnexoBq03C05>/, '')
+      const result = parseModelo3Xml(xmlNoC05)
+      const [personA] = result.household.members
+      // Should still route to person A via id attribute
+      expect(personA.incomes.filter((i) => i.category === 'B')).toHaveLength(1)
+    })
+
+    it('uses id attribute as fallback when AnexoL C03 field is missing', () => {
+      // Remove C03 field, keep id attribute on AnexoL element
+      const xmlNoC03 = jointXml.replace(/<AnexoLq03C03>999888777<\/AnexoLq03C03>/, '')
+      const result = parseModelo3Xml(xmlNoC03)
+      const [, personB] = result.household.members
+      // Should still detect NHR on person B via id attribute
+      expect(personB.special_regimes).toContain('nhr')
     })
   })
 })
