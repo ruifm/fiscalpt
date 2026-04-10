@@ -82,10 +82,14 @@ export function TaxResults({
       ? deriveResultsView(currentResult, { amendable: true })
       : undefined
   const sorted = [...views].sort((a, b) => a.result.year - b.result.year)
+  const viewSavings = sorted.reduce((sum, { view }) => sum + view.totalSavings, 0)
+  // In simulation mode, use the larger of cross-household savings and per-view savings.
+  // simulationSavings captures regime changes (IRS Jovem/NHR), viewSavings captures
+  // filing strategy + proactive optimizations (PPR, etc.) — they don't overlap.
   const totalSavings =
     simulationMode && simulationSavings != null
-      ? simulationSavings
-      : sorted.reduce((sum, { view }) => sum + view.totalSavings, 0)
+      ? Math.max(simulationSavings, viewSavings)
+      : viewSavings
   const hasProactiveSavings = sorted.some(({ view }) => view.proactiveSavings > 0)
   const optimizationCount = results.reduce((sum, r) => sum + r.optimizations.length, 0)
   const hasMultipleYears = sorted.length > 1
