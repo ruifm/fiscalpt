@@ -999,6 +999,9 @@ const pt = {
     switchToSim: 'Simulação Rápida',
     birthYearError: 'Ano de nascimento inválido',
     incomeError: 'Introduza pelo menos um rendimento',
+    share: 'Partilhar',
+    shareCopied: 'Link copiado!',
+    shareNote: 'O link contém apenas os valores inseridos, sem dados pessoais.',
   },
 } as const satisfies Dictionary
 

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import { ArrowLeft, Sparkles, Printer, Lock, ArrowRight, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Sparkles, Printer, Lock, ArrowRight, AlertTriangle, Share2 } from 'lucide-react'
 import { PdfExportButton } from '@/components/pdf-export-button'
 import { ShareResults } from '@/components/share-results'
 import { TaxChat } from '@/components/tax-chat'
@@ -29,6 +29,7 @@ interface TaxResultsProps {
   issues?: ValidationIssue[]
   onBack: () => void
   onReset: () => void
+  onShare?: () => void
   checkoutSessionId?: string | null
   sessionHash?: string
   returnPath?: string
@@ -43,6 +44,7 @@ export function TaxResults({
   issues = [],
   onBack,
   onReset,
+  onShare,
   checkoutSessionId,
   sessionHash,
   returnPath,
@@ -184,6 +186,12 @@ export function TaxResults({
         <Button variant="outline" onClick={onReset} className="w-full sm:w-auto gap-1.5">
           {t('common.newAnalysis')}
         </Button>
+        {onShare && (
+          <Button variant="outline" onClick={onShare} className="w-full sm:w-auto gap-1.5">
+            <Share2 className="h-4 w-4" aria-hidden="true" />
+            {t('simulation.share')}
+          </Button>
+        )}
       </div>
 
       {/* Teaser CTA — visible only when there are savings and paywall is locked */}
@@ -337,6 +345,12 @@ export function TaxResults({
         <Button variant="outline" onClick={onReset} className="w-full sm:w-auto gap-1.5">
           {t('common.newAnalysis')}
         </Button>
+        {onShare && (
+          <Button variant="outline" onClick={onShare} className="w-full sm:w-auto gap-1.5">
+            <Share2 className="h-4 w-4" aria-hidden="true" />
+            {t('simulation.share')}
+          </Button>
+        )}
       </div>
     </div>
   )

@@ -984,6 +984,9 @@ const en: DictShape<PtDict> = {
     switchToSim: 'Quick Simulation',
     birthYearError: 'Invalid birth year',
     incomeError: 'Enter at least one income',
+    share: 'Share',
+    shareCopied: 'Link copied!',
+    shareNote: 'The link contains only the entered values, no personal data.',
   },
 }
 

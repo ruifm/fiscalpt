@@ -13,6 +13,12 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { LocaleToggle } from '@/components/locale-toggle'
 import { useT } from '@/lib/i18n'
 import type { SimulationInputs, SimulationResults } from '@/lib/tax/simulation'
+import { computeSimulationResults } from '@/lib/tax/simulation'
+import {
+  decodeSimulationInputs,
+  encodeSimulationInputs,
+  inputsToFormState,
+} from '@/lib/tax/simulation-share'
 
 const TaxResults = dynamic(() => import('@/components/tax-results').then((mod) => mod.TaxResults), {
   ssr: false,
@@ -91,6 +97,12 @@ export default function SimulacaoPage() {
     return readStorage()?.pendingCheckoutSessionId ?? null
   })
 
+  // Capture share param from URL (read once, used in mount effect)
+  const [shareParam] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('s')
+  })
+
   // All client-only state starts at defaults to match the server render
   // (avoids hydration mismatch). Restored from localStorage after mount.
   const [results, setResults] = useState<SimulationResults | null>(null)
@@ -99,8 +111,23 @@ export default function SimulacaoPage() {
   const [formKey, setFormKey] = useState(0)
   const resultsRef = useRef<HTMLDivElement>(null)
 
-  // Restore state from localStorage after hydration
+  // Restore state from shared link or localStorage after hydration
   useEffect(() => {
+    // Share param takes priority over localStorage
+    if (shareParam) {
+      const decoded = decodeSimulationInputs(shareParam)
+      if (decoded) {
+        const computed = computeSimulationResults(decoded)
+        setResults(computed)
+        setInputs(decoded)
+        setFormState(inputsToFormState(decoded))
+        setFormKey((k) => k + 1)
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname)
+        return
+      }
+    }
+
     if (stored?.results) {
       setResults(stored.results)
       setInputs(stored.inputs ?? null)
@@ -155,6 +182,28 @@ export default function SimulacaoPage() {
       writeStorage({ ...current, pendingCheckoutSessionId: null })
     }
   }, [])
+
+  const [shareCopied, setShareCopied] = useState(false)
+
+  const handleShare = useCallback(() => {
+    if (!_inputs) return
+    const encoded = encodeSimulationInputs(_inputs)
+    const url = `${window.location.origin}/simulacao?s=${encoded}`
+
+    // Try Web Share API first (mobile), fall back to clipboard
+    if (navigator.share) {
+      navigator.share({ title: 'FiscalPT — Simulação', url }).catch(() => {
+        // User cancelled or share failed — fall back to clipboard
+        void navigator.clipboard.writeText(url)
+      })
+      return
+    }
+
+    void navigator.clipboard.writeText(url).then(() => {
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    })
+  }, [_inputs])
 
   const handleFormStateChange = useCallback((state: SimulationFormState) => {
     setFormState(state)
@@ -231,6 +280,7 @@ export default function SimulacaoPage() {
                 issues={[]}
                 onBack={handleBack}
                 onReset={handleReset}
+                onShare={handleShare}
                 checkoutSessionId={checkoutSessionId}
                 returnPath="/simulacao"
                 onPaywallUnlock={handlePaywallUnlock}
@@ -238,6 +288,16 @@ export default function SimulacaoPage() {
                 simulationSavings={results.total_savings}
                 currentResult={results.current}
               />
+
+              {/* Share feedback */}
+              {shareCopied && (
+                <p className="mt-2 text-center text-sm font-medium text-green-600 dark:text-green-400">
+                  ✓ {t('simulation.shareCopied')}
+                </p>
+              )}
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                {t('simulation.shareNote')}
+              </p>
 
               {/* Conversion CTA — full analysis */}
               <div className="mt-8">
