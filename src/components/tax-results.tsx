@@ -2,7 +2,16 @@
 
 import { useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import { ArrowLeft, Sparkles, Printer, Lock, ArrowRight, AlertTriangle, Share2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  Sparkles,
+  Printer,
+  Lock,
+  ArrowRight,
+  AlertTriangle,
+  Share2,
+  Check,
+} from 'lucide-react'
 import { PdfExportButton } from '@/components/pdf-export-button'
 import { ShareResults } from '@/components/share-results'
 import { TaxChat } from '@/components/tax-chat'
@@ -30,6 +39,7 @@ interface TaxResultsProps {
   onBack: () => void
   onReset: () => void
   onShare?: () => void
+  shareCopied?: boolean
   checkoutSessionId?: string | null
   sessionHash?: string
   returnPath?: string
@@ -45,6 +55,7 @@ export function TaxResults({
   onBack,
   onReset,
   onShare,
+  shareCopied,
   checkoutSessionId,
   sessionHash,
   returnPath,
@@ -187,9 +198,17 @@ export function TaxResults({
           {t('common.newAnalysis')}
         </Button>
         {onShare && (
-          <Button variant="outline" onClick={onShare} className="w-full sm:w-auto gap-1.5">
-            <Share2 className="h-4 w-4" aria-hidden="true" />
-            {t('simulation.share')}
+          <Button
+            variant={shareCopied ? 'default' : 'outline'}
+            onClick={onShare}
+            className="w-full sm:w-auto gap-1.5"
+          >
+            {shareCopied ? (
+              <Check className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Share2 className="h-4 w-4" aria-hidden="true" />
+            )}
+            {shareCopied ? t('simulation.shareCopied') : t('simulation.share')}
           </Button>
         )}
       </div>
@@ -346,9 +365,17 @@ export function TaxResults({
           {t('common.newAnalysis')}
         </Button>
         {onShare && (
-          <Button variant="outline" onClick={onShare} className="w-full sm:w-auto gap-1.5">
-            <Share2 className="h-4 w-4" aria-hidden="true" />
-            {t('simulation.share')}
+          <Button
+            variant={shareCopied ? 'default' : 'outline'}
+            onClick={onShare}
+            className="w-full sm:w-auto gap-1.5"
+          >
+            {shareCopied ? (
+              <Check className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Share2 className="h-4 w-4" aria-hidden="true" />
+            )}
+            {shareCopied ? t('simulation.shareCopied') : t('simulation.share')}
           </Button>
         )}
       </div>

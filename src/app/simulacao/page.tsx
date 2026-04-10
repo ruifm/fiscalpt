@@ -294,6 +294,7 @@ export default function SimulacaoPage() {
                 onBack={handleBack}
                 onReset={handleReset}
                 onShare={handleShare}
+                shareCopied={shareCopied}
                 checkoutSessionId={checkoutSessionId}
                 returnPath="/simulacao"
                 onPaywallUnlock={handlePaywallUnlock}
@@ -302,12 +303,6 @@ export default function SimulacaoPage() {
                 currentResult={results.current}
               />
 
-              {/* Share feedback */}
-              {shareCopied && (
-                <p className="mt-2 text-center text-sm font-medium text-green-600 dark:text-green-400">
-                  ✓ {t('simulation.shareCopied')}
-                </p>
-              )}
               <p className="mt-2 text-center text-xs text-muted-foreground">
                 {t('simulation.shareNote')}
               </p>
