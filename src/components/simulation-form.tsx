@@ -24,6 +24,7 @@ export interface PersonFormState {
   gross_cat_a: string
   gross_cat_b: string
   nhr: boolean
+  first_work_year: string
 }
 
 export interface SimulationFormState {
@@ -38,6 +39,7 @@ interface FormErrors {
   persons: Array<{
     birth_year?: string
     income?: string
+    first_work_year?: string
   }>
 }
 
@@ -54,6 +56,7 @@ export const DEFAULT_PERSON: PersonFormState = {
   gross_cat_a: '',
   gross_cat_b: '',
   nhr: false,
+  first_work_year: '',
 }
 
 export const DEFAULT_FORM_STATE: SimulationFormState = {
@@ -66,11 +69,13 @@ export const DEFAULT_FORM_STATE: SimulationFormState = {
 
 function toPersonInput(state: PersonFormState): SimulationPersonInput {
   const catB = parseFloat(state.gross_cat_b) || 0
+  const firstWorkYear = parseInt(state.first_work_year, 10)
   return {
     birth_year: parseInt(state.birth_year, 10),
     gross_cat_a: parseFloat(state.gross_cat_a) || 0,
     gross_cat_b: catB > 0 ? catB : undefined,
     nhr: state.nhr,
+    first_work_year: !isNaN(firstWorkYear) ? firstWorkYear : undefined,
   }
 }
 
@@ -246,6 +251,38 @@ function PersonCard({
             onCheckedChange={(checked) => onChange({ ...state, nhr: checked })}
           />
         </div>
+
+        {/* First work year — shown when potentially IRS Jovem eligible */}
+        {(() => {
+          const birthYear = parseInt(state.birth_year, 10)
+          const age = !isNaN(birthYear) ? 2025 - birthYear : null
+          return age !== null && age <= 35 && !state.nhr ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor={`first-work-year-${label}`}>{t('simulation.firstWorkYear')}</Label>
+                <HelpTip text={t('simulation.firstWorkYearHelp')} />
+              </div>
+              <Input
+                id={`first-work-year-${label}`}
+                type="number"
+                inputMode="numeric"
+                placeholder="2020"
+                value={state.first_work_year}
+                onChange={(e) => onChange({ ...state, first_work_year: e.target.value })}
+                aria-invalid={!!errors.first_work_year}
+                aria-describedby={
+                  errors.first_work_year ? `first-work-year-error-${label}` : undefined
+                }
+                className="max-w-[140px]"
+              />
+              {errors.first_work_year && (
+                <p id={`first-work-year-error-${label}`} className="text-xs text-destructive">
+                  {errors.first_work_year}
+                </p>
+              )}
+            </div>
+          ) : null
+        })()}
       </CardContent>
     </Card>
   )
@@ -323,6 +360,17 @@ export function SimulationForm({ onResults, initialState, onStateChange }: Simul
       if (catA <= 0 && catB <= 0) {
         newErrors.persons[i].income = t('simulation.incomeError')
         valid = false
+      }
+
+      // Validate first_work_year if provided
+      if (p.first_work_year.trim()) {
+        const fwy = parseInt(p.first_work_year, 10)
+        const birthYear = parseInt(p.birth_year, 10)
+        const minWorkYear = !isNaN(birthYear) ? birthYear + 16 : 1960
+        if (isNaN(fwy) || fwy < minWorkYear || fwy > currentYear) {
+          newErrors.persons[i].first_work_year = t('simulation.firstWorkYearError')
+          valid = false
+        }
       }
     }
 

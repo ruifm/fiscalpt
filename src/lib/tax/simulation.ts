@@ -20,6 +20,8 @@ export interface SimulationPersonInput {
   gross_cat_b?: number
   /** NHR toggle — assume active if checked */
   nhr?: boolean
+  /** First year of work in Portugal — used for IRS Jovem benefit year calc */
+  first_work_year?: number
 }
 
 export interface SimulationInputs {
@@ -128,13 +130,17 @@ function buildPerson(
     person.nhr_confirmed = true
   }
 
-  // IRS Jovem: infer first_work_year from age
+  // IRS Jovem: use provided first_work_year, fall back to age heuristic
   if (enableIrsJovem && !input.nhr) {
-    const age = TAX_YEAR - input.birth_year
-    if (age <= YOUNG_AGE_THRESHOLD) {
-      person.irs_jovem_first_work_year = input.birth_year + YOUNG_START_AGE
+    if (input.first_work_year) {
+      person.irs_jovem_first_work_year = input.first_work_year
     } else {
-      person.irs_jovem_first_work_year = input.birth_year + OLDER_START_AGE
+      const age = TAX_YEAR - input.birth_year
+      if (age <= YOUNG_AGE_THRESHOLD) {
+        person.irs_jovem_first_work_year = input.birth_year + YOUNG_START_AGE
+      } else {
+        person.irs_jovem_first_work_year = input.birth_year + OLDER_START_AGE
+      }
     }
   }
 
@@ -145,9 +151,10 @@ function inferIrsJovemEligible(input: SimulationPersonInput): boolean {
   const age = TAX_YEAR - input.birth_year
   if (age > 35) return false
 
-  // Infer first_work_year
-  const firstWorkYear =
-    age <= YOUNG_AGE_THRESHOLD
+  // Use provided first_work_year, fall back to age heuristic
+  const firstWorkYear = input.first_work_year
+    ? input.first_work_year
+    : age <= YOUNG_AGE_THRESHOLD
       ? input.birth_year + YOUNG_START_AGE
       : input.birth_year + OLDER_START_AGE
   const benefitYear = TAX_YEAR - firstWorkYear + 1

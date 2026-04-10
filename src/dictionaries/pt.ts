@@ -991,6 +991,10 @@ const pt = {
     nhr: 'Residente Não Habitual (NHR)?',
     nhrHelp:
       'Se tem estatuto de Residente Não Habitual, taxa fixa de 20% sobre rendimentos qualificados',
+    firstWorkYear: 'Primeiro ano de trabalho em Portugal',
+    firstWorkYearHelp:
+      'Ano em que começou a trabalhar em Portugal. Usado para calcular a elegibilidade ao IRS Jovem. Se deixar em branco, será estimado automaticamente.',
+    firstWorkYearError: 'Ano inválido (mín. 16 anos após nascimento)',
     dependents: 'Dependentes',
     dependentsUnder3: 'Filhos < 3 anos',
     dependents3to6: 'Filhos 3–6 anos',

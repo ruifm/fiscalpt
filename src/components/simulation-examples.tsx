@@ -49,7 +49,7 @@ const EXAMPLES: Array<{
     icon: GraduationCap,
     state: {
       married: false,
-      persons: [person({ birth_year: '1999', gross_cat_a: '20000' })],
+      persons: [person({ birth_year: '1999', gross_cat_a: '20000', first_work_year: '2023' })],
       depsUnder3: 0,
       deps3to6: 0,
       depsOver6: 0,

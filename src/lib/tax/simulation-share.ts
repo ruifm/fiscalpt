@@ -51,6 +51,7 @@ export function inputsToFormState(inputs: SimulationInputs): SimulationFormState
       gross_cat_a: p.gross_cat_a > 0 ? String(p.gross_cat_a) : '',
       gross_cat_b: p.gross_cat_b && p.gross_cat_b > 0 ? String(p.gross_cat_b) : '',
       nhr: p.nhr ?? false,
+      first_work_year: p.first_work_year ? String(p.first_work_year) : '',
     })),
     depsUnder3: inputs.dependents_under_3 ?? 0,
     deps3to6: inputs.dependents_3_to_6 ?? 0,

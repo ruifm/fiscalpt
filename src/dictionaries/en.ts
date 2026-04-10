@@ -976,6 +976,10 @@ const en: DictShape<PtDict> = {
     grossCatBHelp: 'Gross annual self-employment income (recibos verdes)',
     nhr: 'Non-Habitual Resident (NHR)?',
     nhrHelp: 'If you have NHR status, a flat 20% rate applies on qualifying income',
+    firstWorkYear: 'First year working in Portugal',
+    firstWorkYearHelp:
+      'The year you started working in Portugal. Used to calculate IRS Jovem eligibility. Leave blank for automatic estimation.',
+    firstWorkYearError: 'Invalid year (min. 16 years after birth)',
     dependents: 'Dependents',
     dependentsUnder3: 'Children < 3 years',
     dependents3to6: 'Children 3–6 years',

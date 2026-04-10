@@ -95,7 +95,15 @@ describe('simulation-share', () => {
       const state = inputsToFormState(singlePerson)
       expect(state).toEqual({
         married: false,
-        persons: [{ birth_year: '1995', gross_cat_a: '25000', gross_cat_b: '', nhr: false }],
+        persons: [
+          {
+            birth_year: '1995',
+            gross_cat_a: '25000',
+            gross_cat_b: '',
+            nhr: false,
+            first_work_year: '',
+          },
+        ],
         depsUnder3: 0,
         deps3to6: 0,
         depsOver6: 0,

@@ -204,6 +204,37 @@ describe('buildOptimizedSimulationHousehold', () => {
     expect(household.members[0].special_regimes).not.toContain('irs_jovem')
   })
 
+  it('uses explicit first_work_year instead of heuristic', () => {
+    const inputs: SimulationInputs = {
+      married: false,
+      persons: [{ birth_year: 1995, gross_cat_a: 30000, first_work_year: 2022 }],
+      dependents_under_3: 0,
+      dependents_3_to_6: 0,
+      dependents_over_6: 0,
+    }
+
+    const household = buildOptimizedSimulationHousehold(inputs)
+    const person = household.members[0]
+
+    expect(person.special_regimes).toContain('irs_jovem')
+    // Explicit first_work_year = 2022, NOT heuristic (1995 + 23 = 2018)
+    expect(person.irs_jovem_first_work_year).toBe(2022)
+  })
+
+  it('falls back to heuristic when first_work_year is not provided', () => {
+    const inputs: SimulationInputs = {
+      married: false,
+      persons: [{ birth_year: 1995, gross_cat_a: 30000 }], // age 30, no first_work_year
+      dependents_under_3: 0,
+      dependents_3_to_6: 0,
+      dependents_over_6: 0,
+    }
+
+    const household = buildOptimizedSimulationHousehold(inputs)
+    // Heuristic: age > 25 → started at 23 → 1995 + 23 = 2018
+    expect(household.members[0].irs_jovem_first_work_year).toBe(2018)
+  })
+
   it('NHR and IRS Jovem are mutually exclusive — NHR wins', () => {
     const inputs: SimulationInputs = {
       married: false,
