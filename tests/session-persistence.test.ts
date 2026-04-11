@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest'
 
 import {
   saveSessionState,
@@ -470,6 +470,43 @@ describe('graceful degradation when storage is unavailable', () => {
 })
 
 describe('storage fallback cascade', () => {
+  let origLocal: Storage | undefined
+  let origSession: Storage | undefined
+
+  beforeEach(() => {
+    origLocal = globalThis.localStorage
+    origSession = globalThis.sessionStorage
+    // Ensure sessionStorage exists (Node <23 lacks it)
+    if (!origSession) {
+      Object.defineProperty(globalThis, 'sessionStorage', {
+        value: makeStorage(),
+        configurable: true,
+        writable: true,
+      })
+    }
+    // Ensure localStorage exists so we can block it
+    if (!origLocal) {
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: makeStorage(),
+        configurable: true,
+        writable: true,
+      })
+    }
+  })
+
+  afterEach(() => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: origLocal,
+      configurable: true,
+      writable: true,
+    })
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      value: origSession,
+      configurable: true,
+      writable: true,
+    })
+  })
+
   function makeState(): PersistedState {
     return {
       step: 'questionnaire',
@@ -481,39 +518,26 @@ describe('storage fallback cascade', () => {
   }
 
   it('saveSessionState falls back to sessionStorage when localStorage is blocked', () => {
-    const origLocal = globalThis.localStorage
     Object.defineProperty(globalThis, 'localStorage', {
       get() {
         throw new DOMException('Access denied', 'SecurityError')
       },
       configurable: true,
     })
-    try {
-      // Save should succeed via sessionStorage fallback
-      const state = makeState()
-      saveSessionState('fallback-test', state)
-      // Verify it was written to sessionStorage
-      const key = sessionKey('fallback-test')
-      const raw = globalThis.sessionStorage.getItem(key)
-      expect(raw).not.toBeNull()
-      const parsed = JSON.parse(raw!)
-      expect(parsed.step).toBe('questionnaire')
-      // Clean up
-      globalThis.sessionStorage.removeItem(key)
-    } finally {
-      Object.defineProperty(globalThis, 'localStorage', {
-        value: origLocal,
-        configurable: true,
-        writable: true,
-      })
-    }
+
+    const state = makeState()
+    saveSessionState('fallback-test', state)
+    const key = sessionKey('fallback-test')
+    const raw = globalThis.sessionStorage.getItem(key)
+    expect(raw).not.toBeNull()
+    const parsed = JSON.parse(raw!)
+    expect(parsed.step).toBe('questionnaire')
+    globalThis.sessionStorage.removeItem(key)
   })
 
   it('loadSessionState falls back to sessionStorage when localStorage is blocked', () => {
-    const origLocal = globalThis.localStorage
     const key = sessionKey('fallback-load')
     const state = makeState()
-    // Pre-populate sessionStorage
     globalThis.sessionStorage.setItem(key, JSON.stringify(state))
 
     Object.defineProperty(globalThis, 'localStorage', {
@@ -522,17 +546,10 @@ describe('storage fallback cascade', () => {
       },
       configurable: true,
     })
-    try {
-      const loaded = loadSessionState('fallback-load')
-      expect(loaded).not.toBeNull()
-      expect(loaded!.step).toBe('questionnaire')
-    } finally {
-      Object.defineProperty(globalThis, 'localStorage', {
-        value: origLocal,
-        configurable: true,
-        writable: true,
-      })
-      globalThis.sessionStorage.removeItem(key)
-    }
+
+    const loaded = loadSessionState('fallback-load')
+    expect(loaded).not.toBeNull()
+    expect(loaded!.step).toBe('questionnaire')
+    globalThis.sessionStorage.removeItem(key)
   })
 })
