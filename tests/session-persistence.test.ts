@@ -401,3 +401,138 @@ describe('migrateLegacySession', () => {
     expect(result).toBeNull()
   })
 })
+
+describe('graceful degradation when storage is unavailable', () => {
+  function makeState(): PersistedState {
+    return {
+      step: 'questionnaire',
+      households: [makeHousehold()],
+      results: [] as AnalysisResult[],
+      issues: [] as ValidationIssue[],
+      liquidacao: null,
+    }
+  }
+
+  function blockBothStorages(fn: () => void) {
+    const origLocal = globalThis.localStorage
+    const origSession = globalThis.sessionStorage
+    Object.defineProperty(globalThis, 'localStorage', {
+      get() {
+        throw new DOMException('Access denied', 'SecurityError')
+      },
+      configurable: true,
+    })
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      get() {
+        throw new DOMException('Access denied', 'SecurityError')
+      },
+      configurable: true,
+    })
+    try {
+      fn()
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: origLocal,
+        configurable: true,
+        writable: true,
+      })
+      Object.defineProperty(globalThis, 'sessionStorage', {
+        value: origSession,
+        configurable: true,
+        writable: true,
+      })
+    }
+  }
+
+  it('saveSessionState no-ops when both storages throw SecurityError', () => {
+    blockBothStorages(() => {
+      expect(() => saveSessionState('test-id', makeState())).not.toThrow()
+    })
+  })
+
+  it('loadSessionState returns null when both storages throw SecurityError', () => {
+    blockBothStorages(() => {
+      expect(loadSessionState('test-id')).toBeNull()
+    })
+  })
+
+  it('clearSessionState no-ops when both storages throw SecurityError', () => {
+    blockBothStorages(() => {
+      expect(() => clearSessionState('test-id')).not.toThrow()
+    })
+  })
+
+  it('migrateLegacySession returns null when both storages throw SecurityError', () => {
+    blockBothStorages(() => {
+      expect(migrateLegacySession('test-id')).toBeNull()
+    })
+  })
+})
+
+describe('storage fallback cascade', () => {
+  function makeState(): PersistedState {
+    return {
+      step: 'questionnaire',
+      households: [makeHousehold()],
+      results: [] as AnalysisResult[],
+      issues: [] as ValidationIssue[],
+      liquidacao: null,
+    }
+  }
+
+  it('saveSessionState falls back to sessionStorage when localStorage is blocked', () => {
+    const origLocal = globalThis.localStorage
+    Object.defineProperty(globalThis, 'localStorage', {
+      get() {
+        throw new DOMException('Access denied', 'SecurityError')
+      },
+      configurable: true,
+    })
+    try {
+      // Save should succeed via sessionStorage fallback
+      const state = makeState()
+      saveSessionState('fallback-test', state)
+      // Verify it was written to sessionStorage
+      const key = sessionKey('fallback-test')
+      const raw = globalThis.sessionStorage.getItem(key)
+      expect(raw).not.toBeNull()
+      const parsed = JSON.parse(raw!)
+      expect(parsed.step).toBe('questionnaire')
+      // Clean up
+      globalThis.sessionStorage.removeItem(key)
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: origLocal,
+        configurable: true,
+        writable: true,
+      })
+    }
+  })
+
+  it('loadSessionState falls back to sessionStorage when localStorage is blocked', () => {
+    const origLocal = globalThis.localStorage
+    const key = sessionKey('fallback-load')
+    const state = makeState()
+    // Pre-populate sessionStorage
+    globalThis.sessionStorage.setItem(key, JSON.stringify(state))
+
+    Object.defineProperty(globalThis, 'localStorage', {
+      get() {
+        throw new DOMException('Access denied', 'SecurityError')
+      },
+      configurable: true,
+    })
+    try {
+      const loaded = loadSessionState('fallback-load')
+      expect(loaded).not.toBeNull()
+      expect(loaded!.step).toBe('questionnaire')
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: origLocal,
+        configurable: true,
+        writable: true,
+      })
+      globalThis.sessionStorage.removeItem(key)
+    }
+  })
+})

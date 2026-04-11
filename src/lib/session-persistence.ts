@@ -18,6 +18,34 @@ export interface PersistedState {
   liquidacao: LiquidacaoParsed | null
 }
 
+/**
+ * Safely access a Storage object with fallback cascade.
+ * Tries the preferred storage first, then falls back to the other type,
+ * then returns null if both are unavailable.
+ *
+ * This handles cases where localStorage is blocked but sessionStorage
+ * still works (e.g. Safari cross-site tracking prevention).
+ */
+function safeStorage(preferred: 'local' | 'session'): Storage | null {
+  const order: Array<() => Storage> =
+    preferred === 'local'
+      ? [() => globalThis.localStorage, () => globalThis.sessionStorage]
+      : [() => globalThis.sessionStorage, () => globalThis.localStorage]
+
+  for (const getter of order) {
+    try {
+      const s = getter()
+      // Probe with a test write to detect quota/security errors early
+      s.setItem('__fiscalpt_probe__', '1')
+      s.removeItem('__fiscalpt_probe__')
+      return s
+    } catch {
+      // Try next storage type
+    }
+  }
+  return null
+}
+
 export function generateSessionId(): string {
   const bytes = new Uint8Array(16)
   crypto.getRandomValues(bytes)
@@ -42,12 +70,16 @@ export function saveSessionState(
   if (typeof idOrState === 'string') {
     key = sessionKey(idOrState)
     state = stateOrStorage as PersistedState
-    storage = maybeStorage ?? globalThis.localStorage
+    const s = maybeStorage ?? safeStorage('local')
+    if (!s) return
+    storage = s
   } else {
     // Legacy overload: no session ID
     key = SESSION_STORAGE_KEY
     state = idOrState
-    storage = (stateOrStorage as Storage | undefined) ?? globalThis.sessionStorage
+    const s = (stateOrStorage as Storage | undefined) ?? safeStorage('session')
+    if (!s) return
+    storage = s
   }
 
   if (state.step === 'upload' || state.households.length === 0) return
@@ -105,10 +137,14 @@ export function loadSessionState(
 
   if (typeof idOrStorage === 'string') {
     key = sessionKey(idOrStorage)
-    storage = maybeStorage ?? globalThis.localStorage
+    const s = maybeStorage ?? safeStorage('local')
+    if (!s) return null
+    storage = s
   } else {
     key = SESSION_STORAGE_KEY
-    storage = idOrStorage ?? globalThis.sessionStorage
+    const s = idOrStorage ?? safeStorage('session')
+    if (!s) return null
+    storage = s
   }
 
   const raw = storage.getItem(key)
@@ -120,11 +156,11 @@ export function clearSessionState(storage?: Storage): void
 export function clearSessionState(id: string, storage?: Storage): void
 export function clearSessionState(idOrStorage?: string | Storage, maybeStorage?: Storage): void {
   if (typeof idOrStorage === 'string') {
-    const storage = maybeStorage ?? globalThis.localStorage
-    storage.removeItem(sessionKey(idOrStorage))
+    const storage = maybeStorage ?? safeStorage('local')
+    storage?.removeItem(sessionKey(idOrStorage))
   } else {
-    const storage = idOrStorage ?? globalThis.sessionStorage
-    storage.removeItem(SESSION_STORAGE_KEY)
+    const storage = idOrStorage ?? safeStorage('session')
+    storage?.removeItem(SESSION_STORAGE_KEY)
   }
 }
 
@@ -134,18 +170,24 @@ export function clearSessionState(idOrStorage?: string | Storage, maybeStorage?:
  */
 export function migrateLegacySession(
   newId: string,
-  sessionStore: Storage = globalThis.sessionStorage,
-  localStore: Storage = globalThis.localStorage,
+  sessionStore?: Storage | null,
+  localStore?: Storage | null,
 ): PersistedState | null {
-  const raw = sessionStore.getItem(SESSION_STORAGE_KEY)
+  const ss = sessionStore ?? safeStorage('session')
+  if (!ss) return null
+
+  const raw = ss.getItem(SESSION_STORAGE_KEY)
   if (!raw) return null
 
   const state = parsePersistedState(raw)
   if (!state) return null
 
   try {
-    localStore.setItem(sessionKey(newId), JSON.stringify(state))
-    sessionStore.removeItem(SESSION_STORAGE_KEY)
+    const ls = localStore ?? safeStorage('local')
+    if (ls) {
+      ls.setItem(sessionKey(newId), JSON.stringify(state))
+      ss.removeItem(SESSION_STORAGE_KEY)
+    }
   } catch {
     // Storage error — return state anyway, just don't persist
   }
