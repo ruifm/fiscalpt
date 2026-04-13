@@ -125,7 +125,7 @@ export function RecommendationsPaywall({
         if (!verifyRes.ok) throw new Error(t('paywall.paymentNotVerified'))
 
         trackEvent('payment_success')
-        trackConversion('AW-18070272762')
+        trackConversion('AW-18070272762/D88NCJ31wpscEPr1yahD')
 
         const recRes = await fetch('/api/recommendations', {
           method: 'POST',
