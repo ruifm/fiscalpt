@@ -23,6 +23,7 @@ import type {
 } from '@/lib/tax/actionable-recommendations'
 import { getAmendableYears } from '@/lib/tax/upload-validation'
 import { useT } from '@/lib/i18n'
+import { trackEvent, trackConversion } from '@/lib/analytics'
 
 const CheckoutForm = dynamic(
   () => import('@/components/checkout-form').then((mod) => mod.CheckoutForm),
@@ -92,6 +93,11 @@ export function RecommendationsPaywall({
 
   const analysisId = `${results[0]?.year}-${Date.now()}`
 
+  const openCheckout = useCallback(() => {
+    trackEvent('payment_start')
+    setShowCheckout(true)
+  }, [])
+
   useEffect(() => {
     if (checkoutSessionId) {
       window.history.replaceState({}, '', window.location.pathname + window.location.hash)
@@ -117,6 +123,9 @@ export function RecommendationsPaywall({
       try {
         const verifyRes = await fetch(`/api/checkout/verify?session_id=${sessionId}`)
         if (!verifyRes.ok) throw new Error(t('paywall.paymentNotVerified'))
+
+        trackEvent('payment_success')
+        trackConversion('AW-18070272762')
 
         const recRes = await fetch('/api/recommendations', {
           method: 'POST',
@@ -165,7 +174,7 @@ export function RecommendationsPaywall({
 
       // Auto-open checkout when a 100% discount is validated
       if (data.valid && data.discount_percent === 100) {
-        setShowCheckout(true)
+        openCheckout()
       }
     } catch {
       setDiscountStatus({
@@ -174,7 +183,7 @@ export function RecommendationsPaywall({
         error: t('paywall.discountValidationError'),
       })
     }
-  }, [discountCode, t])
+  }, [discountCode, t, openCheckout])
 
   // No actionable optimizations — show congrats + chat-only checkout
   if (totalSavings <= 0 || actionableResults.length === 0) {
@@ -249,7 +258,7 @@ export function RecommendationsPaywall({
             </div>
             <div className="border-t pt-5 space-y-3">
               <p className="text-sm text-muted-foreground">{t('paywall.chatQuestion')}</p>
-              <Button variant="outline" className="gap-2" onClick={() => setShowCheckout(true)}>
+              <Button variant="outline" className="gap-2" onClick={openCheckout}>
                 <Sparkles className="h-4 w-4" aria-hidden="true" />
                 {t('paywall.chatCta')}
               </Button>
@@ -384,7 +393,7 @@ export function RecommendationsPaywall({
             </li>
           </ul>
 
-          <Button size="lg" className="gap-2" onClick={() => setShowCheckout(true)}>
+          <Button size="lg" className="gap-2" onClick={openCheckout}>
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             {buttonLabel}
             <ArrowRight className="h-4 w-4" aria-hidden="true" />

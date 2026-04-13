@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import type { AnalysisResult } from '@/lib/tax/types'
 import type { ActionableReport } from '@/lib/tax/actionable-recommendations'
 import { useLocale, useT } from '@/lib/i18n'
+import { trackEvent } from '@/lib/analytics'
 
 interface PdfExportButtonProps {
   results: AnalysisResult[]
@@ -20,6 +21,7 @@ export function PdfExportButton({ results, unlockedReports }: PdfExportButtonPro
   const primaryYear = results.length > 0 ? results[0].year : new Date().getFullYear()
 
   const handleExport = useCallback(async () => {
+    trackEvent('pdf_exported', { year: primaryYear })
     setLoading(true)
     try {
       const [{ pdf }, { PdfReport }] = await Promise.all([

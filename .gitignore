@@ -40,3 +40,4 @@ npm-debug.log*
 # AI context files (contain local paths and dev preferences)
 AGENTS.md
 CLAUDE.md
+.git.copilot/

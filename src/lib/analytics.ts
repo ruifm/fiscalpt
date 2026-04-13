@@ -7,10 +7,29 @@ export type AnalyticsEventName =
   | 'questionnaire_skip'
   | 'results_viewed'
   | 'pdf_exported'
+  | 'payment_start'
+  | 'payment_success'
   | 'locale_changed'
   | 'theme_changed'
 
-export function trackEvent(_name: AnalyticsEventName, _properties?: Record<string, unknown>): void {
-  // No-op — custom analytics removed. Will be replaced with a proper
-  // analytics provider (Vercel Analytics, PostHog, etc.) in production.
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void
+  }
+}
+
+export function trackEvent(name: AnalyticsEventName, properties?: Record<string, unknown>): void {
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', name, properties)
+  }
+}
+
+/** Fire a Google Ads conversion event. Requires a conversion label from the Dashboard. */
+export function trackConversion(conversionLabel: string, value?: number): void {
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', 'conversion', {
+      send_to: conversionLabel,
+      ...(value != null && { value, currency: 'EUR' }),
+    })
+  }
 }

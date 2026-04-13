@@ -34,6 +34,7 @@ import {
 import { parseDeductionsPageText, type DeductionsParseResult } from '@/lib/tax/deductions-parser'
 import { assembleHouseholds } from '@/lib/tax/assemble-households'
 import { useT } from '@/lib/i18n'
+import { trackEvent } from '@/lib/analytics'
 
 import type { DocumentUploadProps, UploadedFile, SectionFiles, Section, FileMeta } from './types'
 import {
@@ -445,6 +446,7 @@ export function DocumentUpload({ onExtracted }: DocumentUploadProps) {
   }
 
   function processFiles() {
+    trackEvent('upload_start')
     setProcessing(true)
     setValidationError(null)
 

@@ -329,6 +329,7 @@ export function useAnalysisFlow({ sessionId, t }: UseAnalysisFlowOptions) {
         type: 'SET_EXTRACTED',
         payload: { households: hs, issues, liquidacao: liq },
       })
+      trackEvent('questionnaire_start', { householdCount: hs.length })
     },
     [t],
   )
