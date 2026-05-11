@@ -1,0 +1,5 @@
+#!/bin/sh
+# Commit-msg hook: strip Co-authored-by trailers automatically.
+# Install: just install-hooks
+
+sed -i '/^Co-authored-by:/d' "$1"
