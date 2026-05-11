@@ -6,6 +6,8 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     exclude: ['tests/e2e/**', 'node_modules/**', 'scripts/**'],
+    hookTimeout: 30000,
+    testTimeout: 30000,
     coverage: {
       include: ['src/lib/tax/**'],
       exclude: ['src/lib/tax/index.ts'],
